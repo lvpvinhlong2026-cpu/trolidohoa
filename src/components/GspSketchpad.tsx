@@ -33,6 +33,8 @@ export interface GspPoint {
   hidden?: boolean;             // Ẩn hoàn toàn điểm này trên ảnh xuất
   hideDot?: boolean;            // Chỉ ẩn chấm tròn của điểm này
   hideLabel?: boolean;          // Chỉ ẩn chữ nhãn của điểm này
+  labelOffsetX?: number;        // Độ lệch trục X của nhãn chữ so với toạ độ điểm (mặc định 9)
+  labelOffsetY?: number;        // Độ lệch trục Y của nhãn chữ so với toạ độ điểm (mặc định -8)
 }
 
 export interface GspSegment {
@@ -220,6 +222,13 @@ export default function GspSketchpad({
   const [editingPointHideDot, setEditingPointHideDot] = useState<boolean>(false);
   const [editingPointHideLabel, setEditingPointHideLabel] = useState<boolean>(false);
   const [editingPointRatio, setEditingPointRatio] = useState<number>(0.5);
+  const [editingPointLabelOffsetX, setEditingPointLabelOffsetX] = useState<number>(9);
+  const [editingPointLabelOffsetY, setEditingPointLabelOffsetY] = useState<number>(-8);
+
+  // Kéo dời nhãn chữ (Dời text)
+  const [draggedLabelPointId, setDraggedLabelPointId] = useState<string | null>(null);
+  const [hoveredLabelPointId, setHoveredLabelPointId] = useState<string | null>(null);
+  const labelDragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [notice, setNotice] = useState<string | null>(null);
 
   // Kích thước chuẩn khung vẽ logic
@@ -490,14 +499,39 @@ export default function GspSketchpad({
     return nearest;
   };
 
+  // Kiểm tra chuột có trúng nhãn chữ của đỉnh để kéo dời không (Dời text nhãn đỉnh)
+  const findNearbyPointLabel = (x: number, y: number): { point: GspPoint; lx: number; ly: number } | null => {
+    if (pointDisplayMode === 'hidden') return null;
+    for (let i = points.length - 1; i >= 0; i--) {
+      const p = points[i];
+      if (p.hidden || p.hideLabel || !p.label) continue;
+      const lx = p.x + (p.labelOffsetX ?? 9);
+      const ly = p.y + (p.labelOffsetY ?? -8);
+      const w = Math.max(18, p.label.length * 15);
+      const h = 24;
+      if (x >= lx - 6 && x <= lx + w + 6 && y >= ly - h - 4 && y <= ly + 6) {
+        return { point: p, lx, ly };
+      }
+    }
+    return null;
+  };
+
+  // Kiểm tra chuột có đang nhấp sát ngay chấm tròn của điểm không
+  const isStrictlyOnPointDot = (pt: GspPoint, x: number, y: number): boolean => {
+    if (pt.hidden || pt.hideDot || pointDisplayMode === 'labels_only') return false;
+    return Math.hypot(pt.x - x, pt.y - y) <= 8;
+  };
+
   // Tạo điểm mới
-  const createPoint = (x: number, y: number, customLabel?: string): GspPoint => {
+  const createPoint = (x: number, y: number, customLabel?: string, labelOffsetX = 9, labelOffsetY = -8): GspPoint => {
     const pt: GspPoint = {
       id: 'pt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       x,
       y,
       label: customLabel || getNextLabel(points),
-      color: activeColor
+      color: activeColor,
+      labelOffsetX,
+      labelOffsetY
     };
     return pt;
   };
@@ -511,9 +545,10 @@ export default function GspSketchpad({
 
     const nearbyPt = findNearbyPoint(x, y);
     const nearbyTxt = findNearbyText(x, y);
-    const nearbySeg = (!nearbyPt && !nearbyTxt) ? findNearbySegment(x, y) : null;
-    const nearbyEl = (!nearbyPt && !nearbyTxt && !nearbySeg) ? findNearbyEllipse(x, y) : null;
-    const nearbyRa = (!nearbyPt && !nearbyTxt && !nearbySeg && !nearbyEl) ? findNearbyRightAngle(x, y) : null;
+    const nearbyLabel = (!nearbyPt && !nearbyTxt) ? findNearbyPointLabel(x, y) : null;
+    const nearbySeg = (!nearbyPt && !nearbyTxt && !nearbyLabel) ? findNearbySegment(x, y) : null;
+    const nearbyEl = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg) ? findNearbyEllipse(x, y) : null;
+    const nearbyRa = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg && !nearbyEl) ? findNearbyRightAngle(x, y) : null;
 
     let targetType: 'point' | 'segment' | 'ellipse' | 'right_angle' | 'text' | 'canvas' = 'canvas';
     let targetId: string | undefined = undefined;
@@ -522,6 +557,12 @@ export default function GspSketchpad({
       targetType = 'point';
       targetId = nearbyPt.id;
       setSelectedPointId(nearbyPt.id);
+      setSelectedSegmentId(null);
+      setSelectedTextId(null);
+    } else if (nearbyLabel) {
+      targetType = 'point';
+      targetId = nearbyLabel.point.id;
+      setSelectedPointId(nearbyLabel.point.id);
       setSelectedSegmentId(null);
       setSelectedTextId(null);
     } else if (nearbyTxt) {
@@ -614,6 +655,27 @@ export default function GspSketchpad({
         return;
       } else if (!clickedChart && !nearbyPt && !nearbyTxt && !nearbySeg) {
         setSelectedChartId(null);
+      }
+
+      // 3. Kiểm tra nhấp vào Nhãn chữ của đỉnh để kéo dời vị trí nhãn (Dời text nhãn đỉnh)
+      const nearbyLabel = findNearbyPointLabel(x, y);
+      if (nearbyLabel && !isStrictlyOnPointDot(nearbyLabel.point, x, y)) {
+        dragStartSnapshotRef.current = {
+          points: JSON.parse(JSON.stringify(points)),
+          segments: JSON.parse(JSON.stringify(segments)),
+          circles: JSON.parse(JSON.stringify(circles)),
+          ellipses: JSON.parse(JSON.stringify(ellipses)),
+          rightAngles: JSON.parse(JSON.stringify(rightAngles)),
+          texts: JSON.parse(JSON.stringify(texts)),
+          charts: JSON.parse(JSON.stringify(charts))
+        };
+        setDraggedLabelPointId(nearbyLabel.point.id);
+        setSelectedPointId(nearbyLabel.point.id);
+        setSelectedTextId(null);
+        setSelectedSegmentId(null);
+        setSelectedChartId(null);
+        labelDragOffsetRef.current = { dx: x - nearbyLabel.lx, dy: y - nearbyLabel.ly };
+        return;
       }
 
       if (nearbyPt) {
@@ -1092,13 +1154,33 @@ export default function GspSketchpad({
 
     const nearbyPt = findNearbyPoint(x, y);
     const nearbyTxt = findNearbyText(x, y);
-    const nearbySeg = (!nearbyPt && !nearbyTxt) ? findNearbySegment(x, y) : null;
-    const nearbyEl = (!nearbyPt && !nearbyTxt && !nearbySeg) ? findNearbyEllipse(x, y) : null;
+    const nearbyLabel = (!nearbyPt && !nearbyTxt) ? findNearbyPointLabel(x, y) : null;
+    const nearbySeg = (!nearbyPt && !nearbyTxt && !nearbyLabel) ? findNearbySegment(x, y) : null;
+    const nearbyEl = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg) ? findNearbyEllipse(x, y) : null;
 
     setHoveredPointId(nearbyPt ? nearbyPt.id : null);
     setHoveredTextId(nearbyTxt ? nearbyTxt.id : null);
+    setHoveredLabelPointId(nearbyLabel ? nearbyLabel.point.id : null);
     setHoveredSegmentId(nearbySeg ? nearbySeg.id : null);
     setHoveredEllipseId(nearbyEl ? nearbyEl.id : null);
+
+    // Kéo dời vị trí nhãn tên đỉnh (Dời text nhãn đỉnh)
+    if (draggedLabelPointId) {
+      const offset = labelDragOffsetRef.current;
+      setPoints(prev => prev.map(p => {
+        if (p.id === draggedLabelPointId) {
+          const newLx = x - offset.dx;
+          const newLy = y - offset.dy;
+          return {
+            ...p,
+            labelOffsetX: Math.round(newLx - p.x),
+            labelOffsetY: Math.round(newLy - p.y)
+          };
+        }
+        return p;
+      }));
+      return;
+    }
 
     // Bắt điểm trên đoạn thẳng khi đang dùng công cụ 'point_on_segment' hoặc 'point'
     let snapTarget: { segId: string; x: number; y: number; t: number; p1Id: string; p2Id: string } | null = null;
@@ -1205,7 +1287,7 @@ export default function GspSketchpad({
       setChartDragState(null);
       saveSnapshot();
     }
-    if (draggedPointId || draggedTextId) {
+    if (draggedPointId || draggedTextId || draggedLabelPointId) {
       if (dragStartSnapshotRef.current) {
         setHistory(prev => [...prev.slice(-25), dragStartSnapshotRef.current!]);
         setRedoStack([]);
@@ -1213,6 +1295,7 @@ export default function GspSketchpad({
       }
       setDraggedPointId(null);
       setDraggedTextId(null);
+      setDraggedLabelPointId(null);
     }
   };
 
@@ -1240,14 +1323,18 @@ export default function GspSketchpad({
       return;
     }
 
-    // 2. Nhấp đúp vào Điểm đã có -> Đổi tên đỉnh, bật/tắt hiển thị và điều chỉnh vị trí trên cạnh
+    // 2. Nhấp đúp vào Điểm đã có hoặc Nhãn tên đỉnh -> Đổi tên đỉnh, vị trí nhãn, bật/tắt hiển thị và điều chỉnh vị trí trên cạnh
     const nearbyPt = findNearbyPoint(x, y);
-    if (nearbyPt) {
-      setEditingPoint(nearbyPt);
-      setNewLabelInput(nearbyPt.label);
-      setEditingPointHideDot(!!nearbyPt.hideDot);
-      setEditingPointHideLabel(!!nearbyPt.hideLabel);
-      setEditingPointRatio(nearbyPt.ratio ?? 0.5);
+    const nearbyLabel = (!nearbyPt) ? findNearbyPointLabel(x, y) : null;
+    const targetPt = nearbyPt || nearbyLabel?.point;
+    if (targetPt) {
+      setEditingPoint(targetPt);
+      setNewLabelInput(targetPt.label);
+      setEditingPointHideDot(!!targetPt.hideDot);
+      setEditingPointHideLabel(!!targetPt.hideLabel);
+      setEditingPointRatio(targetPt.ratio ?? 0.5);
+      setEditingPointLabelOffsetX(targetPt.labelOffsetX ?? 9);
+      setEditingPointLabelOffsetY(targetPt.labelOffsetY ?? -8);
       return;
     }
 
@@ -1525,10 +1612,10 @@ export default function GspSketchpad({
 
     } else if (presetType === 'pyramid_regular_quad' || presetType === 'pyramid_s_abcd') {
       // Hình chóp tứ giác đều S.ABCD: Đáy ABCD hình vuông (vẽ phối cảnh bình hành), tâm O, SO vuông góc đáy
-      const pA = createPoint(180, 370, 'A');
-      const pB = createPoint(440, 370, 'B');
-      const pC = createPoint(550, 290, 'C');
-      const pD = createPoint(290, 290, 'D');
+      const pA = createPoint(180, 370, 'A', -22, 4);
+      const pB = createPoint(440, 370, 'B', 10, 14);
+      const pC = createPoint(550, 290, 'C', 12, -4);
+      const pD = createPoint(290, 290, 'D', 8, -12);
 
       // Tâm O giao 2 đường chéo đáy
       const oX = Math.round((pA.x + pC.x) / 2);
@@ -1539,25 +1626,43 @@ export default function GspSketchpad({
         y: oY,
         label: 'O',
         type: 'midpoint',
-        parentIds: [pA.id, pC.id]
+        parentIds: [pA.id, pC.id],
+        labelOffsetX: 8,
+        labelOffsetY: -8
       };
 
       // Đỉnh S nằm thẳng đứng ngay trên tâm đáy O
-      const pS = createPoint(oX, 80, 'S');
+      const pS = createPoint(oX, 80, 'S', -6, -14);
 
       // Điểm M mẫu thuộc cạnh bên SB (phụ thuộc và có thể kéo trượt dọc SB)
       const pM: GspPoint = {
         id: 'pt_M',
-        x: Math.round(pS.x + 0.5 * (pB.x - pS.x)),
-        y: Math.round(pS.y + 0.5 * (pB.y - pS.y)),
+        x: Math.round(pS.x + 0.55 * (pB.x - pS.x)),
+        y: Math.round(pS.y + 0.55 * (pB.y - pS.y)),
         label: 'M',
         type: 'on_segment',
         parentIds: [pS.id, pB.id],
         segmentId: 's_sb',
-        ratio: 0.5
+        ratio: 0.55,
+        labelOffsetX: -20,
+        labelOffsetY: 0
       };
 
-      setPoints([pA, pB, pC, pD, pO, pS, pM]);
+      // Điểm N thuộc cạnh bên SC (phụ thuộc và có thể kéo trượt dọc SC)
+      const pN: GspPoint = {
+        id: 'pt_N',
+        x: Math.round(pS.x + 0.45 * (pC.x - pS.x)),
+        y: Math.round(pS.y + 0.45 * (pC.y - pS.y)),
+        label: 'N',
+        type: 'on_segment',
+        parentIds: [pS.id, pC.id],
+        segmentId: 's_sc',
+        ratio: 0.45,
+        labelOffsetX: 12,
+        labelOffsetY: -8
+      };
+
+      setPoints([pA, pB, pC, pD, pO, pS, pM, pN]);
       setSegments([
         // Đáy thấy: AB, BC (nét liền)
         { id: 's_ab', p1Id: pA.id, p2Id: pB.id, style: 'solid', color: '#000000', width: 1.6 },
@@ -1578,7 +1683,12 @@ export default function GspSketchpad({
         { id: 's_bd', p1Id: pB.id, p2Id: pD.id, style: 'dashed', color: '#000000', width: 1.2 },
 
         // Đường cao SO nét đứt
-        { id: 's_so', p1Id: pS.id, p2Id: pO.id, style: 'dashed', color: '#000000', width: 1.4 }
+        { id: 's_so', p1Id: pS.id, p2Id: pO.id, style: 'dashed', color: '#000000', width: 1.4 },
+
+        // Các đoạn nối thiết diện / mặt phẳng (OM, ON, MN) nét đứt
+        { id: 's_om', p1Id: pO.id, p2Id: pM.id, style: 'dashed', color: '#000000', width: 1.3 },
+        { id: 's_on', p1Id: pO.id, p2Id: pN.id, style: 'dashed', color: '#000000', width: 1.3 },
+        { id: 's_mn', p1Id: pM.id, p2Id: pN.id, style: 'dashed', color: '#000000', width: 1.3 }
       ]);
       setCircles([]);
       setEllipses([]);
@@ -1586,7 +1696,7 @@ export default function GspSketchpad({
         { id: 'ra_so', vertexId: pO.id, p1Id: pS.id, p2Id: pA.id, size: 12, color: '#000000' }
       ]);
       setTexts([]);
-      showNotice('Đã nạp mẫu: Hình chóp tứ giác đều S.ABCD (SO ⊥ đáy, có điểm M trên cạnh SB)');
+      showNotice('Đã nạp mẫu: Hình chóp tứ giác đều S.ABCD (SO ⊥ đáy, điểm M, N trên SB, SC)');
 
     } else if (presetType === 'pyramid_regular_tri' || presetType === 'pyramid_s_abc') {
       // Hình chóp tam giác đều S.ABC: Đáy đều ABC, trọng tâm G, SG vuông góc đáy
@@ -1893,10 +2003,13 @@ export default function GspSketchpad({
     for (const p of points) {
       if (p.hidden) continue;
       hasContent = true;
-      minX = Math.min(minX, p.x - 14);
-      maxX = Math.max(maxX, p.x + 36); // dự phòng nhãn chữ tên điểm
-      minY = Math.min(minY, p.y - 28);
-      maxY = Math.max(maxY, p.y + 18);
+      const lx = p.x + (p.labelOffsetX ?? 9);
+      const ly = p.y + (p.labelOffsetY ?? -8);
+      const lw = p.label ? Math.max(20, p.label.length * 16) : 20;
+      minX = Math.min(minX, p.x - 14, lx - 4);
+      maxX = Math.max(maxX, p.x + 14, lx + lw + 4);
+      minY = Math.min(minY, p.y - 14, ly - 22);
+      maxY = Math.max(maxY, p.y + 14, ly + 6);
     }
     for (const c of circles) {
       const center = points.find(pt => pt.id === c.centerId);
@@ -2428,8 +2541,9 @@ export default function GspSketchpad({
         if (!p.label) continue;
 
         const isSelected = isInteractive && selectedPointId === p.id;
-        const lx = p.x + 9;
-        const ly = p.y - 8;
+        const isLabelHovered = isInteractive && (hoveredLabelPointId === p.id || draggedLabelPointId === p.id);
+        const lx = p.x + (p.labelOffsetX ?? 9);
+        const ly = p.y + (p.labelOffsetY ?? -8);
 
         ctx.save();
         ctx.textAlign = 'left';
@@ -2439,13 +2553,26 @@ export default function GspSketchpad({
           ctx.globalAlpha = 0.4; // hiển thị mờ trong khi chỉnh sửa
         }
 
+        // Khung viền nét đứt khi hover hoặc kéo dời nhãn đỉnh (Dời text)
+        if (isInteractive && isLabelHovered) {
+          const m = ctx.measureText(p.label);
+          const lw = Math.max(m.width, 16);
+          const lh = 22;
+          ctx.save();
+          ctx.strokeStyle = '#0d9488';
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 2]);
+          ctx.strokeRect(lx - 4, ly - lh - 2, lw + 8, lh + 6);
+          ctx.restore();
+        }
+
         // Viền trắng bảo vệ chữ không bị đường thẳng đè
         ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 5;
         ctx.lineJoin = 'round';
         ctx.strokeText(p.label, lx, ly);
 
-        ctx.fillStyle = isSelected ? '#0d9488' : (p.color || '#000000');
+        ctx.fillStyle = (isSelected || isLabelHovered) ? '#0d9488' : (p.color || '#000000');
         ctx.fillText(p.label, lx, ly);
         ctx.restore();
       }
@@ -2553,7 +2680,7 @@ export default function GspSketchpad({
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
     renderGspScene(ctx, true);
-  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, selectedPointId, hoveredPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, selectedPointId, hoveredPointId, hoveredLabelPointId, draggedLabelPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
 
   // Nạp sẵn mẫu hình ban đầu nếu trống hoặc khi externalPreset thay đổi
   useEffect(() => {
@@ -2574,7 +2701,7 @@ export default function GspSketchpad({
     if (activeTool === 'right_angle') return 'crosshair';
     if (activeTool === 'point_on_segment') return 'crosshair';
     if (activeTool === 'vector') return 'crosshair';
-    if (hoveredPointId || hoveredTextId) return 'move';
+    if (hoveredPointId || hoveredTextId || hoveredLabelPointId || draggedLabelPointId) return 'move';
     if (activeTool === 'select') {
       if (selectedChartId) {
         const sc = charts.find(c => c.id === selectedChartId);
@@ -2631,10 +2758,10 @@ export default function GspSketchpad({
                     ? 'bg-teal-600 text-white shadow-xs'
                     : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                 }`}
-                title="Chọn đối tượng, kéo thả đỉnh/chữ hoặc nhấp vào đoạn thẳng để đổi nét"
+                title="Chọn đối tượng, kéo thả đỉnh, kéo dời nhãn chữ (A, B, C...) tránh đè nét hoặc nhấp vào cạnh để đổi nét"
               >
                 <MousePointer size={15} />
-                <span>Chọn & Kéo</span>
+                <span>Chọn & Dời text</span>
               </button>
 
               <button
@@ -3370,17 +3497,30 @@ export default function GspSketchpad({
           )}
 
           {/* KHUNG BẢNG VẼ CANVAS TƯƠNG TÁC */}
-          <div className="relative w-full flex items-center justify-center p-2 bg-slate-50/70 dark:bg-slate-950/60 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 overflow-x-auto select-none">
-            <canvas
-              ref={canvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onDoubleClick={handleDoubleClick}
-              onContextMenu={handleContextMenu}
-              style={{ cursor: getCanvasCursor() }}
-              className="max-w-full h-auto bg-white rounded-lg shadow-xs border border-slate-200 touch-none"
-            />
+          <div className="space-y-2">
+            <div className="relative w-full flex items-center justify-center p-2 bg-slate-50/70 dark:bg-slate-950/60 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 overflow-x-auto select-none">
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onDoubleClick={handleDoubleClick}
+                onContextMenu={handleContextMenu}
+                style={{ cursor: getCanvasCursor() }}
+                className="max-w-full h-auto bg-white rounded-lg shadow-xs border border-slate-200 touch-none"
+              />
+            </div>
+            {/* HƯỚNG DẪN TƯƠNG TÁC NHANH VÀ DỜI TEXT */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-teal-500"></span>
+                <b>Dời text nhãn đỉnh:</b> Bấm giữ chuột vào chữ tên đỉnh (<i>S, A, B, C, D, O, M, N...</i>) để kéo dời tự do tránh đè nét cạnh.
+              </span>
+              <span className="flex items-center gap-2 text-slate-400">
+                <span>• Chuột phải để dời nhanh</span>
+                <span>• Nhấp đúp vào điểm để tinh chỉnh 8 hướng</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -3567,15 +3707,48 @@ export default function GspSketchpad({
                     setEditingPointHideDot(!!pt.hideDot);
                     setEditingPointHideLabel(!!pt.hideLabel);
                     setEditingPointRatio(pt.ratio ?? 0.5);
+                    setEditingPointLabelOffsetX(pt.labelOffsetX ?? 9);
+                    setEditingPointLabelOffsetY(pt.labelOffsetY ?? -8);
                     setContextMenu(prev => ({ ...prev, isOpen: false }));
                   }}
                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
                 >
                   <Edit3 size={14} className="text-teal-600" />
-                  Đổi tên đỉnh / Sửa điểm ({pt.label})
+                  Đổi tên / Vị trí nhãn đỉnh ({pt.label})
                 </button>
 
-                {/* 2. Ẩn / Hiện chấm tròn đen (dot •) */}
+                {/* 2. Đổi nhanh vị trí nhãn đỉnh (Dời text) */}
+                <div className="px-2 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                  <div className="text-[10px] font-semibold text-slate-500 mb-1 flex items-center justify-between">
+                    <span>Dời nhãn ({pt.label}):</span>
+                    <span className="text-[9px] text-teal-600 font-bold">Kéo rê trên hình</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[
+                      { label: '↖ Trên', ox: -18, oy: -14 },
+                      { label: '↗ Phải', ox: 12, oy: -12 },
+                      { label: '↙ Trái', ox: -22, oy: 16 },
+                      { label: '↘ Dưới', ox: 12, oy: 16 },
+                      { label: '• Gốc', ox: 9, oy: -8 },
+                    ].map(dir => (
+                      <button
+                        key={dir.label}
+                        type="button"
+                        onClick={() => {
+                          saveSnapshot();
+                          setPoints(prev => prev.map(p => p.id === pt.id ? { ...p, labelOffsetX: dir.ox, labelOffsetY: dir.oy } : p));
+                          setContextMenu(prev => ({ ...prev, isOpen: false }));
+                          showNotice(`Đã dời nhãn ${pt.label} (${dir.label})`);
+                        }}
+                        className="py-1 text-[9px] font-bold bg-white dark:bg-slate-700 hover:bg-teal-50 dark:hover:bg-teal-900/40 rounded border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 cursor-pointer text-center"
+                      >
+                        {dir.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Ẩn / Hiện chấm tròn đen (dot •) */}
                 <button
                   onClick={() => {
                     saveSnapshot();
@@ -3593,7 +3766,7 @@ export default function GspSketchpad({
                   <span className="text-[10px] opacity-60">{pt.hideDot ? 'Đang ẩn' : 'Đang hiện'}</span>
                 </button>
 
-                {/* 3. Ẩn / Hiện nhãn chữ tên đỉnh */}
+                {/* 4. Ẩn / Hiện nhãn chữ tên đỉnh */}
                 <button
                   onClick={() => {
                     saveSnapshot();
@@ -3610,7 +3783,7 @@ export default function GspSketchpad({
                   </span>
                 </button>
 
-                {/* 4. Ẩn toàn bộ điểm này */}
+                {/* 5. Ẩn toàn bộ điểm này */}
                 <button
                   onClick={() => {
                     saveSnapshot();
@@ -4011,6 +4184,56 @@ export default function GspSketchpad({
               </div>
             )}
 
+            {/* Tùy chỉnh vị trí nhãn chữ đỉnh (Dời text) */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Vị trí nhãn chữ ({newLabelInput.trim() || editingPoint.label}):
+                </span>
+                <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold">
+                  {editingPointLabelOffsetX >= 0 ? `+${editingPointLabelOffsetX}` : editingPointLabelOffsetX}px, {editingPointLabelOffsetY >= 0 ? `+${editingPointLabelOffsetY}` : editingPointLabelOffsetY}px
+                </span>
+              </div>
+
+              {/* Lưới 9 nút chọn hướng nhanh */}
+              <div className="grid grid-cols-3 gap-1.5 w-48 mx-auto bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                {[
+                  { label: '↖', ox: -22, oy: -14, title: 'Trên - Trái' },
+                  { label: '⬆', ox: -6, oy: -14, title: 'Trên đỉnh' },
+                  { label: '↗', ox: 12, oy: -14, title: 'Trên - Phải' },
+                  { label: '⬅', ox: -24, oy: 4, title: 'Bên trái' },
+                  { label: '•', ox: 9, oy: -8, title: 'Mặc định (Góc trên phải)' },
+                  { label: '➡', ox: 14, oy: 4, title: 'Bên phải' },
+                  { label: '↙', ox: -22, oy: 18, title: 'Dưới - Trái' },
+                  { label: '⬇', ox: -6, oy: 20, title: 'Dưới đáy' },
+                  { label: '↘', ox: 12, oy: 18, title: 'Dưới - Phải' },
+                ].map(pos => {
+                  const isCur = Math.abs(editingPointLabelOffsetX - pos.ox) <= 3 && Math.abs(editingPointLabelOffsetY - pos.oy) <= 3;
+                  return (
+                    <button
+                      key={pos.title}
+                      type="button"
+                      title={pos.title}
+                      onClick={() => {
+                        setEditingPointLabelOffsetX(pos.ox);
+                        setEditingPointLabelOffsetY(pos.oy);
+                      }}
+                      className={`h-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
+                        isCur
+                          ? 'bg-teal-600 text-white shadow-xs'
+                          : 'bg-white dark:bg-slate-700 hover:bg-teal-50 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      {pos.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-500 text-center italic">
+                Thầy Cô có thể bấm giữ trực tiếp vào chữ tên đỉnh trên hình để kéo dời tự do.
+              </p>
+            </div>
+
             {/* Tùy chọn ẩn hiện riêng điểm này */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -4066,6 +4289,8 @@ export default function GspSketchpad({
                           hideDot: editingPointHideDot,
                           hideLabel: editingPointHideLabel,
                           ratio: p.type === 'on_segment' ? editingPointRatio : p.ratio,
+                          labelOffsetX: editingPointLabelOffsetX,
+                          labelOffsetY: editingPointLabelOffsetY,
                           x: updatedX,
                           y: updatedY
                         };
