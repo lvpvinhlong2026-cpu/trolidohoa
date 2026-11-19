@@ -10,7 +10,8 @@ import {
   BarChart2, 
   Compass, 
   MonitorPlay, 
-  HelpCircle 
+  HelpCircle,
+  GitFork 
 } from 'lucide-react';
 import { TabId } from '../App';
 import { AccentColor, ACCENT_THEMES } from '../types/personalization';
@@ -33,7 +34,7 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
     category: 'Đồ Họa Toán Học (300 DPI)',
     sub: 'Hệ toạ độ Oxy, tương tác trực quan, xuất ảnh 300 DPI chất lượng cao',
     badge: 'Trọng tâm',
-    keywords: ['đồ thị', 'hàm số', 'parabol', 'bậc 3', 'bậc 4', 'trục số', 'bất phương trình', 'miền nghiệm', 'oxy', '300 dpi', 'toán'],
+    keywords: ['đồ thị', 'hàm số', 'parabol', 'bậc 3', 'bậc 4', 'trục số', 'bất phương trình', 'miền nghiệm', 'oxy', '300 dpi', 'toán', 'tích phân', 'diện tích', 'gạch sọc', 'diện tích hình phẳng'],
     icon: TrendingUp,
   },
   {
@@ -80,6 +81,15 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
     badge: 'Mô phỏng',
     keywords: ['mô phỏng', 'simulation', 'tương tác', 'chuyển động', 'khái niệm', 'thí nghiệm ảo'],
     icon: MonitorPlay,
+  },
+  {
+    id: 'probability_tree',
+    label: 'Sơ đồ Cây Xác suất & Định lý Bayes',
+    category: 'Đồ Họa Toán Học (300 DPI)',
+    sub: 'Vẽ sơ đồ cây xác suất, tính xác suất có điều kiện, công thức XS toàn phần & Bayes 300 DPI',
+    badge: 'Toán 12',
+    keywords: ['cây xác suất', 'xác suất', 'bayes', 'toàn phần', 'điều kiện', 'toán 12', 'cây', 'tree', 'probability', 'nhánh cây'],
+    icon: GitFork,
   },
 
   // 2. Hướng Dẫn

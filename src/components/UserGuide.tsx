@@ -12,7 +12,8 @@ import {
   PieChart,
   Copy,
   Download,
-  Sparkles
+  Sparkles,
+  GitFork
 } from 'lucide-react';
 
 interface GuideSection {
@@ -114,6 +115,7 @@ export default function UserGuide() {
             <h3 className="font-bold text-teal-800 dark:text-teal-300">Tính năng:</h3>
             <ul className="list-disc pl-5 text-sm text-teal-700 dark:text-teal-200 space-y-1.5">
               <li><strong>Đồ thị hàm số:</strong> Hàm bậc 1, bậc 2 (Parabol), bậc 3, bậc 4 trùng phương, phân thức bậc 1/bậc 1, bậc 2/bậc 1 với đầy đủ tiệm cận và điểm đặc biệt.</li>
+              <li><strong>Tô miền diện tích Tích phân (Toán 12):</strong> Giới hạn bởi đồ thị f(x), trục hoành Ox hoặc đường thẳng y = mx + n trên đoạn [a; b], gạch sọc toán học tùy chỉnh góc/mật độ, tính diện tích tự động theo công thức Simpson.</li>
               <li><strong>Miền nghiệm BPT:</strong> Gạch chéo nửa mặt phẳng không thỏa mãn, viền liền (lấy dấu bằng) hoặc viền đứt (không lấy dấu bằng).</li>
               <li><strong>Trục số:</strong> Biểu diễn khoảng, đoạn, nửa khoảng với ngoặc tròn ( ), ngoặc vuông [ ], gạch bỏ phần không thuộc tập nghiệm.</li>
             </ul>
@@ -179,6 +181,31 @@ export default function UserGuide() {
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
             Sử dụng trí tuệ nhân tạo Gemini để tự động sinh lệnh dựng hình GeoGebra 3D từ mô tả tiếng Việt (ví dụ: "Cho hình chóp S.ABCD đáy hình vuông cạnh a, SA vuông góc đáy").
           </p>
+        </div>
+      )
+    },
+
+    {
+      id: 'probability_tree_guide',
+      title: 'Sơ đồ Cây Xác suất & Định lý Bayes',
+      icon: <GitFork size={18} />,
+      content: (
+        <div className="space-y-5">
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">Sơ Đồ Cây Xác Suất & Định Lý Bayes (Toán 11 & 12)</h2>
+          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+            Công cụ trực quan hóa sơ đồ hình cây trong chương trình Toán 11 (Xác suất có điều kiện) và Toán 12 (Công thức Xác suất toàn phần & Định lý Bayes) theo chuẩn SGK Kết nối tri thức, Chân trời sáng tạo, Cánh Diều.
+          </p>
+
+          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4 space-y-3">
+            <h3 className="font-bold text-teal-800 dark:text-teal-300">Tính năng nổi bật:</h3>
+            <ul className="list-disc pl-5 text-sm text-teal-700 dark:text-teal-200 space-y-1.5">
+              <li><strong>5 Bộ mẫu chuẩn SGK:</strong> Xét nghiệm y tế (Bayes), Nhà máy sản xuất linh kiện (XS toàn phần), Xạ thủ bắn 2 lượt, Rút bóng từ 2 hộp, Ba dây chuyền sản xuất (cây 3 nhánh).</li>
+              <li><strong>Tùy chỉnh linh hoạt:</strong> Tự do thêm/bớt biến cố Giai đoạn 1 và các nhánh con Giai đoạn 2, nhập xác suất dạng số thập phân hoặc phân số (ví dụ: 1/3, 2/5).</li>
+              <li><strong>Định dạng thẩm mỹ:</strong> Đường nhánh uốn lượn Bezier cong mềm mại hoặc thẳng, nhãn nền mờ chống đè chữ, màu sắc đồng bộ.</li>
+              <li><strong>Tính toán tự động:</strong> Tự động tính xác suất giao \(P(A \cap B)\), xác suất toàn phần \(P(B)\), và định lý Bayes \(P(A_i|B)\) kèm công thức chi tiết.</li>
+              <li><strong>Xuất ảnh 300 DPI:</strong> 1-click chép thẳng vào Clipboard Word hoặc tải ảnh PNG độ phân giải in ấn 300 DPI.</li>
+            </ul>
+          </div>
         </div>
       )
     },

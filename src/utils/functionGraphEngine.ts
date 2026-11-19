@@ -37,6 +37,23 @@ export interface CustomTextAnnotation {
   isItalic?: boolean;     // In nghiêng toán học (mặc định true)
 }
 
+export interface IntegralAreaConfig {
+  enabled: boolean;
+  a: number;                         // Cận dưới
+  b: number;                         // Cận trên
+  gType?: 'zero' | 'linear';         // Đường biên thứ 2: 'zero' (trục Ox: y = 0) hoặc 'linear' (đường thẳng y = mx + n)
+  gLineM?: number;                   // Hệ số góc m của đường thẳng g(x) = mx + n
+  gLineN?: number;                   // Tung độ gốc n của đường thẳng g(x) = mx + n
+  style?: 'hatch' | 'fill' | 'both'; // 'hatch' (gạch sọc đen trắng chuẩn đề thi), 'fill' (tô màu mờ), 'both'
+  hatchAngle?: number;               // Góc nghiêng gạch sọc (độ, mặc định 45)
+  hatchSpacing?: number;             // Khoảng cách giữa các nét gạch sọc (pixels, mặc định 8)
+  hatchColor?: string;               // Màu nét gạch sọc (mặc định '#000000')
+  fillColor?: string;                // Màu phủ (mặc định 'rgba(13, 148, 136, 0.22)')
+  showBoundLines?: boolean;          // Vẽ đường dóng cận x = a, x = b nét đứt vuông góc Ox
+  showAreaLabel?: boolean;           // Hiển thị chữ ký hiệu diện tích S ở tâm miền
+  areaLabelText?: string;            // Nhãn diện tích (mặc định 'S')
+}
+
 export interface GraphConfig {
   type: 'cubic' | 'quartic' | 'rational' | 'rational_2_1' | 'quadratic';
   a: number;
@@ -69,6 +86,9 @@ export interface GraphConfig {
   intervalMode?: 'highlight' | 'only'; // 'highlight': vẽ [a;b] đậm, ngoài mờ; 'only': chỉ vẽ trên [a;b]
   showIntervalEndpoints?: boolean;     // Hiển thị chấm tròn và đường gióng tọa độ 2 đầu mút A, B
   asymptoteIntersectionLabel?: string; // Tên nhãn giao điểm tiệm cận (I)
+
+  // Ứng dụng tích phân tính diện tích hình phẳng (Toán 12)
+  integralArea?: IntegralAreaConfig;
 
   // Tùy chỉnh vị trí gốc O
   originQuadrant?: 'auto' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -1117,6 +1137,192 @@ export function renderGraphToCanvas(
     ctx.restore();
   }
 
+  // 1.5. VẼ MIỀN DIỆN TÍCH TÍCH PHÂN GẠCH SỌC (TOÁN 12 - ỨNG DỤNG HÌNH HỌC TÍCH PHÂN)
+  if (config.integralArea && config.integralArea.enabled) {
+    const intCfg = config.integralArea;
+    const a = Math.min(intCfg.a, intCfg.b);
+    const b = Math.max(intCfg.a, intCfg.b);
+
+    if (b > a) {
+      const g = (x: number): number => {
+        if (intCfg.gType === 'linear') {
+          const m = intCfg.gLineM ?? 1;
+          const n = intCfg.gLineN ?? 0;
+          return m * x + n;
+        }
+        return 0; // Trục hoành Ox: y = 0
+      };
+
+      // Xây dựng đường viền khép kín của miền diện tích từ a đến b
+      const areaSteps = Math.max(120, Math.round((b - a) * unitScale * 2));
+      const areaDx = (b - a) / areaSteps;
+
+      ctx.save();
+      ctx.beginPath();
+
+      // Đi dọc theo đường f(x) từ a -> b
+      let first = true;
+      for (let i = 0; i <= areaSteps; i++) {
+        const x = a + i * areaDx;
+        const y = f(x);
+        if (y !== null && !isNaN(y)) {
+          const sx = toScreenX(x);
+          const sy = toScreenY(y);
+          if (first) {
+            ctx.moveTo(sx, sy);
+            first = false;
+          } else {
+            ctx.lineTo(sx, sy);
+          }
+        }
+      }
+
+      // Đi ngược theo đường g(x) từ b -> a
+      for (let i = areaSteps; i >= 0; i--) {
+        const x = a + i * areaDx;
+        const gy = g(x);
+        const sx = toScreenX(x);
+        const sy = toScreenY(gy);
+        ctx.lineTo(sx, sy);
+      }
+
+      ctx.closePath();
+
+      // 1. Tô màu mờ nền nếu có
+      const doFill = intCfg.style === 'fill' || intCfg.style === 'both';
+      if (doFill) {
+        ctx.fillStyle = intCfg.fillColor || 'rgba(13, 148, 136, 0.22)';
+        ctx.fill();
+      }
+
+      // 2. Gạch sọc xiên (Hatch pattern) chuẩn đề thi nếu có
+      const doHatch = intCfg.style === 'hatch' || intCfg.style === 'both' || !intCfg.style;
+      if (doHatch) {
+        ctx.save();
+        ctx.clip(); // Giới hạn chỉ vẽ nét gạch trong miền khép kín
+
+        const angleDeg = intCfg.hatchAngle ?? 45;
+        const angleRad = (angleDeg * Math.PI) / 180;
+        const spacing = Math.max(5, intCfg.hatchSpacing ?? 8);
+
+        ctx.strokeStyle = intCfg.hatchColor || (intCfg.style === 'both' ? '#0d9488' : '#000000');
+        ctx.lineWidth = 1.1;
+
+        // Bounding box của miền trên màn hình
+        const screenA = toScreenX(a);
+        const screenB = toScreenX(b);
+        const minScreenX = Math.min(screenA, screenB) - 10;
+        const maxScreenX = Math.max(screenA, screenB) + 10;
+        const minScreenY = 0;
+        const maxScreenY = height;
+
+        // Chiều dài đường chéo bao phủ
+        const diag = Math.hypot(maxScreenX - minScreenX, maxScreenY - minScreenY);
+        const cosA = Math.cos(angleRad);
+        const sinA = Math.sin(angleRad);
+
+        // Vector vuông góc với đường gạch
+        const perpX = -sinA;
+        const perpY = cosA;
+
+        // Tâm của bounding box
+        const cx = (minScreenX + maxScreenX) / 2;
+        const cy = (minScreenY + maxScreenY) / 2;
+
+        const numLines = Math.ceil(diag / spacing);
+        ctx.beginPath();
+        for (let k = -numLines; k <= numLines; k++) {
+          const px = cx + k * spacing * perpX;
+          const py = cy + k * spacing * perpY;
+
+          // Điểm đầu và cuối của đường gạch dài vượt ngoài clip
+          const x1 = px - diag * cosA;
+          const y1 = py - diag * sinA;
+          const x2 = px + diag * cosA;
+          const y2 = py + diag * sinA;
+
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // 3. Nếu g(x) là đường thẳng (gType === 'linear'), vẽ luôn đường thẳng g(x)
+      if (intCfg.gType === 'linear') {
+        const m = intCfg.gLineM ?? 1;
+        const n = intCfg.gLineN ?? 0;
+        const yL = m * plotMinX + n;
+        const yR = m * plotMaxX + n;
+        ctx.save();
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(plotMinX), toScreenY(yL));
+        ctx.lineTo(toScreenX(plotMaxX), toScreenY(yR));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 4. Vẽ 2 đường dóng cận thẳng đứng tại x = a và x = b
+      if (intCfg.showBoundLines ?? true) {
+        ctx.save();
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.3;
+
+        // Dóng cận a
+        const ya1 = f(a) ?? 0;
+        const ya2 = g(a);
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(a), toScreenY(Math.min(0, Math.min(ya1, ya2))));
+        ctx.lineTo(toScreenX(a), toScreenY(Math.max(0, Math.max(ya1, ya2))));
+        ctx.stroke();
+
+        // Dóng cận b
+        const yb1 = f(b) ?? 0;
+        const yb2 = g(b);
+        ctx.beginPath();
+        ctx.moveTo(toScreenX(b), toScreenY(Math.min(0, Math.min(yb1, yb2))));
+        ctx.lineTo(toScreenX(b), toScreenY(Math.max(0, Math.max(yb1, yb2))));
+        ctx.stroke();
+        ctx.restore();
+
+        // Đăng ký số cận a, b trên trục hoành Ox
+        registerOxLabel(a, false, 4);
+        registerOxLabel(b, false, 4);
+      }
+
+      // 5. Hiển thị chữ nhãn diện tích "S" ở tâm miền
+      if (intCfg.showAreaLabel ?? true) {
+        const midX = (a + b) / 2;
+        const midY = ((f(midX) ?? 0) + g(midX)) / 2;
+        const sX = toScreenX(midX);
+        const sY = toScreenY(midY);
+        const sText = intCfg.areaLabelText || 'S';
+
+        ctx.save();
+        const sFontSz = Math.round(24 * fontScale);
+        ctx.font = `italic bold ${sFontSz}px ${mathFontFam}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Viền trắng bảo vệ chữ không bị gạch sọc đè
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(sText, sX, sY);
+
+        ctx.fillStyle = doHatch ? '#000000' : '#0d9488';
+        ctx.fillText(sText, sX, sY);
+        ctx.restore();
+      }
+    }
+  }
+
   // 2. Vẽ Hệ trục tọa độ Oxy chuẩn mực SGK (nét đậm, mũi tên sắc sảo)
   const axisWidth = config.axisWidth ?? 1.8;
   const isBoldLabels = config.isBoldLabels ?? true;
@@ -1766,4 +1972,34 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angl
   ctx.fillStyle = '#000000';
   ctx.fill();
   ctx.restore();
+}
+
+/**
+ * Tính giá trị xấp xỉ diện tích hình phẳng giới hạn bởi f(x) và g(x) trên [a; b]
+ * theo công thức tích phân số Simpson: S = \int_a^b |f(x) - g(x)| dx
+ */
+export function calcDefiniteIntegral(
+  f: (x: number) => number | null,
+  g: (x: number) => number,
+  a: number,
+  b: number,
+  n = 200
+): number {
+  const minX = Math.min(a, b);
+  const maxX = Math.max(a, b);
+  if (maxX - minX < 1e-9) return 0;
+
+  const steps = n % 2 === 0 ? n : n + 1;
+  const h = (maxX - minX) / steps;
+  let sum = 0;
+
+  for (let i = 0; i <= steps; i++) {
+    const x = minX + i * h;
+    const yF = f(x) ?? 0;
+    const yG = g(x);
+    const diff = Math.abs(yF - yG);
+    const weight = (i === 0 || i === steps) ? 1 : (i % 2 === 1 ? 4 : 2);
+    sum += weight * diff;
+  }
+  return (h / 3) * sum;
 }

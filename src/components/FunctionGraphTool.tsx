@@ -24,7 +24,8 @@ import {
   formatNumDisplay,
   getIntervalMinMax,
   GraphLabelHitbox,
-  CustomTextAnnotation
+  CustomTextAnnotation,
+  calcDefiniteIntegral
 } from '../utils/functionGraphEngine';
 import InequalityGraphTool from './InequalityGraphTool';
 import NumberLineTool from './NumberLineTool';
@@ -1440,6 +1441,291 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
                         );
                       }
                       return null;
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* ỨNG DỤNG TÍCH PHÂN & TÔ MIỀN DIỆN TÍCH HÌNH PHẲNG (TOÁN 12) */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-teal-800 dark:text-teal-300">
+                    <input
+                      type="checkbox"
+                      checked={!!graphConfig.integralArea?.enabled}
+                      onChange={e => {
+                        const enabled = e.target.checked;
+                        setGraphConfig(prev => ({
+                          ...prev,
+                          integralArea: {
+                            enabled,
+                            a: prev.integralArea?.a ?? -1,
+                            b: prev.integralArea?.b ?? 2,
+                            gType: prev.integralArea?.gType ?? 'zero',
+                            gLineM: prev.integralArea?.gLineM ?? 1,
+                            gLineN: prev.integralArea?.gLineN ?? 0,
+                            style: prev.integralArea?.style ?? 'hatch',
+                            hatchAngle: prev.integralArea?.hatchAngle ?? 45,
+                            hatchSpacing: prev.integralArea?.hatchSpacing ?? 8,
+                            showBoundLines: prev.integralArea?.showBoundLines ?? true,
+                            showAreaLabel: prev.integralArea?.showAreaLabel ?? true,
+                            areaLabelText: prev.integralArea?.areaLabelText ?? 'S'
+                          }
+                        }));
+                      }}
+                      className="rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <span>📐 Tô miền diện tích Tích phân (Toán 12)</span>
+                  </label>
+                  {graphConfig.integralArea?.enabled && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200">
+                      Gạch sọc đề thi
+                    </span>
+                  )}
+                </div>
+
+                {graphConfig.integralArea?.enabled && (
+                  <div className="p-3 bg-teal-50/70 dark:bg-teal-950/30 rounded-xl border border-teal-200 dark:border-teal-800/60 space-y-2.5 text-xs animate-fade-in">
+                    {/* Cận tích phân a và b */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 block">Cận dưới (a):</span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={graphConfig.integralArea?.a ?? -1}
+                          onChange={e => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, a: parseFloat(e.target.value) || 0 }
+                          })}
+                          className="w-full mt-1 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-500 block">Cận trên (b):</span>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={graphConfig.integralArea?.b ?? 2}
+                          onChange={e => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, b: parseFloat(e.target.value) || 0 }
+                          })}
+                          className="w-full mt-1 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Đường biên thứ hai: Trục hoành Ox hoặc Đường thẳng */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 block mb-1">Đường biên dưới g(x):</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, gType: 'zero' }
+                          })}
+                          className={`p-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
+                            (graphConfig.integralArea?.gType ?? 'zero') === 'zero'
+                              ? 'bg-teal-600 text-white shadow-2xs'
+                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          Trục hoành Ox (y = 0)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, gType: 'linear' }
+                          })}
+                          className={`p-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
+                            graphConfig.integralArea?.gType === 'linear'
+                              ? 'bg-teal-600 text-white shadow-2xs'
+                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          Đường thẳng y = mx + n
+                        </button>
+                      </div>
+                      {graphConfig.integralArea?.gType === 'linear' && (
+                        <div className="grid grid-cols-2 gap-2 mt-2 p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <div>
+                            <span className="text-[10px] text-slate-400">Hệ số góc m:</span>
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={graphConfig.integralArea?.gLineM ?? 1}
+                              onChange={e => setGraphConfig({
+                                ...graphConfig,
+                                integralArea: { ...graphConfig.integralArea!, gLineM: parseFloat(e.target.value) || 0 }
+                              })}
+                              className="w-full mt-0.5 p-1 text-xs border rounded font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400">Tung độ gốc n:</span>
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={graphConfig.integralArea?.gLineN ?? 0}
+                              onChange={e => setGraphConfig({
+                                ...graphConfig,
+                                integralArea: { ...graphConfig.integralArea!, gLineN: parseFloat(e.target.value) || 0 }
+                              })}
+                              className="w-full mt-0.5 p-1 text-xs border rounded font-semibold"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Kiểu gạch sọc & hoa văn */}
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { id: 'hatch', label: 'Gạch sọc xiên' },
+                        { id: 'fill', label: 'Màu mờ' },
+                        { id: 'both', label: 'Gạch + Màu' }
+                      ].map(st => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, style: st.id as any }
+                          })}
+                          className={`py-1 text-[11px] font-bold rounded-lg transition cursor-pointer ${
+                            (graphConfig.integralArea?.style ?? 'hatch') === st.id
+                              ? 'bg-teal-600 text-white'
+                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tùy chỉnh góc nghiêng & khoảng cách gạch */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500">Mật độ:</span>
+                      {[
+                        { label: 'Thưa', sp: 11 },
+                        { label: 'Vừa', sp: 8 },
+                        { label: 'Dày', sp: 5 }
+                      ].map(d => (
+                        <button
+                          key={d.label}
+                          type="button"
+                          onClick={() => setGraphConfig({
+                            ...graphConfig,
+                            integralArea: { ...graphConfig.integralArea!, hatchSpacing: d.sp }
+                          })}
+                          className={`flex-1 py-0.5 text-[10px] font-semibold rounded ${
+                            (graphConfig.integralArea?.hatchSpacing ?? 8) === d.sp
+                              ? 'bg-teal-200 dark:bg-teal-800 text-teal-900 dark:text-teal-100 font-bold'
+                              : 'bg-white dark:bg-slate-800 border'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setGraphConfig({
+                          ...graphConfig,
+                          integralArea: {
+                            ...graphConfig.integralArea!,
+                            hatchAngle: (graphConfig.integralArea?.hatchAngle ?? 45) === 45 ? -45 : 45
+                          }
+                        })}
+                        className="px-2 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-800 border rounded hover:bg-slate-100 cursor-pointer"
+                        title="Đổi hướng nghiêng gạch sọc (45° hoặc -45°)"
+                      >
+                        Góc: {(graphConfig.integralArea?.hatchAngle ?? 45)}°
+                      </button>
+                    </div>
+
+                    {/* Mẫu nhanh tích phân chuẩn SGK */}
+                    <div className="pt-1.5 border-t border-teal-200/60 dark:border-teal-800/60">
+                      <span className="text-[10px] font-bold text-teal-800 dark:text-teal-300 block mb-1">
+                        Mẫu nhanh đề thi THPT:
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          {
+                            label: 'Parabol y = 4 - x² trên [-2; 2]',
+                            apply: () => {
+                              setGraphConfig(prev => ({
+                                ...prev,
+                                type: 'quadratic',
+                                a: -1, b: 0, c: 4,
+                                xMin: -3.5, xMax: 3.5, yMin: -2, yMax: 5.5,
+                                integralArea: {
+                                  enabled: true, a: -2, b: 2, gType: 'zero', style: 'hatch',
+                                  hatchAngle: 45, hatchSpacing: 8, showBoundLines: true, showAreaLabel: true, areaLabelText: 'S'
+                                }
+                              }));
+                            }
+                          },
+                          {
+                            label: 'Parabol & Đường thẳng y = x + 2',
+                            apply: () => {
+                              setGraphConfig(prev => ({
+                                ...prev,
+                                type: 'quadratic',
+                                a: 1, b: 0, c: 0,
+                                xMin: -2.5, xMax: 3.5, yMin: -1.5, yMax: 5.5,
+                                integralArea: {
+                                  enabled: true, a: -1, b: 2, gType: 'linear', gLineM: 1, gLineN: 2, style: 'hatch',
+                                  hatchAngle: 45, hatchSpacing: 8, showBoundLines: true, showAreaLabel: true, areaLabelText: 'S'
+                                }
+                              }));
+                            }
+                          },
+                          {
+                            label: 'Hàm bậc 3 y = x³ - 3x trên [0; √3]',
+                            apply: () => {
+                              setGraphConfig(prev => ({
+                                ...prev,
+                                type: 'cubic',
+                                a: 1, b: 0, c: -3, d: 0,
+                                xMin: -2.5, xMax: 2.5, yMin: -3, yMax: 3,
+                                integralArea: {
+                                  enabled: true, a: 0, b: 1.73, gType: 'zero', style: 'hatch',
+                                  hatchAngle: -45, hatchSpacing: 7, showBoundLines: true, showAreaLabel: true, areaLabelText: 'S'
+                                }
+                              }));
+                            }
+                          }
+                        ].map((m, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={m.apply}
+                            className="px-2 py-0.5 text-[10px] font-semibold bg-white dark:bg-slate-800 hover:bg-teal-100 rounded border border-teal-200 dark:border-teal-800 cursor-pointer text-teal-800 dark:text-teal-200 transition"
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Hiển thị giá trị tích phân tính được */}
+                    {(() => {
+                      const f = (x: number) => evalGraphFunction(graphConfig, x);
+                      const g = (x: number) => graphConfig.integralArea?.gType === 'linear'
+                        ? ((graphConfig.integralArea?.gLineM ?? 1) * x + (graphConfig.integralArea?.gLineN ?? 0))
+                        : 0;
+                      const a = graphConfig.integralArea?.a ?? -1;
+                      const b = graphConfig.integralArea?.b ?? 2;
+                      const areaVal = calcDefiniteIntegral(f, g, a, b);
+                      return (
+                        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-teal-300 dark:border-teal-700 flex items-center justify-between text-teal-900 dark:text-teal-200 font-bold text-[11px]">
+                          <span>Diện tích S = ∫ₐᵇ |f(x) - g(x)| dx:</span>
+                          <span className="text-sm text-teal-600 dark:text-teal-400">≈ {formatNumDisplay(areaVal)}</span>
+                        </div>
+                      );
                     })()}
                   </div>
                 )}

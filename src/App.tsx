@@ -24,7 +24,8 @@ import {
   Table,
   Maximize2,
   Minimize2,
-  Grid
+  Grid,
+  GitFork
 } from 'lucide-react';
 
 import { 
@@ -47,6 +48,7 @@ const StatisticsChartTool = lazy(() => import('./components/StatisticsChartTool'
 const CombinedGeometryTab = lazy(() => import('./components/CombinedGeometryTab'));
 const Geogebra3DTool = lazy(() => import('./components/Geogebra3DTool'));
 const SimulationGenerator = lazy(() => import('./components/SimulationGenerator'));
+const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'));
 
 // 2. Hướng dẫn sử dụng
 const UserGuide = lazy(() => import('./components/UserGuide'));
@@ -58,6 +60,7 @@ export type TabId =
   | 'geometry'
   | 'geogebra'
   | 'simulation'
+  | 'probability_tree'
   | 'guide'
   | 'gsp'
   | 'quick3d';
@@ -123,6 +126,13 @@ export const NAV_CATEGORIES: NavCategory[] = [
         sub: 'Minh họa động định lý Toán & Khoa học',
         icon: MonitorPlay,
         badge: 'Mô phỏng',
+      },
+      {
+        id: 'probability_tree',
+        label: 'Sơ đồ Cây Xác suất (Bayes)',
+        sub: 'Xác suất có điều kiện, toàn phần & Bayes 300 DPI',
+        icon: GitFork,
+        badge: 'Toán 12',
       },
     ],
   },
@@ -592,6 +602,13 @@ export default function App() {
             {visitedTabs.has('simulation') && (
               <div className={activeTab === 'simulation' ? 'block animate-fade-in' : 'hidden'}>
                 <SimulationGenerator apiKey={apiKey} model={preferredModel} />
+              </div>
+            )}
+
+            {/* 1.7 SƠ ĐỒ CÂY XÁC SUẤT & ĐỊNH LÝ BAYES (TOÁN 12 SGK MỚI) */}
+            {visitedTabs.has('probability_tree') && (
+              <div className={activeTab === 'probability_tree' ? 'block animate-fade-in' : 'hidden'}>
+                <ProbabilityTreeTool />
               </div>
             )}
 

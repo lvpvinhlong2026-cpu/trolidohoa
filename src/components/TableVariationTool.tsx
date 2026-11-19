@@ -351,28 +351,20 @@ export default function TableVariationTool() {
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [latexCodeCopied, setLatexCodeCopied] = useState<boolean>(false);
   const [showLatexModal, setShowLatexModal] = useState<boolean>(false);
+  const [selectedPreset, setSelectedPreset] = useState<string>('cubic_image1');
 
-  // MẶC ĐỊNH: ĐÚNG CHÍNH XÁC BẢNG TRONG HÌNH ẢNH MẪU
+  // MẶC ĐỊNH: BẬC 3 (HÌNH 1 MẪU ĐỀ THI)
   const [points, setPoints] = useState<XPoint[]>([
     { id: '1', xVal: '-\\infty', derivType: 'blank', intervalSign: '+', yVal: '-\\infty', yPos: 'bottom' },
-    { id: '2', xVal: '0', derivType: '0', intervalSign: '-', yVal: '-1', yPos: 'top' },
-    { 
-      id: '3', 
-      xVal: '1', 
-      derivType: 'double_bar', 
-      intervalSign: '-', 
-      yVal: '-\\infty', 
-      yPos: 'bottom',
-      yRightVal: '+\\infty',
-      yRightPos: 'top'
-    },
-    { id: '4', xVal: '2', derivType: '0', intervalSign: '+', yVal: '3', yPos: 'bottom' },
-    { id: '5', xVal: '+\\infty', derivType: 'blank', intervalSign: 'blank', yVal: '+\\infty', yPos: 'top' },
+    { id: '2', xVal: '-1', derivType: '0', intervalSign: '-', yVal: '2', yPos: 'top' },
+    { id: '3', xVal: '3', derivType: '0', intervalSign: '+', yVal: '-2', yPos: 'bottom' },
+    { id: '4', xVal: '+\\infty', derivType: 'blank', intervalSign: 'blank', yVal: '+\\infty', yPos: 'top' },
   ]);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
   const loadPreset = (presetKey: string) => {
+    setSelectedPreset(presetKey);
     switch (presetKey) {
       case 'cubic_image1':
         setBbtMode('variation');
@@ -690,50 +682,33 @@ export default function TableVariationTool() {
           <Bookmark size={14} className="text-teal-600" />
           <span>Mẫu nhanh:</span>
         </span>
-        <button
-          onClick={() => loadPreset('cubic_image1')}
-          className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer transition shadow-xs flex items-center gap-1"
-        >
-          <Sparkles size={12} />
-          <span>Mẫu Hình 1 (Bậc 3: x = -1, 3)</span>
-        </button>
-        <button
-          onClick={() => loadPreset('rational_2_1')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold shrink-0 cursor-pointer transition flex items-center gap-1"
-        >
-          <Sparkles size={12} />
-          <span>Mẫu Hình 2 (TCĐ x = 1)</span>
-        </button>
-        <button
-          onClick={() => loadPreset('cubic_2_extrema')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium shrink-0 cursor-pointer transition"
-        >
-          Hàm bậc 3 (2 cực trị, a &gt; 0)
-        </button>
-        <button
-          onClick={() => loadPreset('cubic_negative_a')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium shrink-0 cursor-pointer transition"
-        >
-          Hàm bậc 3 (2 cực trị, a &lt; 0)
-        </button>
-        <button
-          onClick={() => loadPreset('quartic_3_extrema')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium shrink-0 cursor-pointer transition"
-        >
-          Hàm trùng phương (3 cực trị)
-        </button>
-        <button
-          onClick={() => loadPreset('rational_1_1')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium shrink-0 cursor-pointer transition"
-        >
-          Phân thức (ax+b)/(cx+d)
-        </button>
-        <button
-          onClick={() => loadPreset('sign_quadratic')}
-          className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium shrink-0 cursor-pointer transition"
-        >
-          Xét dấu tam thức bậc hai
-        </button>
+        {[
+          { key: 'cubic_image1', label: 'Mẫu Hình 1 (Bậc 3: x = -1, 3)', isModel: true },
+          { key: 'rational_2_1', label: 'Mẫu Hình 2 (TCĐ x = 1)', isModel: true },
+          { key: 'cubic_2_extrema', label: 'Hàm bậc 3 (2 cực trị, a > 0)' },
+          { key: 'cubic_negative_a', label: 'Hàm bậc 3 (2 cực trị, a < 0)' },
+          { key: 'quartic_3_extrema', label: 'Hàm trùng phương (3 cực trị)' },
+          { key: 'rational_1_1', label: 'Phân thức (ax+b)/(cx+d)' },
+          { key: 'sign_quadratic', label: 'Xét dấu tam thức bậc hai' },
+        ].map((item) => {
+          const isSelected = selectedPreset === item.key;
+          return (
+            <button
+              key={item.key}
+              onClick={() => loadPreset(item.key)}
+              className={`px-2.5 py-1 rounded-lg text-xs shrink-0 cursor-pointer transition flex items-center gap-1 ${
+                isSelected
+                  ? 'bg-teal-600 hover:bg-teal-700 text-white font-bold shadow-xs'
+                  : 'bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium'
+              }`}
+            >
+              {item.isModel && (
+                <Sparkles size={12} className={isSelected ? 'text-amber-300' : 'text-teal-600'} />
+              )}
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* THÔNG BÁO SAO CHÉP / HƯỚNG DẪN DÁN WORD */}
