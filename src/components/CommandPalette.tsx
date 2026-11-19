@@ -10,9 +10,6 @@ import {
   BarChart2, 
   Compass, 
   MonitorPlay, 
-  FileText, 
-  Brain, 
-  Scissors, 
   HelpCircle 
 } from 'lucide-react';
 import { TabId } from '../App';
@@ -50,11 +47,11 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
   },
   {
     id: 'statistics',
-    label: 'Biểu đồ Hộp & Thống kê (SGK Mới)',
+    label: 'Biểu đồ Thống kê SGK (Cột, Quạt, Hộp)',
     category: 'Đồ Họa Toán Học (300 DPI)',
-    sub: 'Biểu đồ đoạn thẳng, biểu đồ cột, biểu đồ hộp, số liệu ghép nhóm GDPT 2018',
-    badge: 'GDPT 2018',
-    keywords: ['thống kê', 'biểu đồ hộp', 'box plot', 'tứ phân vị', 'trung vị', 'phương sai', 'ghép nhóm'],
+    sub: 'Biểu đồ cột, cột kép, đoạn thẳng, hình quạt tròn THCS & biểu đồ hộp THPT 300 DPI',
+    badge: 'Mới',
+    keywords: ['thống kê', 'biểu đồ cột', 'cột kép', 'đoạn thẳng', 'hình quạt tròn', 'quạt tròn', 'biểu đồ hộp', 'box plot', 'tứ phân vị', 'trung vị', 'ghép nhóm'],
     icon: BarChart2,
   },
   {
@@ -85,23 +82,12 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
     icon: MonitorPlay,
   },
 
-  // 2. Sơ Đồ Tư Duy & Trực Quan
-  {
-    id: 'mindmap',
-    label: 'Sơ đồ Tư duy Bài học (Markmap)',
-    category: 'Sơ Đồ Tư Duy & Trực Quan',
-    sub: 'Sinh sơ đồ tư duy tóm tắt nội dung bài học, xuất ảnh & tương tác trực quan',
-    badge: 'Markmap',
-    keywords: ['sơ đồ tư duy', 'mindmap', 'markmap', 'tóm tắt', 'hệ thống hóa kiến thức', 'ôn tập'],
-    icon: Brain,
-  },
-
-  // 3. Hướng Dẫn
+  // 2. Hướng Dẫn
   {
     id: 'guide',
     label: 'Hướng dẫn Sử dụng Hệ thống',
     category: 'Hệ Thống & Trợ Giúp',
-    sub: 'Tài liệu hướng dẫn chi tiết từng công cụ vẽ đồ thị và số hóa tài liệu',
+    sub: 'Tài liệu hướng dẫn chi tiết từng công cụ vẽ hình và đồ thị Toán học',
     badge: 'Trợ giúp',
     keywords: ['hướng dẫn', 'trợ giúp', 'user guide', 'cách dùng', 'video hướng dẫn'],
     icon: HelpCircle,
@@ -297,7 +283,7 @@ export default function CommandPalette({
           </div>
           <div className="flex items-center gap-1.5 text-[10px]">
             <Star size={11} className="text-amber-500 fill-amber-400" />
-            <span>Đồ họa Toán học & Số hóa Tài liệu LVP</span>
+            <span>Trợ Lý Đồ Họa Toán Học LVP</span>
           </div>
         </div>
       </div>

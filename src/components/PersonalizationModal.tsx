@@ -169,7 +169,7 @@ export default function PersonalizationModal({
                 Trung tâm Cài đặt & Cá nhân hóa
               </h3>
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Tùy biến hệ thống đồ họa & số hóa theo phong cách của Thầy/Cô
+                Tùy biến hệ thống đồ họa Toán học theo phong cách của Thầy/Cô
               </p>
             </div>
           </div>

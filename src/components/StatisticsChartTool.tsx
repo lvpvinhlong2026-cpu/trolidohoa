@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { 
   BarChart2, 
+  BarChart,
   Copy, 
   Download, 
   CheckCircle2, 
@@ -10,11 +11,14 @@ import {
   Sliders, 
   FileSpreadsheet, 
   Plus, 
-  Trash2,
-  Table,
-  Check
+  Trash2, 
+  Table, 
+  Check,
+  PieChart,
+  TrendingUp
 } from 'lucide-react';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
+import ThcsStatisticalChart from './ThcsStatisticalChart';
 
 interface GroupedInterval {
   id: string;
@@ -24,6 +28,7 @@ interface GroupedInterval {
 }
 
 export default function StatisticsChartTool() {
+  const [activeMode, setActiveMode] = useState<'thcs' | 'thpt'>('thcs');
   const [dataType, setDataType] = useState<'raw' | 'grouped'>('raw');
   
   // Dữ liệu mẫu số liệu không ghép nhóm
@@ -395,9 +400,40 @@ export default function StatisticsChartTool() {
     : 'system-ui, -apple-system, sans-serif';
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+    <div className="w-full max-w-[1600px] mx-auto p-3 sm:p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+      {/* THANH CHUYỂN ĐỔI CHẾ ĐỘ BIỂU ĐỒ THCS & THPT */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 flex-wrap">
+        <button
+          onClick={() => setActiveMode('thcs')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+            activeMode === 'thcs'
+              ? 'bg-teal-600 text-white shadow-xs'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }`}
+        >
+          <BarChart size={16} />
+          <span>Biểu đồ SGK THCS (Cột, Cột kép, Đoạn thẳng, Quạt tròn)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMode('thpt')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+            activeMode === 'thpt'
+              ? 'bg-teal-600 text-white shadow-xs'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }`}
+        >
+          <BarChart2 size={16} />
+          <span>Biểu đồ Hộp & Thống kê Ghép nhóm THPT (GDPT 2018)</span>
+        </button>
+      </div>
+
+      {activeMode === 'thcs' ? (
+        <ThcsStatisticalChart />
+      ) : (
+        <div className="space-y-6">
+          {/* HEADER */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-600 dark:text-teal-400">
@@ -1104,6 +1140,8 @@ export default function StatisticsChartTool() {
           </div>
         </div>
       </div>
+    </div>
+  )}
     </div>
   );
 }

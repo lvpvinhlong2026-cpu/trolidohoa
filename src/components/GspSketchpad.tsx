@@ -4,10 +4,21 @@ import {
   Trash2, Undo2, Redo2, Copy, Download, RefreshCw, 
   Layers, CheckCircle2, AlertCircle, Sparkles, Grid, Eye, EyeOff,
   FileDown, FileUp, Edit3, X, Check, Type, ArrowRight, ArrowLeftRight,
-  Box, FolderKanban
+  Box, FolderKanban, BarChart2
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import Gsp3DViewerModal from './Gsp3DViewerModal';
+import ThcsStatisticalChart, { StatisticalChartConfig } from './ThcsStatisticalChart';
+
+export interface GspChartItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  svgString: string;
+  config: StatisticalChartConfig;
+}
 
 export interface GspPoint {
   id: string;
@@ -83,6 +94,7 @@ export interface GspState {
   ellipses?: GspEllipse[];
   rightAngles: GspRightAngle[];
   texts?: GspText[];
+  charts?: GspChartItem[];
 }
 
 export interface GspSketchpadProps {
@@ -108,6 +120,23 @@ export default function GspSketchpad({
   const [ellipses, setEllipses] = useState<GspEllipse[]>([]);
   const [rightAngles, setRightAngles] = useState<GspRightAngle[]>([]);
   const [texts, setTexts] = useState<GspText[]>([]);
+  const [charts, setCharts] = useState<GspChartItem[]>([]);
+  const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
+  const [hoveredChartId, setHoveredChartId] = useState<string | null>(null);
+  const [showChartModal, setShowChartModal] = useState<boolean>(false);
+  const [editingChart, setEditingChart] = useState<GspChartItem | null>(null);
+  const [chartRenderTrigger, setChartRenderTrigger] = useState<number>(0);
+  const chartImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [chartDragState, setChartDragState] = useState<{
+    chartId: string;
+    mode: 'move' | 'resize';
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+    origW: number;
+    origH: number;
+  } | null>(null);
 
   // Lịch sử Undo / Redo
   const [history, setHistory] = useState<GspState[]>([]);
@@ -213,6 +242,13 @@ export default function GspSketchpad({
       if (e.key === 'Escape') {
         setContextMenu(prev => prev.isOpen ? { ...prev, isOpen: false } : prev);
       }
+      // Phím tắt Xóa Biểu đồ khi đang chọn
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedChartId) {
+        saveSnapshot();
+        setCharts(prev => prev.filter(c => c.id !== selectedChartId));
+        setSelectedChartId(null);
+        showNotice('Đã xóa biểu đồ khỏi hình vẽ.');
+      }
       // Phím tắt Hoàn tác: Ctrl + Z hoặc Command + Z
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -244,18 +280,19 @@ export default function GspSketchpad({
       circles: JSON.parse(JSON.stringify(circles)),
       ellipses: JSON.parse(JSON.stringify(ellipses)),
       rightAngles: JSON.parse(JSON.stringify(rightAngles)),
-      texts: JSON.parse(JSON.stringify(texts))
+      texts: JSON.parse(JSON.stringify(texts)),
+      charts: JSON.parse(JSON.stringify(charts))
     };
     setHistory(prev => [...prev.slice(-25), currentState]);
     setRedoStack([]);
-  }, [points, segments, circles, ellipses, rightAngles, texts]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts]);
 
   const handleUndo = () => {
     if (history.length === 0) {
       showNotice('Không có thao tác nào trước đó để hoàn tác.');
       return;
     }
-    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts };
+    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts };
     const prev = history[history.length - 1];
     setRedoStack(r => [currentState, ...r]);
     setHistory(h => h.slice(0, -1));
@@ -266,9 +303,11 @@ export default function GspSketchpad({
     setEllipses(prev.ellipses || []);
     setRightAngles(prev.rightAngles || []);
     setTexts(prev.texts || []);
+    setCharts(prev.charts || []);
     setSelectedPointId(null);
     setSelectedSegmentId(null);
     setSelectedTextId(null);
+    setSelectedChartId(null);
     showNotice('↩️ Đã hoàn tác thao tác vừa rồi (Undo).');
   };
 
@@ -278,7 +317,7 @@ export default function GspSketchpad({
       return;
     }
     const next = redoStack[0];
-    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts };
+    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts };
     setHistory(h => [...h, currentState]);
     setRedoStack(r => r.slice(1));
 
@@ -288,11 +327,12 @@ export default function GspSketchpad({
     setEllipses(next.ellipses || []);
     setRightAngles(next.rightAngles || []);
     setTexts(next.texts || []);
+    setCharts(next.charts || []);
     showNotice('↪️ Đã làm lại thao tác (Redo).');
   };
 
   const handleClearAll = () => {
-    if (points.length === 0 && texts.length === 0 && ellipses.length === 0) return;
+    if (points.length === 0 && texts.length === 0 && ellipses.length === 0 && charts.length === 0) return;
     if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ bản vẽ và bắt đầu lại không?')) {
       saveSnapshot();
       setPoints([]);
@@ -301,9 +341,11 @@ export default function GspSketchpad({
       setEllipses([]);
       setRightAngles([]);
       setTexts([]);
+      setCharts([]);
       setSelectedPointId(null);
       setSelectedSegmentId(null);
       setSelectedTextId(null);
+      setSelectedChartId(null);
       setDrawingStartPointId(null);
       showNotice('Đã làm sạch bảng vẽ.');
     }
@@ -530,6 +572,50 @@ export default function GspSketchpad({
     const nearbySeg = (!nearbyPt && !nearbyTxt) ? findNearbySegment(x, y) : null;
 
     if (activeTool === 'select') {
+      // 1. Kiểm tra nhấp vào góc co giãn của Biểu đồ đang chọn
+      const clickedChartCorner = [...charts].reverse().find(c => {
+        const rx = c.x + c.width;
+        const ry = c.y + c.height;
+        return Math.hypot(x - rx, y - ry) <= 14;
+      });
+
+      if (clickedChartCorner) {
+        setSelectedChartId(clickedChartCorner.id);
+        setChartDragState({
+          chartId: clickedChartCorner.id,
+          mode: 'resize',
+          startX: x,
+          startY: y,
+          origX: clickedChartCorner.x,
+          origY: clickedChartCorner.y,
+          origW: clickedChartCorner.width,
+          origH: clickedChartCorner.height
+        });
+        return;
+      }
+
+      // 2. Kiểm tra nhấp vào thân Biểu đồ để di chuyển
+      const clickedChart = [...charts].reverse().find(c => x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height);
+      if (clickedChart && !nearbyPt && !nearbyTxt) {
+        setSelectedChartId(clickedChart.id);
+        setSelectedPointId(null);
+        setSelectedSegmentId(null);
+        setSelectedTextId(null);
+        setChartDragState({
+          chartId: clickedChart.id,
+          mode: 'move',
+          startX: x,
+          startY: y,
+          origX: clickedChart.x,
+          origY: clickedChart.y,
+          origW: clickedChart.width,
+          origH: clickedChart.height
+        });
+        return;
+      } else if (!clickedChart && !nearbyPt && !nearbyTxt && !nearbySeg) {
+        setSelectedChartId(null);
+      }
+
       if (nearbyPt) {
         dragStartSnapshotRef.current = {
           points: JSON.parse(JSON.stringify(points)),
@@ -980,6 +1066,30 @@ export default function GspSketchpad({
     const { x, y } = getCanvasMouse(e);
     setDrawingCurrentMouse({ x, y });
 
+    // Kéo thả hoặc co giãn biểu đồ
+    if (chartDragState) {
+      const dx = x - chartDragState.startX;
+      const dy = y - chartDragState.startY;
+      if (chartDragState.mode === 'move') {
+        setCharts(prev => prev.map(c => c.id === chartDragState.chartId ? {
+          ...c,
+          x: Math.round(chartDragState.origX + dx),
+          y: Math.round(chartDragState.origY + dy)
+        } : c));
+      } else if (chartDragState.mode === 'resize') {
+        setCharts(prev => prev.map(c => c.id === chartDragState.chartId ? {
+          ...c,
+          width: Math.max(140, Math.round(chartDragState.origW + dx)),
+          height: Math.max(90, Math.round(chartDragState.origH + dy))
+        } : c));
+      }
+      return;
+    }
+
+    // Hover trên biểu đồ
+    const hoveredChart = [...charts].reverse().find(c => x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height);
+    setHoveredChartId(hoveredChart ? hoveredChart.id : null);
+
     const nearbyPt = findNearbyPoint(x, y);
     const nearbyTxt = findNearbyText(x, y);
     const nearbySeg = (!nearbyPt && !nearbyTxt) ? findNearbySegment(x, y) : null;
@@ -1091,6 +1201,10 @@ export default function GspSketchpad({
   };
 
   const handleMouseUp = () => {
+    if (chartDragState) {
+      setChartDragState(null);
+      saveSnapshot();
+    }
     if (draggedPointId || draggedTextId) {
       if (dragStartSnapshotRef.current) {
         setHistory(prev => [...prev.slice(-25), dragStartSnapshotRef.current!]);
@@ -1104,6 +1218,14 @@ export default function GspSketchpad({
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasMouse(e);
+
+    // 0. Nhấp đúp vào Biểu đồ -> Mở trình chỉnh sửa biểu đồ
+    const clickedChart = [...charts].reverse().find(c => x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height);
+    if (clickedChart) {
+      setEditingChart(clickedChart);
+      setShowChartModal(true);
+      return;
+    }
 
     // 1. Nhấp đúp vào Text đã có -> Mở hộp thoại sửa text
     const nearbyTxt = findNearbyText(x, y);
@@ -1804,6 +1926,13 @@ export default function GspSketchpad({
       minY = Math.min(minY, t.y - 28);
       maxY = Math.max(maxY, t.y + 14);
     }
+    for (const ch of charts) {
+      hasContent = true;
+      minX = Math.min(minX, ch.x);
+      maxX = Math.max(maxX, ch.x + ch.width);
+      minY = Math.min(minY, ch.y);
+      maxY = Math.max(maxY, ch.y + ch.height);
+    }
 
     if (!hasContent) return offscreen;
 
@@ -2357,7 +2486,58 @@ export default function GspSketchpad({
       ctx.fillText(t.content, t.x, t.y);
       ctx.restore();
     }
+
+    // 9. Vẽ các biểu đồ thống kê đã chèn (kéo để dời, kéo góc để phóng to/thu nhỏ)
+    for (const c of charts) {
+      const img = chartImagesRef.current.get(c.id);
+      if (img && img.complete) {
+        ctx.drawImage(img, c.x, c.y, c.width, c.height);
+      } else {
+        ctx.save();
+        ctx.strokeStyle = '#94a3b8';
+        ctx.setLineDash([3, 3]);
+        ctx.strokeRect(c.x, c.y, c.width, c.height);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('Đang nạp biểu đồ...', c.x + 10, c.y + 20);
+        ctx.restore();
+      }
+
+      if (isInteractive && (selectedChartId === c.id || hoveredChartId === c.id)) {
+        ctx.save();
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(c.x, c.y, c.width, c.height);
+
+        // Vẽ 4 góc điều chỉnh kích thước
+        const hs = 8;
+        ctx.fillStyle = '#0284c7';
+        ctx.setLineDash([]);
+        ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs);
+        ctx.fillRect(c.x + c.width - hs / 2, c.y - hs / 2, hs, hs);
+        ctx.fillRect(c.x - hs / 2, c.y + c.height - hs / 2, hs, hs);
+        ctx.fillRect(c.x + c.width - hs / 2, c.y + c.height - hs / 2, hs, hs);
+        ctx.restore();
+      }
+    }
   };
+
+  // Nạp hình ảnh biểu đồ vào cache Ref
+  useEffect(() => {
+    charts.forEach(c => {
+      if (!chartImagesRef.current.has(c.id)) {
+        const blob = new Blob([c.svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          chartImagesRef.current.set(c.id, img);
+          setChartRenderTrigger(prev => prev + 1);
+        };
+        img.src = url;
+      }
+    });
+  }, [charts]);
 
   // Render lại Canvas mỗi khi state thay đổi
   useEffect(() => {
@@ -2373,7 +2553,7 @@ export default function GspSketchpad({
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
     renderGspScene(ctx, true);
-  }, [points, segments, circles, ellipses, rightAngles, texts, showGrid, pointDisplayMode, selectedPointId, hoveredPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, selectedPointId, hoveredPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
 
   // Nạp sẵn mẫu hình ban đầu nếu trống hoặc khi externalPreset thay đổi
   useEffect(() => {
@@ -2396,6 +2576,17 @@ export default function GspSketchpad({
     if (activeTool === 'vector') return 'crosshair';
     if (hoveredPointId || hoveredTextId) return 'move';
     if (activeTool === 'select') {
+      if (selectedChartId) {
+        const sc = charts.find(c => c.id === selectedChartId);
+        if (sc && drawingCurrentMouse) {
+          const rx = sc.x + sc.width;
+          const ry = sc.y + sc.height;
+          if (Math.hypot(drawingCurrentMouse.x - rx, drawingCurrentMouse.y - ry) <= 14) {
+            return 'nwse-resize';
+          }
+        }
+      }
+      if (hoveredChartId) return 'move';
       if (hoveredSegmentId) return 'pointer';
       return 'default';
     }
@@ -3063,6 +3254,19 @@ export default function GspSketchpad({
 
             {/* NÚT XUẤT WORD, TẢI ẢNH 300 DPI VÀ MÔ HÌNH 3D XOAY 360 ĐỘ */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* NÚT VẼ BIỂU ĐỒ THỐNG KÊ (THCS & THPT) */}
+              <button
+                onClick={() => {
+                  setEditingChart(null);
+                  setShowChartModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                title="Vẽ biểu đồ thống kê (Cột, Cột kép, Đoạn thẳng, Hình quạt tròn) và chèn vào hình vẽ"
+              >
+                <BarChart2 size={15} />
+                <span>Vẽ biểu đồ</span>
+              </button>
+
               {/* NÚT MÔ HÌNH 3D TƯƠNG TÁC XOAY 360 ĐỘ (CÓ PHÂN LOẠI NÉT THẤY/KHUẤT) */}
               <button
                 onClick={() => setShow3DViewerModal(true)}
@@ -4074,6 +4278,70 @@ export default function GspSketchpad({
         presetType={currentPresetType}
         onOpenFull3DTab={onOpen3D}
       />
+
+      {/* MODAL VẼ BIỂU ĐỒ THỐNG KÊ (THCS & THPT) */}
+      {showChartModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col">
+            <ThcsStatisticalChart
+              initialConfig={editingChart?.config}
+              isModal={true}
+              onCancel={() => {
+                setShowChartModal(false);
+                setEditingChart(null);
+              }}
+              onInsertToCanvas={(svgString, config) => {
+                saveSnapshot();
+                if (editingChart) {
+                  setCharts(prev => prev.map(c => c.id === editingChart.id ? {
+                    ...c,
+                    svgString,
+                    config
+                  } : c));
+                  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const img = new Image();
+                  img.onload = () => {
+                    chartImagesRef.current.set(editingChart.id, img);
+                    setChartRenderTrigger(prev => prev + 1);
+                  };
+                  img.src = url;
+                  showNotice('Đã cập nhật biểu đồ.');
+                } else {
+                  const newId = `chart_${Date.now()}`;
+                  const newW = 440;
+                  const newH = 280;
+                  const newX = Math.round((LOGICAL_WIDTH - newW) / 2);
+                  const newY = Math.round((LOGICAL_HEIGHT - newH) / 2);
+                  const newChart: GspChartItem = {
+                    id: newId,
+                    x: newX,
+                    y: newY,
+                    width: newW,
+                    height: newH,
+                    svgString,
+                    config
+                  };
+                  setCharts(prev => [...prev, newChart]);
+                  setSelectedChartId(newId);
+                  
+                  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const img = new Image();
+                  img.onload = () => {
+                    chartImagesRef.current.set(newId, img);
+                    setChartRenderTrigger(prev => prev + 1);
+                  };
+                  img.src = url;
+                  showNotice('Đã chèn biểu đồ vào hình vẽ.');
+                }
+                setShowChartModal(false);
+                setEditingChart(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

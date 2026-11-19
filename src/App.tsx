@@ -1,7 +1,7 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * Phân hệ 4: TRỢ LÝ ĐỒ HỌA TOÁN HỌC & SỐ HÓA TÀI LIỆU
+ * Phân hệ 4: TRỢ LÝ ĐỒ HỌA TOÁN HỌC
  * Hệ sinh thái Giáo dục Số LVP (LVP EduEcosystem)
  * Tác giả: GV Lê Vĩnh Phúc (0944405124)
  */
@@ -12,8 +12,6 @@ import {
   Compass,
   Layers,
   Palette,
-  FileText,
-  Scissors,
   HelpCircle,
   Settings,
   Moon,
@@ -22,7 +20,6 @@ import {
   ChevronLeft,
   Search,
   MonitorPlay,
-  Brain,
   BarChart2,
   Table,
   Maximize2,
@@ -35,15 +32,13 @@ import {
   ACCENT_THEMES, 
   TeacherProfile 
 } from './types/personalization';
-import LvpEcosystemMenu from './components/LvpEcosystemMenu';
 import CommandPalette from './components/CommandPalette';
 import QuickFavoritesBar from './components/QuickFavoritesBar';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
 
 // =====================================================================
-// CHỈ GIỮ LẠI CÁC PHÂN HỆ CỐT LÕI ĐÚNG VỚI "ĐỒ HỌA & SỐ HÓA"
-// Lọc bỏ hoàn toàn các chức năng thừa (soạn giáo án, đề thi, slide, poster)
+// CHỈ GIỮ LẠI CÁC PHÂN HỆ CỐT LÕI ĐỒ HỌA TOÁN HỌC (300 DPI)
 // =====================================================================
 // 1. Nhóm Đồ họa Toán học (300 DPI)
 const TableVariationTool = lazy(() => import('./components/TableVariationTool'));
@@ -53,10 +48,7 @@ const CombinedGeometryTab = lazy(() => import('./components/CombinedGeometryTab'
 const Geogebra3DTool = lazy(() => import('./components/Geogebra3DTool'));
 const SimulationGenerator = lazy(() => import('./components/SimulationGenerator'));
 
-// 2. Nhóm Sơ đồ Tư duy & Trực quan
-const MindmapGenerator = lazy(() => import('./components/MindmapGenerator'));
-
-// 3. Hướng dẫn sử dụng
+// 2. Hướng dẫn sử dụng
 const UserGuide = lazy(() => import('./components/UserGuide'));
 
 export type TabId =
@@ -66,7 +58,6 @@ export type TabId =
   | 'geometry'
   | 'geogebra'
   | 'simulation'
-  | 'mindmap'
   | 'guide'
   | 'gsp'
   | 'quick3d';
@@ -84,7 +75,7 @@ export interface NavCategory {
 }
 
 // =====================================================================
-// DANH MỤC CÔNG CỤ TINH GỌN ĐÚNG TRỌNG TÂM: ĐỒ HỌA + SỐ HÓA
+// DANH MỤC CÔNG CỤ TINH GỌN ĐÚNG TRỌNG TÂM: ĐỒ HỌA TOÁN HỌC
 // =====================================================================
 export const NAV_CATEGORIES: NavCategory[] = [
   {
@@ -107,10 +98,10 @@ export const NAV_CATEGORIES: NavCategory[] = [
       },
       {
         id: 'statistics',
-        label: 'Biểu đồ Hộp & Thống kê',
-        sub: 'Biểu đồ hộp, số liệu ghép nhóm GDPT 2018',
+        label: 'Biểu đồ Thống kê (Cột, Quạt, Hộp)',
+        sub: 'Cột, cột kép, đoạn thẳng, hình quạt tròn & hộp 300 DPI',
         icon: BarChart2,
-        badge: 'GDPT 2018',
+        badge: 'Mới',
       },
       {
         id: 'geometry',
@@ -132,19 +123,6 @@ export const NAV_CATEGORIES: NavCategory[] = [
         sub: 'Minh họa động định lý Toán & Khoa học',
         icon: MonitorPlay,
         badge: 'Mô phỏng',
-      },
-    ],
-  },
-  {
-    id: 'so_do',
-    title: 'Sơ Đồ Tư Duy & Trực Quan',
-    tools: [
-      {
-        id: 'mindmap',
-        label: 'Sơ đồ Tư duy Bài học',
-        sub: 'Markmap tóm tắt kiến thức chương, bài học',
-        icon: Brain,
-        badge: 'Markmap',
       },
     ],
   },
@@ -367,7 +345,7 @@ export default function App() {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xs sm:text-sm md:text-base font-black tracking-tight text-slate-900 dark:text-white uppercase truncate">
-                  TRỢ LÝ ĐỒ HỌA TOÁN HỌC & SỐ HÓA TÀI LIỆU
+                  TRỢ LÝ ĐỒ HỌA TOÁN HỌC
                 </h1>
               </div>
               {!isCompactMode && (
@@ -392,7 +370,7 @@ export default function App() {
             <button
               onClick={() => setShowCommandPalette(true)}
               className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
-              title="Tìm nhanh công cụ đồ họa & số hóa (Ctrl + K)"
+              title="Tìm nhanh công cụ đồ họa Toán học (Ctrl + K)"
             >
               <Search size={14} className={theme.primaryText} />
               <span className="hidden md:inline">Tìm kiếm</span>
@@ -400,9 +378,6 @@ export default function App() {
                 Ctrl K
               </kbd>
             </button>
-
-            {/* Menu chuyển đổi nhanh các Phân hệ trong Hệ sinh thái LVP */}
-            <LvpEcosystemMenu accentColor={accentColor} />
 
             {/* Nút Cấu hình AI & Cá nhân hóa */}
             <button
@@ -472,7 +447,7 @@ export default function App() {
             {!isSidebarCollapsed ? (
               <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex items-center gap-1.5">
                 <Palette size={13} className={theme.primaryText} />
-                Công cụ Đồ họa & Số hóa
+                Công cụ Đồ họa Toán học
               </span>
             ) : (
               <div className="w-full flex justify-center">
@@ -490,7 +465,7 @@ export default function App() {
             </button>
           </div>
 
-          {/* Danh mục 2 nhóm cốt lõi: Đồ Họa & Số Hóa */}
+          {/* Danh mục công cụ Đồ Họa Toán Học */}
           <div className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
             {NAV_CATEGORIES.map(category => (
               <div key={category.id} className="space-y-1">
@@ -562,29 +537,6 @@ export default function App() {
           </div>
 
           {/* Bridge link to TRO_LI_VAN_BAN */}
-          {!isSidebarCollapsed && (
-            <div className="p-2 border-t border-slate-100 dark:border-slate-800">
-              <a
-                href="http://localhost:3000"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group block p-2 rounded-xl bg-teal-50/70 hover:bg-teal-100/80 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 border border-teal-200/80 dark:border-teal-800/80 transition-all cursor-pointer"
-                title="Mở hệ thống Trợ Lý Văn Bản & Đề Thi (Cổng 3000)"
-              >
-                <div className="flex items-center justify-between text-teal-800 dark:text-teal-300 text-xs font-bold mb-0.5">
-                  <span className="flex items-center gap-1.5">
-                    <FileText size={13} className="text-teal-600 dark:text-teal-400" />
-                    Trợ Lý Văn Bản & Đề Thi
-                  </span>
-                  <span className="text-[9px] text-teal-600 dark:text-teal-400 font-mono">:3000 ↗</span>
-                </div>
-                <p className="text-[10px] text-teal-700/80 dark:text-teal-300/80 leading-snug">
-                  Bóc tách PDF/Word sang LaTeX, Tách & ghép PDF Offline
-                </p>
-              </a>
-            </div>
-          )}
-
           {/* Footer Sidebar */}
           {!isSidebarCollapsed && (
             <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
@@ -643,15 +595,7 @@ export default function App() {
               </div>
             )}
 
-            {/* NHÓM 2: SƠ ĐỒ TƯ DUY & TRỰC QUAN */}
-            {/* 2.1 SƠ ĐỒ TƯ DUY BÀI HỌC (MARKMAP) */}
-            {visitedTabs.has('mindmap') && (
-              <div className={activeTab === 'mindmap' ? 'block animate-fade-in' : 'hidden'}>
-                <MindmapGenerator apiKey={apiKey} model={preferredModel} />
-              </div>
-            )}
-
-            {/* 3. HƯỚNG DẪN SỬ DỤNG HỆ THỐNG */}
+            {/* 2. HƯỚNG DẪN SỬ DỤNG HỆ THỐNG */}
             {visitedTabs.has('guide') && (
               <div className={activeTab === 'guide' ? 'block animate-fade-in' : 'hidden'}>
                 <UserGuide />
