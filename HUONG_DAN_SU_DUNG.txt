@@ -1,0 +1,34 @@
+================================================================================
+          HƯỚNG DẪN KHỞI CHẠY HỆ THỐNG TRỢ LÝ VĂN BẢN - AI
+================================================================================
+
+1. CÁCH KHỞI CHẠY NHANH NHẤT (1-CLICK):
+--------------------------------------------------------------------------------
+- Nhấp đúp chuột (Double-click) vào file:
+      CHAY_HE_THONG.bat   (hoặc file start.bat)
+- Hệ thống sẽ tự động:
+  + Kiểm tra môi trường Bun đã cài đặt trên máy.
+  + Tự động giải phóng cổng 3000 (nếu có tiến trình khác đang chiếm).
+  + Khởi động máy chủ Express + Vite.
+  + Tự động bật trình duyệt web truy cập vào: http://localhost:3000
+
+2. CÁCH KHỞI CHẠY QUA DÒNG LỆNH (TERMINAL):
+--------------------------------------------------------------------------------
+- Mở PowerShell hoặc Command Prompt tại thư mục dự án:
+      bun run dev
+  (hoặc lệnh: bun server.ts)
+- Truy cập trình duyệt: http://localhost:3000
+
+3. CÁCH DỪNG HỆ THỐNG:
+--------------------------------------------------------------------------------
+- Đóng cửa sổ Command Prompt đang chạy (hoặc bấm Ctrl + C).
+- Hoặc nhấp đúp vào file:
+      DUNG_HE_THONG.bat
+
+4. CẤU HÌNH API KEY (GEMINI AI):
+--------------------------------------------------------------------------------
+- Cách 1: Trên giao diện web, nhấn vào biểu tượng bánh răng "Cài đặt", dán
+  API Key Gemini (lấy tại https://aistudio.google.com/api-keys) và bấm Lưu.
+- Cách 2: Mở file .env và điền key vào dòng:
+      GEMINI_API_KEY="AIzaSy..."
+================================================================================

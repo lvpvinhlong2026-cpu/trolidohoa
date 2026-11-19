@@ -1,0 +1,6 @@
+{
+  "name": "Trợ Lý Đồ Họa Toán Học (300 DPI) & Sơ Đồ Tư Duy - AI",
+  "description": "Vẽ hình học 2D/3D (Bảng biến thiên BBT 300 DPI, Oxy, GeoGebra 3D AI, GSP Sketchpad 5), Biểu đồ thống kê GDPT 2018, Sơ đồ tư duy Markmap và Mô phỏng tương tác Toán học bằng AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
