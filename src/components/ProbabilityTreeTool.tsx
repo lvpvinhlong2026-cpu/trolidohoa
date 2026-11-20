@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Sliders, Eye, Palette, Check, HelpCircle
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
+import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export interface Stage2Branch {
   id: string;
@@ -238,7 +239,9 @@ export default function ProbabilityTreeTool() {
   const [showProbOnBranches, setShowProbOnBranches] = useState<boolean>(true);
   const [showOutcomeFormulas, setShowOutcomeFormulas] = useState<boolean>(true);
   const [showOutcomeProbValues, setShowOutcomeProbValues] = useState<boolean>(true);
-  const [fontChoice, setFontChoice] = useState<'times' | 'sans'>('times');
+  const [fontChoice, setFontChoice] = useState<MathFontChoice>('times');
+  const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
+  const [isBold, setIsBold] = useState<boolean>(true);
   const [fontSizeScale, setFontSizeScale] = useState<number>(1.0);
 
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -356,9 +359,7 @@ export default function ProbabilityTreeTool() {
     ctx.fillRect(0, 0, width, height);
 
     const isMono = colorMode === 'monochrome';
-    const fontFamily = fontChoice === 'times' 
-      ? '"Times New Roman", Times, "STIX Two Text", serif' 
-      : 'system-ui, -apple-system, sans-serif';
+    const fontFamily = MATH_FONT_FAMILIES[fontChoice];
 
     // Đếm tổng số lá (leaves) ở đầu cành
     let totalLeaves = 0;
@@ -387,7 +388,7 @@ export default function ProbabilityTreeTool() {
     // Tiêu đề các giai đoạn (Stages) ở đỉnh
     if (showStageLabels) {
       ctx.save();
-      ctx.font = `bold ${Math.round(13 * fontSizeScale)}px ${fontFamily}`;
+      ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(13 * fontSizeScale)}px ${fontFamily}`;
       ctx.fillStyle = isMono ? '#475569' : '#0f766e';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -470,13 +471,13 @@ export default function ProbabilityTreeTool() {
         const textX = x0 + (node.x - x0) * t;
         const textY = y0 + (node.y - y0) * t - 9;
 
-        ctx.font = `italic bold ${Math.round(15 * fontSizeScale)}px ${fontFamily}`;
+        ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${Math.round(15 * fontSizeScale)}px ${fontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
         // Viền trắng bảo vệ chữ
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = isBold ? 4 : 2.6;
         ctx.lineJoin = 'round';
         ctx.strokeText(b1.prob, textX, textY);
 
@@ -511,12 +512,12 @@ export default function ProbabilityTreeTool() {
           const textX = node.x + (child.x - node.x) * t;
           const textY = node.y + (child.y - node.y) * t - 9;
 
-          ctx.font = `italic bold ${Math.round(14 * fontSizeScale)}px ${fontFamily}`;
+          ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${Math.round(14 * fontSizeScale)}px ${fontFamily}`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
 
           ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 4;
+          ctx.lineWidth = isBold ? 4 : 2.6;
           ctx.lineJoin = 'round';
           ctx.strokeText(b2.prob, textX, textY);
 
@@ -534,7 +535,7 @@ export default function ProbabilityTreeTool() {
         ctx.textBaseline = 'middle';
 
         // Tên biến cố kết quả
-        ctx.font = `italic bold ${Math.round(16 * fontSizeScale)}px ${fontFamily}`;
+        ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${Math.round(16 * fontSizeScale)}px ${fontFamily}`;
         ctx.fillStyle = '#000000';
         ctx.fillText(outcomeName, xOutcome, child.y);
 
@@ -547,7 +548,7 @@ export default function ProbabilityTreeTool() {
             ? ` = ${formatDecimalResult(jointProbVal)}` 
             : '';
 
-          ctx.font = `bold ${Math.round(14 * fontSizeScale)}px ${fontFamily}`;
+          ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(14 * fontSizeScale)}px ${fontFamily}`;
           ctx.fillStyle = isMono ? '#334155' : '#0f766e';
           const nameWidth = ctx.measureText(outcomeName).width;
           ctx.fillText(`${formulaStr}${valStr}`, xOutcome + nameWidth + 6, child.y);
@@ -565,7 +566,7 @@ export default function ProbabilityTreeTool() {
     ctx.fill();
 
     if (rootLabel.trim()) {
-      ctx.font = `bold ${Math.round(13 * fontSizeScale)}px ${fontFamily}`;
+      ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(13 * fontSizeScale)}px ${fontFamily}`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#475569';
@@ -583,12 +584,12 @@ export default function ProbabilityTreeTool() {
       ctx.fill();
 
       // Nhãn biến cố tầng 1 (chữ to rõ in nghiêng đậm)
-      ctx.font = `italic bold ${Math.round(18 * fontSizeScale)}px ${fontFamily}`;
+      ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${Math.round(18 * fontSizeScale)}px ${fontFamily}`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
 
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 5;
+      ctx.lineWidth = isBold ? 5 : 3;
       ctx.lineJoin = 'round';
       ctx.strokeText(node.b1.label, node.x + 8, node.y - 2);
 
@@ -607,12 +608,12 @@ export default function ProbabilityTreeTool() {
         ctx.fill();
 
         // Nhãn biến cố tầng 2
-        ctx.font = `italic bold ${Math.round(18 * fontSizeScale)}px ${fontFamily}`;
+        ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${Math.round(18 * fontSizeScale)}px ${fontFamily}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
 
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 5;
+        ctx.lineWidth = isBold ? 5 : 3;
         ctx.lineJoin = 'round';
         ctx.strokeText(child.b2.label, child.x + 8, child.y - 2);
 
@@ -848,6 +849,19 @@ export default function ProbabilityTreeTool() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Phông chữ & Nét vẽ hiển thị */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <MathFontSelector
+                font={fontChoice}
+                onFontChange={setFontChoice}
+                stroke={strokeChoice}
+                onStrokeChange={setStrokeChoice}
+                isBold={isBold}
+                onBoldChange={setIsBold}
+                size="sm"
+              />
             </div>
 
             {/* Bật tắt nhãn và công thức */}

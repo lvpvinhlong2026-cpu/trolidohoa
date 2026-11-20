@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
 import ThcsStatisticalChart from './ThcsStatisticalChart';
+import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface GroupedInterval {
   id: string;
@@ -44,7 +45,9 @@ export default function StatisticsChartTool() {
   ]);
 
   const [chartType, setChartType] = useState<'both' | 'box' | 'hist'>('both');
-  const [fontChoice, setFontChoice] = useState<'times' | 'sans'>('times');
+  const [fontChoice, setFontChoice] = useState<MathFontChoice>('times');
+  const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
+  const [isBold, setIsBold] = useState<boolean>(true);
   const [boxThemeColor, setBoxThemeColor] = useState<string>('#0d9488'); // teal-600
   const [showOutliers, setShowOutliers] = useState<boolean>(true);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
@@ -395,9 +398,7 @@ export default function StatisticsChartTool() {
   };
 
   // Font family
-  const fontFamilyStyle = fontChoice === 'times' 
-    ? '"Times New Roman", Times, "Cambria Math", serif' 
-    : 'system-ui, -apple-system, sans-serif';
+  const fontFamilyStyle = MATH_FONT_FAMILIES[fontChoice];
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-3 sm:p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
@@ -588,15 +589,15 @@ export default function StatisticsChartTool() {
               </label>
 
               <div className="flex items-center gap-2 ml-auto">
-                <span>Phông chữ:</span>
-                <select
-                  value={fontChoice}
-                  onChange={(e) => setFontChoice(e.target.value as any)}
-                  className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold"
-                >
-                  <option value="times">Times New Roman (Toán VN)</option>
-                  <option value="sans">Sans-serif hiện đại</option>
-                </select>
+                <MathFontSelector
+                  font={fontChoice}
+                  onFontChange={setFontChoice}
+                  stroke={strokeChoice}
+                  onStrokeChange={setStrokeChoice}
+                  isBold={isBold}
+                  onBoldChange={setIsBold}
+                  size="sm"
+                />
               </div>
             </div>
           </div>
@@ -846,7 +847,7 @@ export default function StatisticsChartTool() {
                     textAnchor="middle"
                     fill="#1e293b"
                     fontSize="16"
-                    fontWeight="bold"
+                    fontWeight={isBold ? 'bold' : 'normal'}
                   >
                     {dataType === 'raw'
                       ? 'BIỂU ĐỒ HỘP (BOX PLOT) PHÂN BỐ DỮ LIỆU'
@@ -911,7 +912,7 @@ export default function StatisticsChartTool() {
                                     textAnchor="middle"
                                     fill="#0f766e"
                                     fontSize="11"
-                                    fontWeight="bold"
+                                    fontWeight={isBold ? 'bold' : 'normal'}
                                   >
                                     {g.freq}
                                   </text>
@@ -1008,7 +1009,7 @@ export default function StatisticsChartTool() {
                               textAnchor="middle"
                               fill="#ef4444"
                               fontSize="14"
-                              fontWeight="bold"
+                              fontWeight={isBold ? 'bold' : 'normal'}
                             >
                               {val}*
                             </text>
@@ -1024,7 +1025,7 @@ export default function StatisticsChartTool() {
                         textAnchor="middle"
                         fill="#0f766e"
                         fontSize="16"
-                        fontWeight="bold"
+                        fontWeight={isBold ? 'bold' : 'normal'}
                       >
                         Q₁ = {stats.Q1}
                       </text>
@@ -1035,7 +1036,7 @@ export default function StatisticsChartTool() {
                         textAnchor="middle"
                         fill="#e11d48"
                         fontSize="17"
-                        fontWeight="bold"
+                        fontWeight={isBold ? 'bold' : 'normal'}
                       >
                         Me = {stats.Q2}
                       </text>
@@ -1046,7 +1047,7 @@ export default function StatisticsChartTool() {
                         textAnchor="middle"
                         fill="#0f766e"
                         fontSize="16"
-                        fontWeight="bold"
+                        fontWeight={isBold ? 'bold' : 'normal'}
                       >
                         Q₃ = {stats.Q3}
                       </text>
@@ -1058,7 +1059,7 @@ export default function StatisticsChartTool() {
                         textAnchor="middle"
                         fill="#334155"
                         fontSize="14"
-                        fontWeight="bold"
+                        fontWeight={isBold ? 'bold' : 'normal'}
                       >
                         Min: {dataType === 'raw' && rawStats ? rawStats.whiskerMin : stats.min}
                       </text>
@@ -1068,7 +1069,7 @@ export default function StatisticsChartTool() {
                         textAnchor="middle"
                         fill="#334155"
                         fontSize="14"
-                        fontWeight="bold"
+                        fontWeight={isBold ? 'bold' : 'normal'}
                       >
                         Max: {dataType === 'raw' && rawStats ? rawStats.whiskerMax : stats.max}
                       </text>
@@ -1100,7 +1101,7 @@ export default function StatisticsChartTool() {
                           fill="#334155"
                           fontSize="17"
                           fontStyle="italic"
-                          fontWeight="bold"
+                          fontWeight={isBold ? 'bold' : 'normal'}
                         >
                           x
                         </text>
@@ -1124,7 +1125,7 @@ export default function StatisticsChartTool() {
                                 textAnchor="middle"
                                 fill="#1e293b"
                                 fontSize="15"
-                                fontWeight="bold"
+                                fontWeight={isBold ? 'bold' : 'normal'}
                               >
                                 {t}
                               </text>

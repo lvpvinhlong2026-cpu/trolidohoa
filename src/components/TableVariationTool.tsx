@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
   Table, 
   Copy, 
@@ -13,29 +13,36 @@ import {
   Eye,
   CheckCircle2,
   Bookmark,
-  AlertCircle
+  AlertCircle,
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/dpiUtils';
+import { 
+  analyzeFunction, 
+  analyzeFromCoeffs, 
+  analyzeFromCoeffsOnInterval, 
+  analyzeFunctionOnInterval, 
+  renderBBTToCanvas, 
+  BBTData, 
+  formatNum 
+} from '../utils/bbtEngine';
+import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export type BBTType = 'variation' | 'sign_chart';
+export type MasterBBTMode = 'auto' | 'variation' | 'sign_chart';
 
 export interface XPoint {
   id: string;
   xVal: string;
-  // Trạng thái y' tại điểm x: '0' | 'double_bar' (||) | 'single_bar' (|) | 'blank'
   derivType: '0' | 'double_bar' | 'single_bar' | 'blank';
-  // Dấu của y' ở khoảng bên phải điểm x này (nếu không phải điểm cuối)
   intervalSign: '+' | '-' | 'blank';
-  // Giá trị của y tại điểm x:
-  // Nếu là tiệm cận đứng (double_bar) thì có thể có giá trị bên trái và bên phải (vd: -inf / +inf)
   yVal: string;
-  yRightVal?: string; // Dùng cho tiệm cận đứng 2 nhánh
-  // Vị trí độ cao của y: 'top' (cực đại / +inf), 'bottom' (cực tiểu / -inf), 'middle'
+  yRightVal?: string;
   yPos: 'top' | 'bottom' | 'middle';
   yRightPos?: 'top' | 'bottom' | 'middle';
 }
 
-// Chuyển ký hiệu LaTeX sang ký tự hiển thị Toán học chuẩn
 function formatDisplayMath(text: string): string {
   if (!text) return '';
   return text
@@ -50,27 +57,55 @@ function formatDisplayMath(text: string): string {
     .replace(/_3/g, '₃');
 }
 
-/**
- * =========================================================================
- * BỘ VẼ TRỰC TIẾP LÊN HTML5 CANVAS (300 DPI CHUẨN IN ẤN VÀ MICROSOFT WORD)
- * Giải quyết triệt để 100% lỗi không dán được hình vào Word!
- * Tối ưu hóa chữ to rõ, chuẩn SGK và đề thi Toán học
- * =========================================================================
- */
+function bbtDataToPoints(bbt: BBTData): XPoint[] {
+  return bbt.points.map((pt, i) => {
+    let derivType: XPoint['derivType'] = 'blank';
+    if (pt.isDoubleBar || pt.yPrimeSymbol === '||') {
+      derivType = 'double_bar';
+    } else if (pt.yPrimeSymbol === '0') {
+      derivType = '0';
+    } else if (pt.yPrimeSymbol === '|') {
+      derivType = 'single_bar';
+    }
+
+    const intervalSign = bbt.intervals[i]?.sign || 'blank';
+
+    let yPos: XPoint['yPos'] = 'middle';
+    if (pt.yPos === 'top') yPos = 'top';
+    else if (pt.yPos === 'bottom') yPos = 'bottom';
+    else if (pt.yValue === '+∞' || pt.yValue === '+\\infty') yPos = 'top';
+    else if (pt.yValue === '-∞' || pt.yValue === '-\\infty') yPos = 'bottom';
+
+    return {
+      id: String(Date.now() + i),
+      xVal: pt.xLabel,
+      derivType,
+      intervalSign,
+      yVal: pt.isDoubleBar ? (pt.leftLimit || '-∞') : pt.yValue,
+      yRightVal: pt.isDoubleBar ? (pt.rightLimit || '+∞') : undefined,
+      yPos,
+      yRightPos: pt.isDoubleBar ? (pt.rightLimit === '+∞' || pt.rightLimit === '+\\infty' ? 'top' : 'bottom') : undefined
+    };
+  });
+}
+
 function drawBBTToCanvas(
   canvas: HTMLCanvasElement,
   points: XPoint[],
   bbtMode: BBTType,
-  fontChoice: 'times' | 'sans',
+  fontChoice: MathFontChoice,
   colorStyle: 'monochrome' | 'colored',
   scale: number = 3.0,
   fontSizeMode: 'standard' | 'large' | 'extra' = 'large',
-  tableWidthMode: 'auto' | 'compact' | 'wide' = 'auto'
+  tableWidthMode: 'auto' | 'compact' | 'wide' = 'auto',
+  strokeChoice: MathStrokeChoice = 'standard',
+  isBold: boolean = true
 ): void {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   const fontMultiplier = fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35;
+  const strokeMultiplier = strokeChoice === 'thin' ? 0.75 : strokeChoice === 'bold' ? 1.4 : 1.0;
   const numPts = points.length;
 
   const svgW = tableWidthMode === 'wide' 
@@ -104,13 +139,11 @@ function drawBBTToCanvas(
   ctx.save();
   ctx.scale(scale, scale);
 
-  // 1. Tô nền trắng tinh khiết
+  // 1. Tô nền trắng
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, svgW, svgH);
 
-  const fontFamily = fontChoice === 'times'
-    ? '"Times New Roman", Times, "STIX Two Text", "Cambria Math", serif'
-    : 'system-ui, -apple-system, sans-serif';
+  const fontFamily = MATH_FONT_FAMILIES[fontChoice];
 
   const strokeColor = '#000000';
   const textColor = '#000000';
@@ -118,26 +151,25 @@ function drawBBTToCanvas(
   const plusColor = isMono ? '#000000' : '#0d9488';
   const minusColor = isMono ? '#000000' : '#e11d48';
 
-  // 2. Kẻ khung viền ngoài chữ nhật kín bao quanh bảng (Nét chuẩn 2.2px)
+  // 2. Viền ngoài
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 2.2 * strokeMultiplier;
   ctx.strokeRect(tableX, tableY, tableW, tableH);
 
-  // 3. Đường dọc phân cách cột nhãn (x, y', y)
-  ctx.lineWidth = 2.0;
+  // 3. Đường dọc phân cách cột nhãn
+  ctx.lineWidth = 2.0 * strokeMultiplier;
   ctx.beginPath();
   ctx.moveTo(dataAreaX, tableY);
   ctx.lineTo(dataAreaX, yBottom);
   ctx.stroke();
 
-  // 4. Đường ngang phân cách dòng x và y'
-  ctx.lineWidth = 1.8;
+  // 4. Đường ngang
+  ctx.lineWidth = 1.8 * strokeMultiplier;
   ctx.beginPath();
   ctx.moveTo(tableX, yRow2);
   ctx.lineTo(tableX + tableW, yRow2);
   ctx.stroke();
 
-  // 5. Đường ngang phân cách dòng y' và y
   if (bbtMode === 'variation') {
     ctx.beginPath();
     ctx.moveTo(tableX, yRow3);
@@ -145,187 +177,190 @@ function drawBBTToCanvas(
     ctx.stroke();
   }
 
-  // 6. Nhãn cột trái (x, y', y) - In nghiêng đậm chuẩn toán, chữ to rõ
+  // 5. Cột nhãn
   ctx.fillStyle = textColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const headerFontSz = Math.round(20 * fontMultiplier);
-  ctx.font = `italic bold ${headerFontSz}px ${fontFamily}`;
-  ctx.fillText('x', tableX + colLabelW / 2, tableY + hRowX / 2);
-  ctx.fillText(bbtMode === 'variation' ? "y'" : "f'(x)", tableX + colLabelW / 2, yRow2 + hRowDeriv / 2);
+  const labelX = tableX + colLabelW / 2;
+
+  const headerFontSz = Math.round(18 * fontMultiplier);
+  ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${headerFontSz}px ${fontFamily}`;
+  ctx.fillText('x', labelX, yRow1 + hRowX / 2);
+
+  ctx.fillText(bbtMode === 'variation' ? "y'" : "f'(x)", labelX, yRow2 + hRowDeriv / 2);
+
   if (bbtMode === 'variation') {
-    ctx.fillText('y', tableX + colLabelW / 2, yRow3 + hRowY / 2);
+    ctx.fillText('y', labelX, yRow3 + hRowY / 2);
   }
 
-  // 7. Tính tọa độ các mốc x
-  const endMargin = 38;
-  const usableWidth = dataAreaW - 2 * endMargin;
-  const colSpacing = usableWidth / Math.max(1, numPts - 1);
-  const getXPos = (idx: number) => dataAreaX + endMargin + idx * colSpacing;
+  // 6. Tính tọa độ x cho từng điểm
+  const colStep = dataAreaW / Math.max(1, numPts - 1);
+  const getColX = (index: number) => {
+    if (index === 0) return dataAreaX + 35;
+    if (index === numPts - 1) return dataAreaX + dataAreaW - 35;
+    return dataAreaX + index * colStep;
+  };
 
-  // 8. Vẽ giá trị dòng x (To rõ, sắc nét)
-  for (let i = 0; i < numPts; i++) {
-    const px = getXPos(i);
-    const xText = formatDisplayMath(points[i].xVal);
-    const isInf = xText.includes('∞');
-    const xFontSz = Math.round((isInf ? 19 : 18) * fontMultiplier);
-    ctx.font = `bold ${xFontSz}px ${fontFamily}`;
-    ctx.fillText(xText, px, tableY + hRowX / 2);
-  }
+  const xFontSz = Math.round(16 * fontMultiplier);
+  ctx.font = `${isBold ? 'bold ' : 'normal '}${xFontSz}px ${fontFamily}`;
 
-  // 9. Vẽ nội dung dòng y' (0, vạch đơn |, vạch kép ||, dấu +, -)
-  for (let i = 0; i < numPts; i++) {
-    const pt = points[i];
-    const px = getXPos(i);
+  points.forEach((pt, i) => {
+    const px = getColX(i);
+    ctx.fillStyle = textColor;
+    ctx.fillText(formatDisplayMath(pt.xVal), px, yRow1 + hRowX / 2);
 
+    const zeroFontSz = Math.round(16 * fontMultiplier);
     if (pt.derivType === '0') {
+      ctx.font = `${isBold ? 'bold ' : 'normal '}${zeroFontSz}px ${fontFamily}`;
       ctx.fillStyle = textColor;
-      const zeroFontSz = Math.round(18 * fontMultiplier);
-      ctx.font = `bold ${zeroFontSz}px ${fontFamily}`;
       ctx.fillText('0', px, yRow2 + hRowDeriv / 2);
-    } else if (pt.derivType === 'single_bar') {
+    } else if (pt.derivType === 'double_bar') {
+      ctx.lineWidth = 2.0;
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.8;
+      const barH = bbtMode === 'variation' ? (yBottom - yRow2) : hRowDeriv;
+      ctx.beginPath();
+      ctx.moveTo(px - 2.5, yRow2);
+      ctx.lineTo(px - 2.5, yRow2 + barH);
+      ctx.moveTo(px + 2.5, yRow2);
+      ctx.lineTo(px + 2.5, yRow2 + barH);
+      ctx.stroke();
+    } else if (pt.derivType === 'single_bar') {
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = strokeColor;
+      const barH = bbtMode === 'variation' ? (yBottom - yRow2) : hRowDeriv;
       ctx.beginPath();
       ctx.moveTo(px, yRow2);
-      ctx.lineTo(px, bbtMode === 'variation' ? yBottom : yRow3);
-      ctx.stroke();
-    } else if (pt.derivType === 'double_bar') {
-      const barH = (bbtMode === 'variation' ? yBottom : yRow3) - yRow2;
-      const barOffset = 3.5;
-      // Xóa phần đường kẻ ngang giữa 2 vạch để tạo khe trắng thông suốt đúng chuẩn SGK
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(px - barOffset - 1, yRow2 + 1, barOffset * 2 + 2, barH - 2);
-
-      // Vạch đôi kéo dài từ dưới dòng x xuống đáy bảng
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(px - barOffset, yRow2);
-      ctx.lineTo(px - barOffset, bbtMode === 'variation' ? yBottom : yRow3);
-      ctx.moveTo(px + barOffset, yRow2);
-      ctx.lineTo(px + barOffset, bbtMode === 'variation' ? yBottom : yRow3);
+      ctx.lineTo(px, yRow2 + barH);
       ctx.stroke();
     }
+  });
 
-    // Dấu +, - giữa các khoảng (Đậm nét, to rõ chuẩn in)
-    if (i < numPts - 1 && pt.intervalSign !== 'blank') {
-      const midX = (px + getXPos(i + 1)) / 2;
+  // 7. Dấu khoảng
+  points.forEach((pt, i) => {
+    if (i < numPts - 1 && pt.intervalSign && pt.intervalSign !== 'blank') {
+      const xLeft = getColX(i);
+      const xRight = getColX(i + 1);
+      const midX = (xLeft + xRight) / 2;
       const midY = yRow2 + hRowDeriv / 2;
 
-      if (pt.intervalSign === '-') {
-        // Dấu trừ nét vẽ đậm đà, rõ ràng như SGK
-        ctx.strokeStyle = minusColor;
-        ctx.lineWidth = Math.max(3.0, Math.round(2.5 * fontMultiplier));
-        ctx.lineCap = 'round';
-        const halfMinusW = Math.round(7.5 * fontMultiplier);
-        ctx.beginPath();
-        ctx.moveTo(midX - halfMinusW, midY);
-        ctx.lineTo(midX + halfMinusW, midY);
-        ctx.stroke();
-      } else {
+      const signFontSz = Math.round(18 * fontMultiplier);
+      ctx.font = `${isBold ? 'bold ' : 'normal '}${signFontSz}px ${fontFamily}`;
+
+      if (pt.intervalSign === '+') {
         ctx.fillStyle = plusColor;
-        const plusFontSz = Math.round(21 * fontMultiplier);
-        ctx.font = `bold ${plusFontSz}px ${fontFamily}`;
         ctx.fillText('+', midX, midY);
+      } else if (pt.intervalSign === '-') {
+        ctx.fillStyle = minusColor;
+        ctx.fillText('−', midX, midY);
       }
     }
-  }
+  });
 
-  // 10. Vẽ dòng y và các mũi tên chiều biến thiên
+  // 8. Dòng biến thiên y
   if (bbtMode === 'variation') {
+    const padY = 22;
+    const yTop = yRow3 + padY;
+    const yMid = yRow3 + hRowY / 2;
+    const yBot = yBottom - padY;
+
     const getYCoord = (pos: 'top' | 'bottom' | 'middle') => {
-      if (pos === 'top') return yRow3 + 28;
-      if (pos === 'bottom') return yBottom - 26;
-      return yRow3 + hRowY / 2 + 3;
+      if (pos === 'top') return yTop;
+      if (pos === 'bottom') return yBot;
+      return yMid;
     };
 
-    // A. Vẽ các mũi tên nối trước (nét đậm to rõ)
-    const arrowLineWidth = Math.max(2.0, Math.round(1.8 * fontMultiplier));
+    const getValHalfW = (text?: string) => {
+      if (!text) return 10;
+      const str = formatDisplayMath(text).trim();
+      if (str.includes('∞')) return Math.round(22 * (fontMultiplier > 1.2 ? 1.15 : 1));
+      if (str.includes('/')) return Math.round(20 * (fontMultiplier > 1.2 ? 1.15 : 1));
+      ctx.save();
+      ctx.font = `${isBold ? 'bold ' : ''}${Math.round(16 * fontMultiplier)}px ${fontFamily}`;
+      const m = ctx.measureText(str).width;
+      ctx.restore();
+      return Math.max(12, Math.round(m / 2));
+    };
+
+    // Vẽ mũi tên biến thiên
+    ctx.lineWidth = 2.2 * strokeMultiplier;
     ctx.strokeStyle = strokeColor;
     ctx.fillStyle = strokeColor;
-    ctx.lineWidth = arrowLineWidth;
 
     for (let i = 0; i < numPts - 1; i++) {
-      const pt = points[i];
-      const nextPt = points[i + 1];
-      const px = getXPos(i);
-      const nextPx = getXPos(i + 1);
+      const p1 = points[i];
+      const p2 = points[i + 1];
 
-      const isCurDouble = pt.derivType === 'double_bar';
-      const isNextDouble = nextPt.derivType === 'double_bar';
+      const x1 = getColX(i);
+      const x2 = getColX(i + 1);
 
-      const srcX = isCurDouble ? px + 28 : px;
-      const srcY = isCurDouble ? getYCoord(pt.yRightPos || 'top') : getYCoord(pt.yPos);
-      const srcLabel = isCurDouble ? (pt.yRightVal || '') : pt.yVal;
+      const isDb1 = p1.derivType === 'double_bar';
+      const isDb2 = p2.derivType === 'double_bar';
 
-      const dstX = isNextDouble ? nextPx - 28 : nextPx;
-      const dstY = getYCoord(nextPt.yPos);
-      const dstLabel = nextPt.yVal;
+      const aX1 = isDb1 ? x1 + 28 : x1;
+      const aY1 = getYCoord(isDb1 ? (p1.yRightPos || 'top') : p1.yPos);
+      const val1 = isDb1 ? p1.yRightVal : p1.yVal;
 
-      const srcLen = formatDisplayMath(srcLabel).length;
-      const dstLen = formatDisplayMath(dstLabel).length;
-      const marginSrcX = Math.max(20, srcLen * 6.0 + 8);
-      const marginDstX = Math.max(20, dstLen * 6.0 + 8);
+      const aX2 = isDb2 ? x2 - 28 : x2;
+      const aY2 = getYCoord(p2.yPos);
+      const val2 = p2.yVal;
 
-      let y1 = srcY;
-      let y2 = dstY;
-      if (dstY < srcY) {
-        y1 = srcY - 8;
-        y2 = dstY + 8;
-      } else if (dstY > srcY) {
-        y1 = srcY + 8;
-        y2 = dstY - 8;
+      const w1 = getValHalfW(val1);
+      const w2 = getValHalfW(val2);
+      const R1 = w1 + 8;
+      const R2 = w2 + 8;
+
+      const dx = aX2 - aX1;
+      const dy = aY2 - aY1;
+
+      if (dx > R1 + R2 + 10) {
+        const m = dy / dx;
+        const startX = aX1 + R1;
+        const startY = aY1 + m * R1;
+        const endX = aX2 - R2;
+        const endY = aY2 - m * R2;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        const angle = Math.atan2(endY - startY, endX - startX);
+        const arrowLength = 10 * strokeMultiplier;
+        const arrowWidth = Math.PI / 6;
+
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - arrowLength * Math.cos(angle - arrowWidth),
+          endY - arrowLength * Math.sin(angle - arrowWidth)
+        );
+        ctx.lineTo(
+          endX - arrowLength * Math.cos(angle + arrowWidth),
+          endY - arrowLength * Math.sin(angle + arrowWidth)
+        );
+        ctx.closePath();
+        ctx.fill();
       }
-
-      const x1 = srcX + marginSrcX;
-      const x2 = dstX - marginDstX;
-
-      // Kẻ thân mũi tên
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-
-      // Vẽ đỉnh tam giác đầu mũi tên sắc nét
-      const angle = Math.atan2(y2 - y1, x2 - x1);
-      const headLen = Math.round(10 * fontMultiplier);
-      const headAngle = Math.PI / 7;
-
-      ctx.beginPath();
-      ctx.moveTo(x2, y2);
-      ctx.lineTo(
-        x2 - headLen * Math.cos(angle - headAngle),
-        y2 - headLen * Math.sin(angle - headAngle)
-      );
-      ctx.lineTo(
-        x2 - headLen * Math.cos(angle + headAngle),
-        y2 - headLen * Math.sin(angle + headAngle)
-      );
-      ctx.closePath();
-      ctx.fill();
     }
 
-    // B. Vẽ các giá trị y đè lên lớp nền trắng halo để đảm bảo chữ luôn cực kỳ nổi bật
-    ctx.fillStyle = textColor;
+    // Giá trị y
+    const yFontSz = Math.round(16 * fontMultiplier);
+    ctx.font = `${isBold ? 'bold ' : ''}${Math.round(16 * fontMultiplier)}px ${fontFamily}`;
 
     for (let i = 0; i < numPts; i++) {
       const pt = points[i];
-      const px = getXPos(i);
+      const px = getColX(i);
 
-      const renderValWithHalo = (val: string, posX: number, posY: number) => {
-        const textStr = formatDisplayMath(val);
-        if (!textStr) return;
-        const isInf = textStr.includes('∞');
-        const yFontSz = Math.round((isInf ? 19 : 18) * fontMultiplier);
-        ctx.font = `bold ${yFontSz}px ${fontFamily}`;
-        const textWidth = ctx.measureText(textStr).width;
+      const renderValWithHalo = (text: string, posX: number, posY: number) => {
+        if (!text) return;
+        const textStr = formatDisplayMath(text);
+        const metrics = ctx.measureText(textStr);
+        const bgW = metrics.width + 4;
+        const bgH = yFontSz + 4;
 
-        // Nền trắng che phủ nhẹ nhàng
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(posX - textWidth / 2 - 4, posY - 12 * fontMultiplier, textWidth + 8, 24 * fontMultiplier);
+        ctx.fillRect(posX - bgW / 2, posY - bgH / 2, bgW, bgH);
 
-        // Chữ số to rõ
         ctx.fillStyle = textColor;
         ctx.fillText(textStr, posX, posY);
       };
@@ -343,17 +378,30 @@ function drawBBTToCanvas(
 }
 
 export default function TableVariationTool() {
+  const [masterMode, setMasterMode] = useState<MasterBBTMode>('auto');
   const [bbtMode, setBbtMode] = useState<BBTType>('variation');
-  const [fontChoice, setFontChoice] = useState<'times' | 'sans'>('times');
+  const [fontChoice, setFontChoice] = useState<MathFontChoice>('times');
   const [colorStyle, setColorStyle] = useState<'monochrome' | 'colored'>('monochrome');
   const [fontSizeMode, setFontSizeMode] = useState<'standard' | 'large' | 'extra'>('large');
   const [tableWidthMode, setTableWidthMode] = useState<'auto' | 'compact' | 'wide'>('auto');
+  const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
+  const [isBoldLabels, setIsBoldLabels] = useState<boolean>(true);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const [latexCodeCopied, setLatexCodeCopied] = useState<boolean>(false);
-  const [showLatexModal, setShowLatexModal] = useState<boolean>(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('cubic_image1');
 
-  // MẶC ĐỊNH: BẬC 3 (HÌNH 1 MẪU ĐỀ THI)
+  // STATE CHO CHẾ ĐỘ TỰ ĐỘNG (AI / TÍNH TOÁN TOÁN HỌC)
+  const [autoInputMode, setAutoInputMode] = useState<'coeffs' | 'text'>('coeffs');
+  const [autoFnType, setAutoFnType] = useState<'rational_2_1' | 'rational_1_1' | 'cubic' | 'quartic'>('rational_2_1');
+  const [autoCoeffs, setAutoCoeffs] = useState({ a: 1, b: -1, c: 1, d: 1, e: -1 });
+  const [autoFnInput, setAutoFnInput] = useState<string>('x^3 - 3*x + 1');
+  const [autoUseInterval, setAutoUseInterval] = useState<boolean>(false);
+  const [autoInterval, setAutoInterval] = useState({ min: -2, max: 2, minInclusive: true, maxInclusive: true });
+  const [analyzedData, setAnalyzedData] = useState<BBTData | null>(null);
+
+  const autoCanvasRef = useRef<HTMLCanvasElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  // MẶC ĐỊNH: BẬC 3
   const [points, setPoints] = useState<XPoint[]>([
     { id: '1', xVal: '-\\infty', derivType: 'blank', intervalSign: '+', yVal: '-\\infty', yPos: 'bottom' },
     { id: '2', xVal: '-1', derivType: '0', intervalSign: '-', yVal: '2', yPos: 'top' },
@@ -361,7 +409,72 @@ export default function TableVariationTool() {
     { id: '4', xVal: '+\\infty', derivType: 'blank', intervalSign: 'blank', yVal: '+\\infty', yPos: 'top' },
   ]);
 
-  const svgRef = useRef<SVGSVGElement>(null);
+  // PHÂN TÍCH VÀ RENDER CHẾ ĐỘ TỰ ĐỘNG
+  useEffect(() => {
+    let result: BBTData | null = null;
+    try {
+      if (autoUseInterval) {
+        if (autoInputMode === 'coeffs') {
+          result = analyzeFromCoeffsOnInterval(
+            autoFnType,
+            autoCoeffs.a,
+            autoCoeffs.b,
+            autoCoeffs.c,
+            autoCoeffs.d,
+            autoCoeffs.e,
+            autoInterval.min,
+            autoInterval.max,
+            autoInterval.minInclusive,
+            autoInterval.maxInclusive
+          );
+        } else {
+          result = analyzeFunctionOnInterval(
+            autoFnInput,
+            autoInterval.min,
+            autoInterval.max,
+            autoInterval.minInclusive,
+            autoInterval.maxInclusive
+          );
+        }
+      } else {
+        if (autoInputMode === 'coeffs') {
+          result = analyzeFromCoeffs(
+            autoFnType,
+            autoCoeffs.a,
+            autoCoeffs.b,
+            autoCoeffs.c,
+            autoCoeffs.d,
+            autoCoeffs.e
+          );
+        } else {
+          result = analyzeFunction(autoFnInput);
+        }
+      }
+      setAnalyzedData(result);
+
+      if (autoCanvasRef.current && result) {
+        renderBBTToCanvas(result, autoCanvasRef.current, 2.4, {
+          fontSizeScale: fontSizeMode === 'extra' ? 1.25 : fontSizeMode === 'large' ? 1.15 : 1.0,
+          fontFamily: MATH_FONT_FAMILIES[fontChoice],
+          strokeChoice,
+          isBold: isBoldLabels
+        });
+      }
+    } catch (err) {
+      console.error('Lỗi phân tích hàm số tự động:', err);
+    }
+  }, [autoInputMode, autoFnType, autoCoeffs, autoFnInput, autoUseInterval, autoInterval, fontChoice, strokeChoice, isBoldLabels, fontSizeMode, masterMode]);
+
+  // CHUYỂN DỮ LIỆU TỰ ĐỘNG SANG CHẾ ĐỘ TÙY BIẾN THỦ CÔNG
+  const handleTransferToManual = () => {
+    if (!analyzedData) return;
+    const newPoints = bbtDataToPoints(analyzedData);
+    setPoints(newPoints);
+    setBbtMode('variation');
+    setMasterMode('variation');
+    setCopyStatus('transferred');
+    setTimeout(() => setCopyStatus(null), 3000);
+  };
 
   const loadPreset = (presetKey: string) => {
     setSelectedPreset(presetKey);
@@ -452,23 +565,19 @@ export default function TableVariationTool() {
   };
 
   const handleAddPoint = () => {
-    const newId = Date.now().toString();
-    const lastIdx = points.length - 1;
+    const newId = String(Date.now());
+    const lastIndex = points.length - 1;
     const newPt: XPoint = {
       id: newId,
-      xVal: 'x_0',
+      xVal: '0',
       derivType: '0',
       intervalSign: '+',
       yVal: '0',
-      yPos: 'middle'
+      yPos: 'middle',
     };
-    const nextPoints = [...points];
-    nextPoints.splice(Math.max(1, lastIdx), 0, newPt);
-    setPoints(nextPoints);
-  };
-
-  const handleUpdatePoint = (id: string, updates: Partial<XPoint>) => {
-    setPoints(points.map(p => p.id === id ? { ...p, ...updates } : p));
+    const updated = [...points];
+    updated.splice(lastIndex, 0, newPt);
+    setPoints(updated);
   };
 
   const handleDeletePoint = (id: string) => {
@@ -476,74 +585,21 @@ export default function TableVariationTool() {
     setPoints(points.filter(p => p.id !== id));
   };
 
-  // Xuất mã LaTeX tkz-tab
-  const latexTikzTabCode = useMemo(() => {
-    const xList = points.map(p => `$${p.xVal}$`).join(' , ');
-    let linesStr = '';
-    let varsStr = '';
+  const handleUpdatePoint = (id: string, updates: Partial<XPoint>) => {
+    setPoints(points.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
 
-    const lineParts: string[] = [];
-    points.forEach((p, idx) => {
-      if (idx > 0) {
-        if (p.derivType === '0') lineParts.push('0');
-        else if (p.derivType === 'double_bar') lineParts.push('d');
-        else if (p.derivType === 'single_bar') lineParts.push('t');
-      }
-      if (idx < points.length - 1) {
-        lineParts.push(p.intervalSign === '+' ? '+' : p.intervalSign === '-' ? '-' : '');
-      }
-    });
-    linesStr = lineParts.filter(Boolean).join(' , ');
-
-    if (bbtMode === 'variation') {
-      const varParts: string[] = [];
-      points.forEach((p, idx) => {
-        const sign = p.yPos === 'top' ? '+' : p.yPos === 'bottom' ? '-' : '';
-        if (p.derivType === 'double_bar') {
-          varParts.push(`-D/${p.yVal || '-\\infty'}/${p.yRightVal || '+\\infty'}`);
-        } else {
-          varParts.push(`${sign}/${p.yVal || '0'}`);
-        }
-      });
-      varsStr = varParts.join(' , ');
-    }
-
-    if (bbtMode === 'sign_chart') {
-      return `\\begin{tikzpicture}
-  \\tkzTabInit[lgt=1.5,espcl=2.2]{$x$/1, $f'(x)$/1}{${xList}}
-  \\tkzTabLine{ , ${linesStr} , }
-\\end{tikzpicture}`;
-    }
-
-    return `\\begin{tikzpicture}
-  \\tkzTabInit[lgt=1.5,espcl=2.2]{$x$/1, $y'$/1, $y$/2}{${xList}}
-  \\tkzTabLine{ , ${linesStr} , }
-  \\tkzTabVar{${varsStr}}
-\\end{tikzpicture}`;
-  }, [points, bbtMode]);
-
-  // ========================================================
-  // SAO CHÉP ẢNH VÀO CLIPBOARD (300 DPI - DÁN WORD HIỂN THỊ 100%)
-  // ========================================================
-  const handleCopyImage = async () => {
+  // SAO CHÉP ẢNH TỰ ĐỘNG
+  const handleCopyAutoImage = async () => {
+    if (!autoCanvasRef.current) return;
     try {
-      // 1. Tạo Canvas ảo độ phân giải cao (scale = 3.0 cho độ nét 300 DPI)
-      const canvas = document.createElement('canvas');
-      drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode);
-
-      // 2. Chuyển Canvas thành Blob PNG
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error('Không thể tạo blob PNG từ canvas');
-
-      // 3. Nhúng siêu dữ liệu pHYs 300 DPI vào PNG để Microsoft Word nhận diện đúng chuẩn in ấn
+      const blob = await new Promise<Blob | null>(resolve => autoCanvasRef.current!.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Không tạo được blob');
       const blobWithDpi = await addDpiToBlob(blob, 300);
-
-      // 4. Chuẩn bị thẻ ảnh HTML Data URL (hỗ trợ cả dán qua Bitmap và dán qua HTML trong Microsoft Word)
-      const dataUrl = canvas.toDataURL('image/png');
-      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${canvas.width / 3}" height="${canvas.height / 3}" style="display:inline-block; max-width:100%; height:auto;" />`;
+      const dataUrl = autoCanvasRef.current.toDataURL('image/png');
+      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${autoCanvasRef.current.width / 2.4}" height="${autoCanvasRef.current.height / 2.4}" style="display:inline-block; max-width:100%; height:auto;" />`;
       const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
 
-      // 5. Ghi đồng thời 'image/png' và 'text/html' vào Clipboard hệ thống
       try {
         await navigator.clipboard.write([
           new ClipboardItem({
@@ -552,7 +608,58 @@ export default function TableVariationTool() {
           })
         ]);
       } catch {
-        // Fallback: ghi 'image/png' đơn lẻ nếu trình duyệt chưa hỗ trợ multi-mime
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blobWithDpi })
+        ]);
+      }
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus(null), 3500);
+    } catch (err) {
+      console.warn('Clipboard write thất bại, tải trực tiếp:', err);
+      handleDownloadAutoPng();
+    }
+  };
+
+  const handleDownloadAutoPng = async () => {
+    if (!autoCanvasRef.current) return;
+    try {
+      const blob = await new Promise<Blob | null>(resolve => autoCanvasRef.current!.toBlob(resolve, 'image/png'));
+      if (blob) {
+        const blobWithDpi = await addDpiToBlob(blob, 300);
+        const url = URL.createObjectURL(blobWithDpi);
+        const a = document.createElement('a');
+        a.download = `Bang_bien_thien_300DPI_${Date.now()}.png`;
+        a.href = url;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('Lỗi khi tải PNG:', e);
+    }
+  };
+
+  // SAO CHÉP ẢNH TÙY BIẾN
+  const handleCopyImage = async () => {
+    try {
+      const canvas = document.createElement('canvas');
+      drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
+
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Không thể tạo blob PNG');
+
+      const blobWithDpi = await addDpiToBlob(blob, 300);
+      const dataUrl = canvas.toDataURL('image/png');
+      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${canvas.width / 3}" height="${canvas.height / 3}" style="display:inline-block; max-width:100%; height:auto;" />`;
+      const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
+
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': blobWithDpi,
+            'text/html': htmlBlob
+          })
+        ]);
+      } catch {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blobWithDpi })
         ]);
@@ -561,34 +668,15 @@ export default function TableVariationTool() {
       setCopyStatus('copied');
       setTimeout(() => setCopyStatus(null), 3500);
     } catch (err) {
-      console.warn('Clipboard write thất bại, chuyển sang phương án tải trực tiếp:', err);
-      // Fallback: Tự động tải file PNG 300 DPI về máy nếu trình duyệt chặn clipboard
-      try {
-        const canvas = document.createElement('canvas');
-        drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode);
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-        if (blob) {
-          const blobWithDpi = await addDpiToBlob(blob, 300);
-          const url = URL.createObjectURL(blobWithDpi);
-          const a = document.createElement('a');
-          a.download = `Bang_bien_thien_300DPI_${Date.now()}.png`;
-          a.href = url;
-          a.click();
-          URL.revokeObjectURL(url);
-          setCopyStatus('downloaded');
-          setTimeout(() => setCopyStatus(null), 4000);
-        }
-      } catch (e2) {
-        console.error('Lỗi khi tải fallback:', e2);
-      }
+      console.warn('Lỗi copy clipboard:', err);
+      handleDownloadPng();
     }
   };
 
-  // TẢI ẢNH PNG 300 DPI
   const handleDownloadPng = async () => {
     try {
       const canvas = document.createElement('canvas');
-      drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode);
+      drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (blob) {
         const blobWithDpi = await addDpiToBlob(blob, 300);
@@ -604,7 +692,6 @@ export default function TableVariationTool() {
     }
   };
 
-  // TẢI ẢNH VECTOR SVG
   const handleDownloadSvg = () => {
     if (!svgRef.current) return;
     let svgData = new XMLSerializer().serializeToString(svgRef.current);
@@ -620,757 +707,1030 @@ export default function TableVariationTool() {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopyLatex = () => {
-    navigator.clipboard.writeText(latexTikzTabCode);
-    setLatexCodeCopied(true);
-    setTimeout(() => setLatexCodeCopied(false), 2000);
-  };
-
-  const fontFamilyStyle = fontChoice === 'times' 
-    ? '"Times New Roman", Times, "STIX Two Text", "Cambria Math", serif' 
-    : 'system-ui, -apple-system, sans-serif';
-
+  const fontFamilyStyle = MATH_FONT_FAMILIES[fontChoice];
   const isMono = colorStyle === 'monochrome';
   const strokeColor = '#000000';
   const textColor = '#000000';
-  const arrowColor = '#000000';
   const plusColor = isMono ? '#000000' : '#0d9488';
   const minusColor = isMono ? '#000000' : '#e11d48';
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 animate-fade-in">
       
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-600 dark:text-teal-400">
-              <Table size={20} />
-            </div>
-            <span>Bảng Biến Thiên & Bảng Xét Dấu Toán Học</span>
-          </h2>
-        </div>
+      {/* HEADER: TIÊU ĐỀ */}
+      <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
+            <Table size={20} />
+          </div>
+          <span>Bảng Biến Thiên & Bảng Xét Dấu Toán Học</span>
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Hỗ trợ tự động phân tích hàm số SGK mới và tùy chỉnh thủ công từng điểm mốc 300 DPI dán trực tiếp vào Word
+        </p>
+      </div>
 
-        {/* Nút chuyển đổi: Bảng Biến Thiên vs Bảng Xét Dấu */}
-        <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+      {/* DÒNG DƯỚI: 3 CHẾ ĐỘ TÍCH HỢP TOÀN DIỆN */}
+      <div className="flex items-center justify-start flex-wrap gap-2 pt-0.5">
+        <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold shadow-xs">
           <button
-            onClick={() => setBbtMode('variation')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-              bbtMode === 'variation'
-                ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            onClick={() => setMasterMode('auto')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              masterMode === 'auto'
+                ? 'bg-teal-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
             }`}
           >
-            Bảng biến thiên đầy đủ (x, y', y)
+            <Sparkles size={15} />
+            <span>Tự động từ hàm số</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white/20">1-Click</span>
           </button>
+
           <button
-            onClick={() => setBbtMode('sign_chart')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-              bbtMode === 'sign_chart'
-                ? 'bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            onClick={() => {
+              setMasterMode('variation');
+              setBbtMode('variation');
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              masterMode === 'variation' && bbtMode === 'variation'
+                ? 'bg-teal-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
             }`}
           >
-            Bảng xét dấu (x, f'(x))
+            <Table size={15} />
+            <span>Tùy biến BBT đầy đủ</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setMasterMode('sign_chart');
+              setBbtMode('sign_chart');
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
+              masterMode === 'sign_chart' || bbtMode === 'sign_chart'
+                ? 'bg-teal-600 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
+            }`}
+          >
+            <Sliders size={15} />
+            <span>Bảng xét dấu</span>
           </button>
         </div>
       </div>
 
-      {/* DANH SÁCH MẪU NHANH (PRESETS) */}
-      <div className="bg-slate-50 dark:bg-slate-800/40 p-3 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto scrollbar-thin">
-        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 shrink-0">
-          <Bookmark size={14} className="text-teal-600" />
-          <span>Mẫu nhanh:</span>
-        </span>
-        {[
-          { key: 'cubic_image1', label: 'Mẫu Hình 1 (Bậc 3: x = -1, 3)', isModel: true },
-          { key: 'rational_2_1', label: 'Mẫu Hình 2 (TCĐ x = 1)', isModel: true },
-          { key: 'cubic_2_extrema', label: 'Hàm bậc 3 (2 cực trị, a > 0)' },
-          { key: 'cubic_negative_a', label: 'Hàm bậc 3 (2 cực trị, a < 0)' },
-          { key: 'quartic_3_extrema', label: 'Hàm trùng phương (3 cực trị)' },
-          { key: 'rational_1_1', label: 'Phân thức (ax+b)/(cx+d)' },
-          { key: 'sign_quadratic', label: 'Xét dấu tam thức bậc hai' },
-        ].map((item) => {
-          const isSelected = selectedPreset === item.key;
-          return (
-            <button
-              key={item.key}
-              onClick={() => loadPreset(item.key)}
-              className={`px-2.5 py-1 rounded-lg text-xs shrink-0 cursor-pointer transition flex items-center gap-1 ${
-                isSelected
-                  ? 'bg-teal-600 hover:bg-teal-700 text-white font-bold shadow-xs'
-                  : 'bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium'
-              }`}
-            >
-              {item.isModel && (
-                <Sparkles size={12} className={isSelected ? 'text-amber-300' : 'text-teal-600'} />
-              )}
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* THÔNG BÁO SAO CHÉP / HƯỚNG DẪN DÁN WORD */}
+      {/* THÔNG BÁO COPY & STATUS */}
       {copyStatus && (
         <div className={`p-3 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fade-in ${
-          copyStatus === 'copied'
+          copyStatus === 'copied' || copyStatus === 'transferred'
             ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800'
             : 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800'
         }`}>
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} className={copyStatus === 'copied' ? 'text-emerald-600' : 'text-amber-600'} />
+            <CheckCircle2 size={18} className="text-emerald-600" />
             <span>
               {copyStatus === 'copied'
-                ? 'Đã sao chép ảnh Bảng biến thiên (300 DPI)! Thầy/Cô mở Microsoft Word và nhấn phím Ctrl + V để dán ngay.'
-                : 'Trình duyệt đã tự động tải tệp ảnh 300 DPI về máy. Thầy/Cô có thể vào Word chọn Insert Picture để chèn ảnh.'}
+                ? 'Đã sao chép ảnh Bảng biến thiên (300 DPI)! Mở Microsoft Word và nhấn phím Ctrl + V để dán ngay.'
+                : copyStatus === 'transferred'
+                  ? 'Đã nạp toàn bộ dữ liệu tự động sang Bảng tùy biến chi tiết! Thầy/Cô có thể tùy ý chỉnh sửa từng điểm.'
+                  : 'Đã tải tệp ảnh độ nét cao về máy tính.'}
             </span>
           </div>
-          <button
-            onClick={() => setCopyStatus(null)}
-            className="text-xs opacity-70 hover:opacity-100 cursor-pointer"
-          >
-            ✕
-          </button>
+          <button onClick={() => setCopyStatus(null)} className="text-xs opacity-70 hover:opacity-100 cursor-pointer">✕</button>
         </div>
       )}
 
-      {/* BODY GRID: BẢNG NHẬP LIỆU CÁC MỐC & KHUNG HIỂN THỊ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* CỘT TRÁI (5 CỘT): DANH SÁCH CÁC ĐIỂM MỐC */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+      {/* =========================================================================
+          CHẾ ĐỘ 1: TỰ ĐỘNG PHÂN TÍCH TỪ HÀM SỐ (AI / ENGINE TOÁN HỌC)
+          ========================================================================= */}
+      {masterMode === 'auto' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* CỘT TRÁI: CẤU HÌNH HÀM SỐ TỰ ĐỘNG (5 CỘT) */}
+          <div className="lg:col-span-5 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                Thiết lập từng cột mốc tọa độ:
+              <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Sliders size={14} className="text-teal-600" />
+                Cấu hình hàm số:
               </span>
-              <button
-                onClick={handleAddPoint}
-                className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
-              >
-                <Plus size={13} />
-                <span>Thêm mốc x</span>
-              </button>
+              <div className="flex bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[10px] font-bold">
+                <button
+                  onClick={() => setAutoInputMode('coeffs')}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${autoInputMode === 'coeffs' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-500'}`}
+                >
+                  Nhập hệ số (a,b,c...)
+                </button>
+                <button
+                  onClick={() => setAutoInputMode('text')}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${autoInputMode === 'text' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-500'}`}
+                >
+                  Gõ biểu thức f(x)
+                </button>
+              </div>
             </div>
 
-            {/* DANH SÁCH CÁC ĐIỂM MỐC */}
-            <div className="space-y-2.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-              {points.map((pt, idx) => {
-                const isFirst = idx === 0;
-                const isLast = idx === points.length - 1;
+            {autoInputMode === 'coeffs' ? (
+              <div className="space-y-3">
+                {/* Chọn dạng hàm */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'rational_2_1', label: 'Bậc 2 / 1', formula: '(ax²+bx+c)/(dx+e)', desc: 'SGK Mới Toán 12' },
+                    { id: 'rational_1_1', label: 'Phân thức 1 / 1', formula: '(ax+b)/(cx+d)', desc: 'Tiệm cận đứng, ngang' },
+                    { id: 'cubic', label: 'Hàm bậc 3', formula: 'ax³+bx²+cx+d', desc: 'Có 2 hoặc 0 cực trị' },
+                    { id: 'quartic', label: 'Bậc 4 trùng phương', formula: 'ax⁴+bx²+c', desc: '1 hoặc 3 cực trị' },
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setAutoFnType(t.id as any);
+                        if (t.id === 'rational_2_1') setAutoCoeffs({ a: 1, b: -1, c: 1, d: 1, e: -1 });
+                        if (t.id === 'rational_1_1') setAutoCoeffs({ a: 2, b: 1, c: 1, d: -1, e: 0 });
+                        if (t.id === 'cubic') setAutoCoeffs({ a: 1, b: 0, c: -3, d: 0, e: 0 });
+                        if (t.id === 'quartic') setAutoCoeffs({ a: 1, b: -2, c: -3, d: 0, e: 0 });
+                      }}
+                      className={`p-2.5 rounded-xl border text-left font-bold transition cursor-pointer ${
+                        autoFnType === t.id
+                          ? 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-200 border-teal-500 shadow-xs ring-1 ring-teal-400'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="text-xs">{t.label}</div>
+                      <div className="text-[10px] font-mono text-teal-700 dark:text-teal-400">{t.formula}</div>
+                    </button>
+                  ))}
+                </div>
 
-                return (
-                  <div 
-                    key={pt.id} 
-                    className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2"
+                {/* Presets bài thi chuẩn SGK */}
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                    Mẫu bài thi chuẩn SGK (1-Click):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {autoFnType === 'rational_2_1' && [
+                      { label: '(x²-x+1)/(x-1)', a: 1, b: -1, c: 1, d: 1, e: -1 },
+                      { label: '(x²+x+1)/(x-1)', a: 1, b: 1, c: 1, d: 1, e: -1 },
+                      { label: '(x²-2x-3)/(x-1)', a: 1, b: -2, c: -3, d: 1, e: -1 },
+                      { label: '(-x²+2x+1)/(x+1)', a: -1, b: 2, c: 1, d: 1, e: 1 },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAutoCoeffs({ a: p.a, b: p.b, c: p.c, d: p.d, e: p.e })}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+
+                    {autoFnType === 'rational_1_1' && [
+                      { label: '(2x+1)/(x-1)', a: 2, b: 1, c: 1, d: -1 },
+                      { label: '(x-2)/(x+1)', a: 1, b: -2, c: 1, d: 1 },
+                      { label: '(-x+1)/(2x-3)', a: -1, b: 1, c: 2, d: -3 },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+
+                    {autoFnType === 'cubic' && [
+                      { label: 'x³ - 3x', a: 1, b: 0, c: -3, d: 0 },
+                      { label: '-x³ + 3x² - 1', a: -1, b: 3, c: 0, d: -1 },
+                      { label: 'x³ - 3x² + 2', a: 1, b: -3, c: 0, d: 2 },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+
+                    {autoFnType === 'quartic' && [
+                      { label: 'x⁴ - 2x² - 3', a: 1, b: -2, c: -3 },
+                      { label: '-x⁴ + 4x² + 1', a: -1, b: 4, c: 1 },
+                      { label: 'x⁴ + 2x²', a: 1, b: 2, c: 0 },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c })}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nhập hệ số */}
+                <div className={`grid gap-2 pt-1 ${autoFnType === 'rational_2_1' ? 'grid-cols-5' : autoFnType === 'quartic' ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 block mb-0.5">a:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={autoCoeffs.a}
+                      onChange={e => setAutoCoeffs({ ...autoCoeffs, a: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-1.5 text-center font-bold text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 block mb-0.5">b:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={autoCoeffs.b}
+                      onChange={e => setAutoCoeffs({ ...autoCoeffs, b: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-1.5 text-center font-bold text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 block mb-0.5">c:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={autoCoeffs.c}
+                      onChange={e => setAutoCoeffs({ ...autoCoeffs, c: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-1.5 text-center font-bold text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    />
+                  </div>
+                  {(autoFnType === 'cubic' || autoFnType === 'rational_1_1' || autoFnType === 'rational_2_1') && (
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 block mb-0.5">d:</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={autoCoeffs.d}
+                        onChange={e => setAutoCoeffs({ ...autoCoeffs, d: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-1.5 text-center font-bold text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                  )}
+                  {autoFnType === 'rational_2_1' && (
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 block mb-0.5">e:</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={autoCoeffs.e}
+                        onChange={e => setAutoCoeffs({ ...autoCoeffs, e: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-1.5 text-center font-bold text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1">Nhập biểu thức f(x):</span>
+                  <input
+                    type="text"
+                    value={autoFnInput}
+                    onChange={e => setAutoFnInput(e.target.value)}
+                    placeholder="Ví dụ: x^3 - 3*x + 1, (2*x+1)/(x-1)..."
+                    className="w-full p-2.5 font-mono text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-teal-800 dark:text-teal-200"
+                  />
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Hỗ trợ: đa thức bậc 2, 3, 4, phân thức hữu tỉ, căn thức, luỹ thừa...
+                </div>
+              </div>
+            )}
+
+            {/* Khảo sát trên đoạn [a; b] */}
+            <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={autoUseInterval}
+                  onChange={e => setAutoUseInterval(e.target.checked)}
+                  className="rounded text-teal-600 focus:ring-teal-500"
+                />
+                <span>Khảo sát BBT trên đoạn/khoảng [a; b] (Tìm GTLN/GTNN):</span>
+              </label>
+
+              {autoUseInterval && (
+                <div className="grid grid-cols-2 gap-2 pt-1 animate-fade-in">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block mb-0.5">Mút trái a:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={autoInterval.min}
+                      onChange={e => setAutoInterval({ ...autoInterval, min: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block mb-0.5">Mút phải b:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={autoInterval.max}
+                      onChange={e => setAutoInterval({ ...autoInterval, max: parseFloat(e.target.value) || 0 })}
+                      className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* NÚT CHUYỂN SANG CHẾ ĐỘ CHỈNH SỬA THỦ CÔNG */}
+            <button
+              type="button"
+              onClick={handleTransferToManual}
+              className="w-full py-2.5 px-3 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:hover:bg-teal-900/60 text-teal-800 dark:text-teal-200 border border-teal-200 dark:border-teal-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+              title="Chuyển bảng biến thiên tự động này sang chế độ chỉnh sửa từng điểm"
+            >
+              <ArrowRight size={15} />
+              <span>Chuyển sang chế độ Tùy biến chi tiết (Từng mốc điểm)</span>
+            </button>
+          </div>
+
+          {/* CỘT PHẢI: KHUNG VẼ CANVAS TỰ ĐỘNG & THANH CÔNG CỤ (7 CỘT) */}
+          <div className="lg:col-span-7 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[460px] space-y-4">
+            
+            {/* THANH ĐIỀU KHIỂN PHÔNG & NÉT TRÊN CANVAS */}
+            <div className="w-full pb-3 border-b border-slate-200 dark:border-slate-700">
+              <MathFontSelector
+                font={fontChoice}
+                onFontChange={setFontChoice}
+                stroke={strokeChoice}
+                onStrokeChange={setStrokeChoice}
+                isBold={isBoldLabels}
+                onBoldChange={setIsBoldLabels}
+                size="sm"
+                extraRow1Right={
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyAutoImage}
+                      className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
+                      title="Sao chép ảnh BBT độ nét 300 DPI dán trực tiếp vào Microsoft Word"
+                    >
+                      <Copy size={14} />
+                      <span>Chép vào Word (300 DPI)</span>
+                    </button>
+                    <button
+                      onClick={handleDownloadAutoPng}
+                      className="px-3 py-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
+                      title="Tải ảnh PNG về máy"
+                    >
+                      <Download size={14} />
+                      <span>Tải PNG</span>
+                    </button>
+                  </div>
+                }
+              />
+            </div>
+
+            {/* VÙNG HIỂN THỊ CANVAS */}
+            <div className="w-full overflow-x-auto p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-center min-h-[280px]">
+              <canvas ref={autoCanvasRef} className="max-w-full h-auto" />
+            </div>
+
+            {/* CHÚ THÍCH PHÂN TÍCH */}
+            {analyzedData && (
+              <div className="w-full text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                <span>Hàm số: <strong className="font-mono text-teal-700 dark:text-teal-300">{analyzedData.fnDisplay}</strong></span>
+                <span className="text-[11px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-semibold">Chuẩn in ấn 300 DPI</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          CHẾ ĐỘ 2 & 3: TÙY BIẾN CHI TIẾT & BẢNG XÉT DẤU (MỐC ĐIỂM + TEMPLATES)
+          ========================================================================= */}
+      {(masterMode === 'variation' || masterMode === 'sign_chart') && (
+        <div className="space-y-4 animate-fade-in">
+          {/* MẪU SGK NHANH */}
+          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto scrollbar-thin">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 shrink-0">
+              <Bookmark size={14} className="text-teal-600" />
+              <span>Mẫu SGK:</span>
+            </span>
+            {[
+              { key: 'cubic_image1', label: 'Bậc 3 (x = -1, 3)' },
+              { key: 'rational_2_1', label: 'Bậc 2/1 (TCĐ x = 1)' },
+              { key: 'cubic_2_extrema', label: 'Bậc 3 (2 cực trị, a > 0)' },
+              { key: 'cubic_negative_a', label: 'Bậc 3 (a < 0)' },
+              { key: 'quartic_3_extrema', label: 'Trùng phương (3 cực trị)' },
+              { key: 'rational_1_1', label: 'Phân thức (ax+b)/(cx+d)' },
+              { key: 'sign_quadratic', label: 'Bảng xét dấu tam thức' },
+            ].map((item) => {
+              const isSelected = selectedPreset === item.key;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => loadPreset(item.key)}
+                  className={`px-2.5 py-1 rounded-lg text-xs shrink-0 cursor-pointer transition flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-teal-600 hover:bg-teal-700 text-white font-bold shadow-xs'
+                      : 'bg-white dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* GRID CỘT TRÁI (ĐIỂM MỐC) & CỘT PHẢI (BẢN VẼ) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* CỘT TRÁI (5 CỘT): DANH SÁCH CÁC ĐIỂM MỐC */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Thiết lập từng cột mốc tọa độ:
+                  </span>
+                  <button
+                    onClick={handleAddPoint}
+                    className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 text-[11px] font-bold flex items-center justify-center">
-                          {idx + 1}
-                        </span>
-                        {/* Giá trị x */}
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs font-bold text-slate-500">x:</span>
-                          <input
-                            type="text"
-                            value={pt.xVal}
-                            onChange={(e) => handleUpdatePoint(pt.id, { xVal: e.target.value })}
-                            className="w-16 px-2 py-0.5 text-center font-bold text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                            placeholder="x"
-                          />
-                        </div>
-                      </div>
+                    <Plus size={13} />
+                    <span>Thêm mốc x</span>
+                  </button>
+                </div>
 
-                      {/* Nút xóa mốc */}
-                      {!isFirst && !isLast && (
-                        <button
-                          onClick={() => handleDeletePoint(pt.id)}
-                          className="text-slate-400 hover:text-red-500 cursor-pointer p-1"
-                          title="Xóa mốc này"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
+                {/* DANH SÁCH CÁC ĐIỂM MỐC */}
+                <div className="space-y-2.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                  {points.map((pt, idx) => {
+                    const isFirst = idx === 0;
+                    const isLast = idx === points.length - 1;
 
-                    {/* DÒNG Y': TRẠNG THÁI TẠI ĐIỂM & DẤU KHOẢNG BÊN PHẢI */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-[11px] text-slate-500 block mb-0.5">Tại mốc y':</span>
-                        <select
-                          value={pt.derivType}
-                          onChange={(e) => handleUpdatePoint(pt.id, { derivType: e.target.value as any })}
-                          className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
-                        >
-                          <option value="0">0 (Nghiệm đạo hàm)</option>
-                          <option value="double_bar">|| (Vạch đôi không xác định)</option>
-                          <option value="single_bar">| (Vạch đơn)</option>
-                          <option value="blank">Để trống</option>
-                        </select>
-                      </div>
+                    return (
+                      <div 
+                        key={pt.id} 
+                        className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 text-[11px] font-bold flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-slate-500">x:</span>
+                              <input
+                                type="text"
+                                value={pt.xVal}
+                                onChange={(e) => handleUpdatePoint(pt.id, { xVal: e.target.value })}
+                                className="w-16 px-2 py-0.5 text-center font-bold text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
+                                placeholder="x"
+                              />
+                            </div>
+                          </div>
 
-                      {!isLast ? (
-                        <div>
-                          <span className="text-[11px] text-slate-500 block mb-0.5">Dấu khoảng sau:</span>
-                          <select
-                            value={pt.intervalSign}
-                            onChange={(e) => handleUpdatePoint(pt.id, { intervalSign: e.target.value as any })}
-                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-teal-700 dark:text-teal-300"
-                          >
-                            <option value="+">+ (Dương)</option>
-                            <option value="-">- (Âm)</option>
-                            <option value="blank">Để trống</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 flex items-center pt-3">
-                          (Điểm mút cuối)
-                        </div>
-                      )}
-                    </div>
-
-                    {/* DÒNG Y: GIÁ TRỊ & ĐỘ CAO MŨI TÊN (CHỈ DÀNH CHO BẢNG BIẾN THIÊN) */}
-                    {bbtMode === 'variation' && (
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-[11px] text-slate-500 block mb-0.5">
-                            {pt.derivType === 'double_bar' ? 'Giá trị y (Trái vạch ||):' : 'Giá trị y:'}
-                          </span>
-                          <input
-                            type="text"
-                            value={pt.yVal}
-                            onChange={(e) => handleUpdatePoint(pt.id, { yVal: e.target.value })}
-                            className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                            placeholder="y"
-                          />
-                          <select
-                            value={pt.yPos}
-                            onChange={(e) => handleUpdatePoint(pt.id, { yPos: e.target.value as any })}
-                            className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
-                          >
-                            <option value="top">Ở trên cao (Cực đại / +inf)</option>
-                            <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
-                            <option value="middle">Ở giữa</option>
-                          </select>
-                        </div>
-
-                        {pt.derivType === 'double_bar' && (
-                          <div>
-                            <span className="text-[11px] text-slate-500 block mb-0.5">Giá trị y (Phải vạch ||):</span>
-                            <input
-                              type="text"
-                              value={pt.yRightVal || ''}
-                              onChange={(e) => handleUpdatePoint(pt.id, { yRightVal: e.target.value })}
-                              className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                              placeholder="+inf"
-                            />
-                            <select
-                              value={pt.yRightPos || 'top'}
-                              onChange={(e) => handleUpdatePoint(pt.id, { yRightPos: e.target.value as any })}
-                              className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
+                          {!isFirst && !isLast && (
+                            <button
+                              onClick={() => handleDeletePoint(pt.id)}
+                              className="text-slate-400 hover:text-red-500 cursor-pointer p-1"
+                              title="Xóa mốc này"
                             >
-                              <option value="top">Ở trên cao (Cực đại / +inf)</option>
-                              <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
-                              <option value="middle">Ở giữa</option>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* DÒNG Y': TRẠNG THÁI TẠI ĐIỂM & DẤU KHOẢNG BÊN PHẢI */}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[11px] text-slate-500 block mb-0.5">Tại mốc y':</span>
+                            <select
+                              value={pt.derivType}
+                              onChange={(e) => handleUpdatePoint(pt.id, { derivType: e.target.value as any })}
+                              className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                            >
+                              <option value="0">0 (Nghiệm đạo hàm)</option>
+                              <option value="double_bar">|| (Vạch đôi không xác định)</option>
+                              <option value="single_bar">| (Vạch đơn)</option>
+                              <option value="blank">Để trống</option>
                             </select>
+                          </div>
+
+                          {!isLast ? (
+                            <div>
+                              <span className="text-[11px] text-slate-500 block mb-0.5">Dấu khoảng sau:</span>
+                              <select
+                                value={pt.intervalSign}
+                                onChange={(e) => handleUpdatePoint(pt.id, { intervalSign: e.target.value as any })}
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-teal-700 dark:text-teal-300"
+                              >
+                                <option value="+">+ (Dương)</option>
+                                <option value="-">- (Âm)</option>
+                                <option value="blank">Để trống</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-400 flex items-center pt-3">
+                              (Điểm mút cuối)
+                            </div>
+                          )}
+                        </div>
+
+                        {/* DÒNG Y: GIÁ TRỊ & ĐỘ CAO MŨI TÊN */}
+                        {bbtMode === 'variation' && (
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[11px] text-slate-500 block mb-0.5">
+                                {pt.derivType === 'double_bar' ? 'Giá trị y (Trái vạch ||):' : 'Giá trị y:'}
+                              </span>
+                              <input
+                                type="text"
+                                value={pt.yVal}
+                                onChange={(e) => handleUpdatePoint(pt.id, { yVal: e.target.value })}
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
+                                placeholder="y"
+                              />
+                              <select
+                                value={pt.yPos}
+                                onChange={(e) => handleUpdatePoint(pt.id, { yPos: e.target.value as any })}
+                                className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
+                              >
+                                <option value="top">Ở trên cao (Cực đại / +inf)</option>
+                                <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
+                                <option value="middle">Ở giữa</option>
+                              </select>
+                            </div>
+
+                            {pt.derivType === 'double_bar' && (
+                              <div>
+                                <span className="text-[11px] text-slate-500 block mb-0.5">Giá trị y (Phải vạch ||):</span>
+                                <input
+                                  type="text"
+                                  value={pt.yRightVal || ''}
+                                  onChange={(e) => handleUpdatePoint(pt.id, { yRightVal: e.target.value })}
+                                  className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
+                                  placeholder="+inf"
+                                />
+                                <select
+                                  value={pt.yRightPos || 'top'}
+                                  onChange={(e) => handleUpdatePoint(pt.id, { yRightPos: e.target.value as any })}
+                                  className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
+                                >
+                                  <option value="top">Ở trên cao (Cực đại / +inf)</option>
+                                  <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
+                                  <option value="middle">Ở giữa</option>
+                                </select>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* CỘT PHẢI (7 CỘT): KHUNG VẼ BẢNG BIẾN THIÊN & NÚT XUẤT */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* THANH CÔNG CỤ TÙY CHỌN & XUẤT ẢNH */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2">
+                <MathFontSelector
+                  font={fontChoice}
+                  onFontChange={setFontChoice}
+                  stroke={strokeChoice}
+                  onStrokeChange={setStrokeChoice}
+                  isBold={isBoldLabels}
+                  onBoldChange={setIsBoldLabels}
+                  size="sm"
+                  extraRow1Right={
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleCopyImage}
+                        className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
+                        title="Sao chép ảnh độ nét 300 DPI dán trực tiếp vào Word (Ctrl + V)"
+                      >
+                        <Copy size={14} />
+                        <span>Chép vào Word (300 DPI)</span>
+                      </button>
+                      <button
+                        onClick={handleDownloadPng}
+                        className="px-3 py-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
+                        title="Tải ảnh PNG về máy"
+                      >
+                        <Download size={14} />
+                        <span>Tải PNG</span>
+                      </button>
+                      <button
+                        onClick={handleDownloadSvg}
+                        className="p-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold cursor-pointer transition"
+                        title="Tải file vector SVG"
+                      >
+                        <Code size={14} />
+                      </button>
+                    </div>
+                  }
+                />
+
+                <div className="flex items-center gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cỡ chữ:</span>
+                    <select
+                      value={fontSizeMode}
+                      onChange={(e) => setFontSizeMode(e.target.value as any)}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 cursor-pointer shadow-xs"
+                    >
+                      <option value="large">To rõ SGK (Khuyên dùng)</option>
+                      <option value="extra">Rất to (Đặc biệt rõ)</option>
+                      <option value="standard">Tiêu chuẩn</option>
+                    </select>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
 
-        {/* CỘT PHẢI (7 CỘT): KHUNG VẼ BẢNG BIẾN THIÊN & NÚT XUẤT */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* THANH CÔNG CỤ TÙY CHỌN & XUẤT ẢNH */}
-          <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cỡ chữ:</span>
-                <select
-                  value={fontSizeMode}
-                  onChange={(e) => setFontSizeMode(e.target.value as any)}
-                  className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 cursor-pointer shadow-xs"
-                >
-                  <option value="large">To rõ SGK (Khuyên dùng)</option>
-                  <option value="extra">Rất to (Đề thi / Slide)</option>
-                  <option value="standard">Tiêu chuẩn vừa phải</option>
-                </select>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Màu:</span>
+                    <select
+                      value={colorStyle}
+                      onChange={(e) => setColorStyle(e.target.value as any)}
+                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                    >
+                      <option value="monochrome">Đen trắng SGK</option>
+                      <option value="colored">Màu sắc trực quan</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Khổ bảng:</span>
-                <select
-                  value={tableWidthMode}
-                  onChange={(e) => setTableWidthMode(e.target.value as any)}
-                  className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer shadow-xs"
-                >
-                  <option value="auto">Tự động cân đối (Khuyên dùng)</option>
-                  <option value="wide">Rộng rãi (740px)</option>
-                  <option value="compact">Gọn gàng (580px)</option>
-                </select>
-              </div>
+              {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}
+              {(() => {
+                const fontMultiplier = fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35;
+                const numPts = points.length;
 
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Phông:</span>
-                <select
-                  value={fontChoice}
-                  onChange={(e) => setFontChoice(e.target.value as any)}
-                  className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
-                >
-                  <option value="times">Times New Roman (Chuẩn Toán VN)</option>
-                  <option value="sans">Sans-serif hiện đại</option>
-                </select>
-              </div>
+                const svgW = tableWidthMode === 'wide' 
+                  ? 740 
+                  : tableWidthMode === 'compact' 
+                    ? 580 
+                    : Math.min(740, Math.max(560, numPts <= 3 ? 540 : numPts === 4 ? 614 : numPts === 5 ? 660 : 720));
 
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Chế độ:</span>
-                <select
-                  value={colorStyle}
-                  onChange={(e) => setColorStyle(e.target.value as any)}
-                  className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
-                >
-                  <option value="monochrome">Đen trắng chuẩn SGK & Đề thi</option>
-                  <option value="colored">Màu sắc trực quan</option>
-                </select>
-              </div>
-            </div>
+                const paddingX = 15;
+                const tableX = paddingX;
+                const tableW = svgW - 2 * paddingX;
+                const colLabelW = 58;
+                const dataAreaX = tableX + colLabelW;
+                const dataAreaW = tableW - colLabelW;
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyImage}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 ring-2 ring-teal-500/30"
-                title="Sao chép ảnh độ nét 300 DPI để dán ngay (Ctrl+V) vào Microsoft Word"
-              >
-                {copyStatus === 'copied' ? <Check size={15} /> : <Copy size={15} />}
-                <span>{copyStatus === 'copied' ? 'Đã sao chép 300 DPI!' : 'Sao chép ảnh (Dán Word)'}</span>
-              </button>
+                const hRowX = Math.round(45 * (fontMultiplier > 1.3 ? 1.05 : 1));
+                const hRowDeriv = Math.round(43 * (fontMultiplier > 1.3 ? 1.05 : 1));
+                const hRowY = bbtMode === 'variation' ? 148 : 0;
+                const tableH = hRowX + hRowDeriv + hRowY;
+                const tableY = 20;
 
-              <button
-                onClick={handleDownloadPng}
-                className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                title="Tải ảnh PNG độ nét 300 DPI"
-              >
-                <Download size={13} />
-                <span>PNG</span>
-              </button>
+                const yRow1 = tableY;
+                const yRow2 = yRow1 + hRowX;
+                const yRow3 = yRow2 + hRowDeriv;
+                const yBottom = yRow3 + hRowY;
+                const svgH = yBottom + 25;
 
-              <button
-                onClick={handleDownloadSvg}
-                className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                title="Tải ảnh vector SVG phóng to vô hạn"
-              >
-                <Download size={13} />
-                <span>SVG</span>
-              </button>
+                const colStep = dataAreaW / Math.max(1, numPts - 1);
+                const getColX = (index: number) => {
+                  if (index === 0) return dataAreaX + 35;
+                  if (index === numPts - 1) return dataAreaX + dataAreaW - 35;
+                  return dataAreaX + index * colStep;
+                };
 
-              <button
-                onClick={() => setShowLatexModal(true)}
-                className="px-3 py-2 bg-slate-900 text-white dark:bg-slate-700 hover:bg-slate-800 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
-                title="Lấy mã LaTeX tkz-tab"
-              >
-                <Code size={13} />
-                <span>LaTeX</span>
-              </button>
-            </div>
-          </div>
+                const padY = 22;
+                const yTop = yRow3 + padY;
+                const yMid = yRow3 + hRowY / 2;
+                const yBot = yBottom - padY;
 
-          {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}
-          <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[360px] overflow-x-auto">
-            {(() => {
-              const fontMultiplier = fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35;
-              const numPts = points.length;
+                const getYCoord = (pos: 'top' | 'bottom' | 'middle') => {
+                  if (pos === 'top') return yTop;
+                  if (pos === 'bottom') return yBot;
+                  return yMid;
+                };
 
-              const svgW = tableWidthMode === 'wide' 
-                ? 740 
-                : tableWidthMode === 'compact' 
-                  ? 580 
-                  : Math.min(740, Math.max(560, numPts <= 3 ? 540 : numPts === 4 ? 614 : numPts === 5 ? 660 : 720));
+                return (
+                  <div className="w-full overflow-x-auto p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-center">
+                    <svg
+                      ref={svgRef}
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      className="w-full max-w-[740px] h-auto select-none"
+                      style={{ fontFamily: fontFamilyStyle }}
+                    >
+                      <rect width={svgW} height={svgH} fill="#FFFFFF" />
 
-              const paddingX = 15;
-              const tableX = paddingX;
-              const tableW = svgW - 2 * paddingX;
-              const colLabelW = 58;
-              const dataAreaX = tableX + colLabelW;
-              const dataAreaW = tableW - colLabelW;
+                      {/* Khung viền ngoài */}
+                      <rect
+                        x={tableX}
+                        y={tableY}
+                        width={tableW}
+                        height={tableH}
+                        fill="none"
+                        stroke={strokeColor}
+                        strokeWidth="2.2"
+                      />
 
-              const hRowX = Math.round(45 * (fontMultiplier > 1.3 ? 1.05 : 1));
-              const hRowDeriv = Math.round(43 * (fontMultiplier > 1.3 ? 1.05 : 1));
-              const hRowY = bbtMode === 'variation' ? 148 : 0;
-              const tableH = hRowX + hRowDeriv + hRowY;
-              const tableY = 20;
+                      {/* Đường dọc nhãn */}
+                      <line
+                        x1={dataAreaX}
+                        y1={tableY}
+                        x2={dataAreaX}
+                        y2={yBottom}
+                        stroke={strokeColor}
+                        strokeWidth="2.0"
+                      />
 
-              const yRow1 = tableY;
-              const yRow2 = yRow1 + hRowX;
-              const yRow3 = yRow2 + hRowDeriv;
-              const yBottom = yRow3 + hRowY;
-              const svgH = yBottom + 25;
+                      {/* Đường ngang x - y' */}
+                      <line
+                        x1={tableX}
+                        y1={yRow2}
+                        x2={tableX + tableW}
+                        y2={yRow2}
+                        stroke={strokeColor}
+                        strokeWidth="1.8"
+                      />
 
-              const endMargin = 38;
-              const usableWidth = dataAreaW - 2 * endMargin;
-              const colSpacing = usableWidth / Math.max(1, numPts - 1);
-              const getXPos = (idx: number) => dataAreaX + endMargin + idx * colSpacing;
+                      {/* Đường ngang y' - y */}
+                      {bbtMode === 'variation' && (
+                        <line
+                          x1={tableX}
+                          y1={yRow3}
+                          x2={tableX + tableW}
+                          y2={yRow3}
+                          stroke={strokeColor}
+                          strokeWidth="1.8"
+                        />
+                      )}
 
-              const getYCoord = (pos: 'top' | 'bottom' | 'middle') => {
-                if (pos === 'top') return yRow3 + 28;
-                if (pos === 'bottom') return yBottom - 26;
-                return yRow3 + hRowY / 2 + 3;
-              };
-
-              const halfMinusW = Math.round(7.5 * fontMultiplier);
-              const minusLineWidth = Math.max(3.0, Math.round(2.5 * fontMultiplier));
-              const arrowLineWidth = Math.max(2.0, Math.round(1.8 * fontMultiplier));
-              const headLen = Math.round(10 * fontMultiplier);
-              const headAngle = Math.PI / 7;
-
-              return (
-                <svg
-                  ref={svgRef}
-                  xmlns="http://www.w3.org/2000/svg"
-                  width={svgW}
-                  height={svgH}
-                  viewBox={`0 0 ${svgW} ${svgH}`}
-                  className="w-full max-w-[740px] h-auto select-none"
-                  style={{ fontFamily: fontFamilyStyle, backgroundColor: '#ffffff' }}
-                >
-                  {/* 1. KHUNG BAO NGOÀI TOÀN BẢNG */}
-                  <rect
-                    x={tableX}
-                    y={tableY}
-                    width={tableW}
-                    height={tableH}
-                    fill="#ffffff"
-                    stroke={strokeColor}
-                    strokeWidth="2.2"
-                  />
-
-                  {/* 2. ĐƯỜNG DỌC NGĂN CỘT TIÊU ĐỀ */}
-                  <line
-                    x1={dataAreaX}
-                    y1={tableY}
-                    x2={dataAreaX}
-                    y2={yBottom}
-                    stroke={strokeColor}
-                    strokeWidth="2.0"
-                  />
-
-                  {/* 3. ĐƯỜNG NGANG DÒNG X VÀ Y' */}
-                  <line
-                    x1={tableX}
-                    y1={yRow2}
-                    x2={tableX + tableW}
-                    y2={yRow2}
-                    stroke={strokeColor}
-                    strokeWidth="1.8"
-                  />
-
-                  {/* 4. ĐƯỜNG NGANG DÒNG Y' VÀ Y */}
-                  {bbtMode === 'variation' && (
-                    <line
-                      x1={tableX}
-                      y1={yRow3}
-                      x2={tableX + tableW}
-                      y2={yRow3}
-                      stroke={strokeColor}
-                      strokeWidth="1.8"
-                    />
-                  )}
-
-                  {/* 5. TIÊU ĐỀ CỘT TRÁI (x, y', y) - CHỮ TO RÕ */}
-                  <g fill={textColor} fontSize={Math.round(20 * fontMultiplier)} fontWeight="bold" fontStyle="italic">
-                    <text x={tableX + colLabelW / 2} y={tableY + hRowX / 2 + 7} textAnchor="middle">
-                      x
-                    </text>
-                    <text x={tableX + colLabelW / 2} y={yRow2 + hRowDeriv / 2 + 7} textAnchor="middle">
-                      {bbtMode === 'variation' ? "y'" : "f'(x)"}
-                    </text>
-                    {bbtMode === 'variation' && (
-                      <text x={tableX + colLabelW / 2} y={yRow3 + hRowY / 2 + 7} textAnchor="middle">
-                        y
+                      {/* Cột nhãn */}
+                      <text
+                        x={tableX + colLabelW / 2}
+                        y={yRow1 + hRowX / 2}
+                        dominantBaseline="central"
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontStyle="italic"
+                        fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                        fontSize={Math.round(18 * fontMultiplier)}
+                      >
+                        x
                       </text>
-                    )}
-                  </g>
 
-                  {/* 6. GIÁ TRỊ DÒNG X - TO RÕ SẮC NÉT */}
-                  <g fill={textColor} fontWeight="bold">
-                    {points.map((pt, idx) => {
-                      const xText = formatDisplayMath(pt.xVal);
-                      const isInf = xText.includes('∞');
-                      const xFontSz = Math.round((isInf ? 19 : 18) * fontMultiplier);
-                      return (
+                      <text
+                        x={tableX + colLabelW / 2}
+                        y={yRow2 + hRowDeriv / 2}
+                        dominantBaseline="central"
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontStyle="italic"
+                        fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                        fontSize={Math.round(18 * fontMultiplier)}
+                      >
+                        {bbtMode === 'variation' ? "y'" : "f'(x)"}
+                      </text>
+
+                      {bbtMode === 'variation' && (
                         <text
-                          key={pt.id}
-                          x={getXPos(idx)}
-                          y={tableY + hRowX / 2 + 7}
+                          x={tableX + colLabelW / 2}
+                          y={yRow3 + hRowY / 2}
+                          dominantBaseline="central"
                           textAnchor="middle"
-                          fontSize={xFontSz}
+                          fill={textColor}
+                          fontStyle="italic"
+                          fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                          fontSize={Math.round(18 * fontMultiplier)}
                         >
-                          {xText}
+                          y
                         </text>
-                      );
-                    })}
-                  </g>
+                      )}
 
-                  {/* 7. GIÁ TRỊ DÒNG Y' (0, VẠCH ĐÔI ||, DẤU +, - TO RÕ) */}
-                  <g fill={textColor}>
-                    {points.map((pt, idx) => {
-                      const px = getXPos(idx);
-
-                      return (
-                        <g key={pt.id}>
-                          {pt.derivType === '0' && (
-                            <text 
-                              x={px} 
-                              y={yRow2 + hRowDeriv / 2 + 7} 
-                              textAnchor="middle"
-                              fontSize={Math.round(18 * fontMultiplier)}
-                              fontWeight="bold"
-                            >
-                              0
-                            </text>
-                          )}
-
-                          {pt.derivType === 'single_bar' && (
-                            <line 
-                              x1={px} 
-                              y1={yRow2} 
-                              x2={px} 
-                              y2={bbtMode === 'variation' ? yBottom : yRow3} 
-                              stroke={strokeColor} 
-                              strokeWidth="1.8" 
-                            />
-                          )}
-
-                          {pt.derivType === 'double_bar' && (
-                            <>
-                              {/* Khe trắng xóa đường kẻ ngang nằm giữa 2 vạch chuẩn hình */}
-                              <rect
-                                x={px - 4}
-                                y={yRow2 + 1}
-                                width={8}
-                                height={(bbtMode === 'variation' ? yBottom : yRow3) - yRow2 - 2}
-                                fill="#ffffff"
-                              />
-                              <line 
-                                x1={px - 3.5} 
-                                y1={yRow2} 
-                                x2={px - 3.5} 
-                                y2={bbtMode === 'variation' ? yBottom : yRow3} 
-                                stroke={strokeColor} 
-                                strokeWidth="1.6" 
-                              />
-                              <line 
-                                x1={px + 3.5} 
-                                y1={yRow2} 
-                                x2={px + 3.5} 
-                                y2={bbtMode === 'variation' ? yBottom : yRow3} 
-                                stroke={strokeColor} 
-                                strokeWidth="1.6" 
-                              />
-                            </>
-                          )}
-
-                          {idx < points.length - 1 && pt.intervalSign !== 'blank' && (
-                            pt.intervalSign === '-' ? (
-                              <line
-                                x1={(px + getXPos(idx + 1)) / 2 - halfMinusW}
-                                y1={yRow2 + hRowDeriv / 2}
-                                x2={(px + getXPos(idx + 1)) / 2 + halfMinusW}
-                                y2={yRow2 + hRowDeriv / 2}
-                                stroke={minusColor}
-                                strokeWidth={minusLineWidth}
-                                strokeLinecap="round"
-                              />
-                            ) : (
-                              <text
-                                x={(px + getXPos(idx + 1)) / 2}
-                                y={yRow2 + hRowDeriv / 2 + 8}
-                                textAnchor="middle"
-                                fontSize={Math.round(21 * fontMultiplier)}
-                                fontWeight="bold"
-                                fill={plusColor}
-                              >
-                                +
-                              </text>
-                            )
-                          )}
-                        </g>
-                      );
-                    })}
-                  </g>
-
-                  {/* 8. GIÁ TRỊ DÒNG Y & MŨI TÊN BIẾN THIÊN */}
-                  {bbtMode === 'variation' && (
-                    <g className="variation-arrows">
-                      {/* Mũi tên */}
-                      {points.map((pt, idx) => {
-                        if (idx >= points.length - 1) return null;
-
-                        const nextPt = points[idx + 1];
-                        const px = getXPos(idx);
-                        const nextPx = getXPos(idx + 1);
-
-                        const isCurDouble = pt.derivType === 'double_bar';
-                        const isNextDouble = nextPt.derivType === 'double_bar';
-
-                        const srcX = isCurDouble ? px + 28 : px;
-                        const srcY = isCurDouble 
-                          ? getYCoord(pt.yRightPos || 'top') 
-                          : getYCoord(pt.yPos);
-                        const srcLabel = isCurDouble ? (pt.yRightVal || '') : pt.yVal;
-
-                        const dstX = isNextDouble ? nextPx - 28 : nextPx;
-                        const dstY = getYCoord(nextPt.yPos);
-                        const dstLabel = nextPt.yVal;
-
-                        const srcTextLen = formatDisplayMath(srcLabel).length;
-                        const dstTextLen = formatDisplayMath(dstLabel).length;
-                        const marginSrcX = Math.max(20, srcTextLen * 6.0 + 8);
-                        const marginDstX = Math.max(20, dstTextLen * 6.0 + 8);
-
-                        let y1 = srcY;
-                        let y2 = dstY;
-                        if (dstY < srcY) {
-                          y1 = srcY - 8;
-                          y2 = dstY + 8;
-                        } else if (dstY > srcY) {
-                          y1 = srcY + 8;
-                          y2 = dstY - 8;
-                        }
-
-                        const x1 = srcX + marginSrcX;
-                        const x2 = dstX - marginDstX;
-
-                        const angle = Math.atan2(y2 - y1, x2 - x1);
-
-                        const arrowP1 = [
-                          x2 - headLen * Math.cos(angle - headAngle),
-                          y2 - headLen * Math.sin(angle - headAngle),
-                        ];
-                        const arrowP2 = [
-                          x2 - headLen * Math.cos(angle + headAngle),
-                          y2 - headLen * Math.sin(angle + headAngle),
-                        ];
+                      {/* Các điểm x & vạch tại điểm */}
+                      {points.map((pt, i) => {
+                        const px = getColX(i);
+                        const barH = bbtMode === 'variation' ? (yBottom - yRow2) : hRowDeriv;
 
                         return (
-                          <g key={`arrow-${idx}`}>
-                            <line
-                              x1={x1}
-                              y1={y1}
-                              x2={x2}
-                              y2={y2}
-                              stroke={arrowColor}
-                              strokeWidth={arrowLineWidth}
-                              strokeLinecap="round"
-                            />
-                            <polygon
-                              points={`${x2},${y2} ${arrowP1[0]},${arrowP1[1]} ${arrowP2[0]},${arrowP2[1]}`}
-                              fill={arrowColor}
-                            />
+                          <g key={pt.id}>
+                            <text
+                              x={px}
+                              y={yRow1 + hRowX / 2}
+                              dominantBaseline="central"
+                              textAnchor="middle"
+                              fill={textColor}
+                              fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                              fontSize={Math.round(16 * fontMultiplier)}
+                            >
+                              {formatDisplayMath(pt.xVal)}
+                            </text>
+
+                            {pt.derivType === '0' && (
+                              <text
+                                x={px}
+                                y={yRow2 + hRowDeriv / 2}
+                                dominantBaseline="central"
+                                textAnchor="middle"
+                                fill={textColor}
+                                fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                                fontSize={Math.round(16 * fontMultiplier)}
+                              >
+                                0
+                              </text>
+                            )}
+
+                            {pt.derivType === 'double_bar' && (
+                              <g>
+                                <line
+                                  x1={px - 2.5}
+                                  y1={yRow2}
+                                  x2={px - 2.5}
+                                  y2={yRow2 + barH}
+                                  stroke={strokeColor}
+                                  strokeWidth="2.0"
+                                />
+                                <line
+                                  x1={px + 2.5}
+                                  y1={yRow2}
+                                  x2={px + 2.5}
+                                  y2={yRow2 + barH}
+                                  stroke={strokeColor}
+                                  strokeWidth="2.0"
+                                />
+                              </g>
+                            )}
+
+                            {pt.derivType === 'single_bar' && (
+                              <line
+                                x1={px}
+                                y1={yRow2}
+                                x2={px}
+                                y2={yRow2 + barH}
+                                stroke={strokeColor}
+                                strokeWidth="1.6"
+                              />
+                            )}
                           </g>
                         );
                       })}
 
-                      {/* Giá trị y (có nền trắng bảo vệ để chữ số luôn to rõ và không bị đường kẻ che) */}
-                      {points.map((pt, idx) => {
-                        const px = getXPos(idx);
-                        const isDouble = pt.derivType === 'double_bar';
+                      {/* Dấu khoảng sau */}
+                      {points.map((pt, i) => {
+                        if (i >= numPts - 1 || !pt.intervalSign || pt.intervalSign === 'blank') return null;
+                        const xLeft = getColX(i);
+                        const xRight = getColX(i + 1);
+                        const midX = (xLeft + xRight) / 2;
+                        const midY = yRow2 + hRowDeriv / 2;
 
-                        const renderSvgVal = (val: string, posX: number, posY: number, key: string) => {
-                          const textStr = formatDisplayMath(val);
-                          if (!textStr) return null;
-                          const isInf = textStr.includes('∞');
-                          const yFontSz = Math.round((isInf ? 19 : 18) * fontMultiplier);
-                          const boxW = Math.max(28, textStr.length * 11 * (fontMultiplier / 1.35) + 8);
-                          const boxH = Math.round(22 * (fontMultiplier / 1.35));
-
-                          return (
-                            <g key={key}>
-                              <rect
-                                x={posX - boxW / 2}
-                                y={posY - boxH / 2 - 4}
-                                width={boxW}
-                                height={boxH}
-                                fill="#ffffff"
-                              />
-                              <text
-                                x={posX}
-                                y={posY}
-                                textAnchor="middle"
-                                fontSize={yFontSz}
-                                fontWeight="bold"
-                                fill={textColor}
-                              >
-                                {textStr}
-                              </text>
-                            </g>
-                          );
-                        };
-
-                        if (!isDouble) {
-                          return renderSvgVal(pt.yVal, px, getYCoord(pt.yPos), `val-${pt.id}`);
-                        } else {
-                          return (
-                            <g key={`val-group-${pt.id}`}>
-                              {renderSvgVal(pt.yVal, px - 28, getYCoord(pt.yPos), `val-l-${pt.id}`)}
-                              {renderSvgVal(pt.yRightVal || '', px + 28, getYCoord(pt.yRightPos || 'top'), `val-r-${pt.id}`)}
-                            </g>
-                          );
-                        }
+                        return (
+                          <text
+                            key={`sign-${pt.id}`}
+                            x={midX}
+                            y={midY}
+                            dominantBaseline="central"
+                            textAnchor="middle"
+                            fill={pt.intervalSign === '+' ? plusColor : minusColor}
+                            fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                            fontSize={Math.round(18 * fontMultiplier)}
+                          >
+                            {pt.intervalSign === '+' ? '+' : '−'}
+                          </text>
+                        );
                       })}
-                    </g>
-                  )}
-                </svg>
-              );
-            })()}
-          </div>
-        </div>
-      </div>
 
-      {/* MODAL MÃ LATEX TKZ-TAB */}
-      {showLatexModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-xl p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Code size={18} className="text-teal-600" />
-                <span>Mã nguồn LaTeX (Gói tkz-tab)</span>
-              </h3>
-              <button
-                onClick={() => setShowLatexModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
+                      {/* Mũi tên biến thiên */}
+                      {bbtMode === 'variation' && (
+                        <g>
+                          {points.map((p1, i) => {
+                            if (i >= numPts - 1) return null;
+                            const p2 = points[i + 1];
+                            const x1 = getColX(i);
+                            const x2 = getColX(i + 1);
 
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Sao chép đoạn mã bên dưới và dán vào tài liệu LaTeX của bạn (cần khai báo gói <code>\usepackage&#123;tkz-tab&#125;</code>):
-            </p>
+                            const isDb1 = p1.derivType === 'double_bar';
+                            const isDb2 = p2.derivType === 'double_bar';
 
-            <pre className="p-4 bg-slate-900 text-teal-300 rounded-xl text-xs font-mono overflow-x-auto max-h-[220px]">
-              {latexTikzTabCode}
-            </pre>
+                            const aX1 = isDb1 ? x1 + 28 : x1;
+                            const aY1 = getYCoord(isDb1 ? (p1.yRightPos || 'top') : p1.yPos);
+                            const val1 = isDb1 ? p1.yRightVal : p1.yVal;
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowLatexModal(false)}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Đóng
-              </button>
-              <button
-                onClick={handleCopyLatex}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              >
-                {latexCodeCopied ? <Check size={14} /> : <Copy size={14} />}
-                <span>{latexCodeCopied ? 'Đã sao chép mã!' : 'Sao chép mã LaTeX'}</span>
-              </button>
+                            const aX2 = isDb2 ? x2 - 28 : x2;
+                            const aY2 = getYCoord(p2.yPos);
+                            const val2 = p2.yVal;
+
+                            const getSvgValHalfW = (text?: string) => {
+                              if (!text) return 10;
+                              const str = formatDisplayMath(text).trim();
+                              if (str.includes('∞')) return Math.round(22 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              if (str.includes('/')) return Math.round(20 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              return Math.max(12, Math.round((str.length * 7 + 8) * (fontMultiplier > 1.2 ? 1.1 : 1)));
+                            };
+
+                            const w1 = getSvgValHalfW(val1);
+                            const w2 = getSvgValHalfW(val2);
+                            const R1 = w1 + 8;
+                            const R2 = w2 + 8;
+
+                            const dx = aX2 - aX1;
+                            const dy = aY2 - aY1;
+
+                            if (dx <= R1 + R2 + 10) return null;
+
+                            const m = dy / dx;
+                            const startX = aX1 + R1;
+                            const startY = aY1 + m * R1;
+                            const endX = aX2 - R2;
+                            const endY = aY2 - m * R2;
+
+                            const angle = Math.atan2(endY - startY, endX - startX);
+                            const arrowLength = 10 * (strokeChoice === 'thin' ? 0.8 : strokeChoice === 'bold' ? 1.3 : 1.0);
+                            const arrowWidth = Math.PI / 6;
+
+                            const pArrow1X = endX - arrowLength * Math.cos(angle - arrowWidth);
+                            const pArrow1Y = endY - arrowLength * Math.sin(angle - arrowWidth);
+                            const pArrow2X = endX - arrowLength * Math.cos(angle + arrowWidth);
+                            const pArrow2Y = endY - arrowLength * Math.sin(angle + arrowWidth);
+
+                            const arrowStrokeW = 2.2 * (strokeChoice === 'thin' ? 0.75 : strokeChoice === 'bold' ? 1.4 : 1.0);
+
+                            return (
+                              <g key={`arrow-${p1.id}`}>
+                                <line
+                                  x1={startX}
+                                  y1={startY}
+                                  x2={endX}
+                                  y2={endY}
+                                  stroke={strokeColor}
+                                  strokeWidth={arrowStrokeW}
+                                />
+                                <polygon
+                                  points={`${endX},${endY} ${pArrow1X},${pArrow1Y} ${pArrow2X},${pArrow2Y}`}
+                                  fill={strokeColor}
+                                />
+                              </g>
+                            );
+                          })}
+
+                          {/* Giá trị y */}
+                          {points.map((pt, i) => {
+                            const px = getColX(i);
+                            const yFontSz = Math.round(16 * fontMultiplier);
+
+                            if (pt.derivType !== 'double_bar') {
+                              return (
+                                <g key={`yval-${pt.id}`}>
+                                  <text
+                                    x={px}
+                                    y={getYCoord(pt.yPos)}
+                                    dominantBaseline="central"
+                                    textAnchor="middle"
+                                    fill={textColor}
+                                    fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                                    fontSize={yFontSz}
+                                    paintOrder="stroke"
+                                    stroke="#FFFFFF"
+                                    strokeWidth="5"
+                                    strokeLinejoin="round"
+                                  >
+                                    {formatDisplayMath(pt.yVal)}
+                                  </text>
+                                </g>
+                              );
+                            } else {
+                              return (
+                                <g key={`yval-db-${pt.id}`}>
+                                  <text
+                                    x={px - 28}
+                                    y={getYCoord(pt.yPos)}
+                                    dominantBaseline="central"
+                                    textAnchor="middle"
+                                    fill={textColor}
+                                    fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                                    fontSize={yFontSz}
+                                    paintOrder="stroke"
+                                    stroke="#FFFFFF"
+                                    strokeWidth="5"
+                                    strokeLinejoin="round"
+                                  >
+                                    {formatDisplayMath(pt.yVal)}
+                                  </text>
+                                  <text
+                                    x={px + 28}
+                                    y={getYCoord(pt.yRightPos || 'top')}
+                                    dominantBaseline="central"
+                                    textAnchor="middle"
+                                    fill={textColor}
+                                    fontWeight={isBoldLabels ? 'bold' : 'normal'}
+                                    fontSize={yFontSz}
+                                    paintOrder="stroke"
+                                    stroke="#FFFFFF"
+                                    strokeWidth="5"
+                                    strokeLinejoin="round"
+                                  >
+                                    {formatDisplayMath(pt.yRightVal)}
+                                  </text>
+                                </g>
+                              );
+                            }
+                          })}
+                        </g>
+                      )}
+                    </svg>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

@@ -586,18 +586,23 @@ export function renderInequalityToCanvas(
       ctx.rotate(angle);
 
       const fSize = Math.round(18 * fontScale);
-      ctx.font = `italic ${isBold ? 'bold ' : '500 '}${fSize}px ${fontFam}`;
+      ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${fSize}px ${fontFam}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
 
       // Halo trắng chống đè vạch gạch sọc
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = isBold ? 4.5 : 2.8;
       ctx.lineJoin = 'round';
       ctx.strokeText(lbl, 0, -4);
 
       ctx.fillStyle = ineq.color ?? '#DC2626';
       ctx.fillText(lbl, 0, -4);
+      if (isBold) {
+        ctx.strokeStyle = ineq.color ?? '#DC2626';
+        ctx.lineWidth = 0.6;
+        ctx.strokeText(lbl, 0, -4);
+      }
 
       ctx.restore();
     }
@@ -646,10 +651,10 @@ export function renderInequalityToCanvas(
       if (pt.label && pt.label.trim()) {
         const pLabel = pt.label.trim();
         const fSize = Math.round(19 * fontScale);
-        ctx.font = `italic ${isBold ? 'bold ' : '500 '}${fSize}px ${fontFam}`;
+        ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${fSize}px ${fontFam}`;
         ctx.fillStyle = '#0284C7'; // Màu xanh cyan chuẩn SGK Kết nối tri thức
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = isBold ? 3.5 : 2.4;
         ctx.lineJoin = 'round';
 
         let lx = sx + 8;
@@ -740,10 +745,10 @@ export function renderInequalityToCanvas(
 
   // Ghi số tọa độ trên các trục Ox và Oy (Halo trắng sắc nét)
   const numFontSz = Math.round(21 * fontScale);
-  ctx.font = `${isBold ? 'bold ' : '500 '}${numFontSz}px ${fontFam}`;
+  ctx.font = `${isBold ? 'bold ' : 'normal '}${numFontSz}px ${fontFam}`;
   ctx.fillStyle = '#0284C7'; // Màu xanh cyan số tọa độ như SGK Hình 1 & 2
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = isBold ? 4.0 : 2.6;
   ctx.lineJoin = 'round';
 
   // Thu thập các mốc cần ghi số (giao điểm trục, điểm kiểm tra, hoặc các vạch chia chính)
@@ -810,7 +815,7 @@ export function renderInequalityToCanvas(
 
   // Nhãn trục x và y
   const axisLabelFontSz = Math.round(25 * fontScale);
-  ctx.font = `italic ${isBold ? 'bold ' : '500 '}${axisLabelFontSz}px ${fontFam}`;
+  ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${axisLabelFontSz}px ${fontFam}`;
   ctx.fillStyle = '#0284C7';
 
   // Chữ x
@@ -818,18 +823,33 @@ export function renderInequalityToCanvas(
   ctx.textBaseline = 'middle';
   ctx.strokeText('x', width - 8, axY + 12);
   ctx.fillText('x', width - 8, axY + 12);
+  if (isBold) {
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 0.6;
+    ctx.strokeText('x', width - 8, axY + 12);
+  }
 
   // Chữ y
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.strokeText('y', axX - 14, 14);
   ctx.fillText('y', axX - 14, 14);
+  if (isBold) {
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 0.6;
+    ctx.strokeText('y', axX - 14, 14);
+  }
 
   // Gốc O
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
   ctx.strokeText('O', axX - 5, axY + 4);
   ctx.fillText('O', axX - 5, axY + 4);
+  if (isBold) {
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 0.6;
+    ctx.strokeText('O', axX - 5, axY + 4);
+  }
 
   ctx.restore();
 

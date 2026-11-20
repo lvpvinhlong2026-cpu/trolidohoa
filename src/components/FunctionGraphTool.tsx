@@ -29,31 +29,24 @@ import {
 } from '../utils/functionGraphEngine';
 import InequalityGraphTool from './InequalityGraphTool';
 import NumberLineTool from './NumberLineTool';
+import MathFontSelector, { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
   apiKey?: string;
   model?: string;
+  onNavigateToBBT?: () => void;
 }
 
-export default function FunctionGraphTool({ apiKey, model }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState<'bbt' | 'graph' | 'inequality' | 'number_line'>('bbt');
+export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Props) {
+  const [activeSubTab, setActiveSubTab] = useState<'graph' | 'inequality' | 'number_line'>('graph');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [fontScale, setFontScale] = useState<number>(1.0);
-  const [graphFont, setGraphFont] = useState<string>('times');
+  const [graphFont, setGraphFont] = useState<MathFontChoice>('times');
 
   // Chuyển đổi tên font key thành chuỗi font-family chuẩn CSS/Canvas
   const getFontFamilyString = (fontKey: string) => {
-    switch (fontKey) {
-      case 'latex':
-        return '"KaTeX_Main", "KaTeX_Math", "Computer Modern", "Latin Modern Roman", serif';
-      case 'cambria':
-        return '"Cambria Math", "Cambria", serif';
-      case 'sans':
-        return '"Be Vietnam Pro", system-ui, sans-serif';
-      case 'times':
-      default:
-        return '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
-    }
+    if (fontKey === 'latex') return MATH_FONT_FAMILIES.latex;
+    return MATH_FONT_FAMILIES.times;
   };
 
   // Preload KaTeX và các phông toán học để Canvas vẽ chuẩn xác 100% không bị fallback
@@ -78,25 +71,6 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
       setFontsReady(true);
     }
   }, []);
-
-  // ==========================================
-  // STATE CHO TAB BẢNG BIẾN THIÊN (BBT)
-  // ==========================================
-  const [bbtMode, setBbtMode] = useState<'coeffs' | 'text'>('coeffs');
-  const [bbtType, setBbtType] = useState<'rational_2_1' | 'rational_1_1' | 'cubic' | 'quartic'>('rational_2_1');
-  const [bbtCoeffs, setBbtCoeffs] = useState({
-    a: 1,
-    b: -1,
-    c: 1,
-    d: 1,
-    e: -1
-  });
-  const [bbtFnInput, setBbtFnInput] = useState('(x^2 - x + 1)/(x - 1)');
-  const [bbtUseInterval, setBbtUseInterval] = useState<boolean>(false);
-  const [bbtInterval, setBbtInterval] = useState<{ a: number; b: number }>({ a: 0, b: 2 });
-  const [bbtMinMax, setBbtMinMax] = useState<IntervalMinMaxInfo | null>(null);
-  const bbtCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [bbtDataUrl, setBbtDataUrl] = useState<string>('');
 
   // ==========================================
   // STATE CHO TAB ĐỒ THỊ OXY
@@ -228,52 +202,6 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCustomTextId]);
-
-  // Render BBT
-  useEffect(() => {
-    if (bbtCanvasRef.current && activeSubTab === 'bbt') {
-      try {
-        let analyzed: BBTData;
-        if (bbtUseInterval) {
-          const res = bbtMode === 'coeffs'
-            ? analyzeFromCoeffsOnInterval(
-                bbtType,
-                bbtCoeffs.a,
-                bbtCoeffs.b,
-                bbtCoeffs.c,
-                bbtCoeffs.d,
-                bbtCoeffs.e,
-                bbtInterval.a,
-                bbtInterval.b
-              )
-            : analyzeFunctionOnInterval(bbtFnInput, bbtInterval.a, bbtInterval.b);
-          analyzed = res.bbt;
-          setBbtMinMax(res.minMax);
-        } else {
-          setBbtMinMax(null);
-          if (bbtMode === 'coeffs') {
-            analyzed = analyzeFromCoeffs(
-              bbtType,
-              bbtCoeffs.a,
-              bbtCoeffs.b,
-              bbtCoeffs.c,
-              bbtCoeffs.d,
-              bbtCoeffs.e
-            );
-          } else {
-            analyzed = analyzeFunction(bbtFnInput);
-          }
-        }
-        renderBBTToCanvas(analyzed, bbtCanvasRef.current, 2.4, { 
-          fontSizeScale: fontScale,
-          fontFamily: getFontFamilyString(graphFont)
-        });
-        setBbtDataUrl(bbtCanvasRef.current.toDataURL('image/png'));
-      } catch (err) {
-        console.error('Lỗi phân tích hàm số BBT:', err);
-      }
-    }
-  }, [bbtCoeffs, bbtType, bbtMode, bbtFnInput, bbtUseInterval, bbtInterval, activeSubTab, fontScale, graphFont, fontsReady]);
 
   // Render Đồ thị Oxy
   useEffect(() => {
@@ -595,52 +523,55 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
           </div>
         </div>
 
-        {/* Chuyển 4 tab chuyên sâu */}
-        <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-          <button
-            onClick={() => setActiveSubTab('bbt')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeSubTab === 'bbt'
-                ? 'bg-teal-600 text-white shadow-xs font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <Table size={14} />
-            <span>Bảng biến thiên</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('graph')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeSubTab === 'graph'
-                ? 'bg-teal-600 text-white shadow-xs font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <TrendingUp size={14} />
-            <span>Đồ thị Oxy</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('inequality')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeSubTab === 'inequality'
-                ? 'bg-teal-600 text-white shadow-xs font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <Layers size={14} />
-            <span>Miền nghiệm BPT (Oxy)</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('number_line')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeSubTab === 'number_line'
-                ? 'bg-teal-600 text-white shadow-xs font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-            }`}
-          >
-            <Ruler size={14} />
-            <span>Trục số (Khoảng, Đoạn)</span>
-          </button>
+        {/* Chuyển các tab chuyên sâu */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+            <button
+              onClick={() => setActiveSubTab('graph')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeSubTab === 'graph'
+                  ? 'bg-teal-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <TrendingUp size={14} />
+              <span>Đồ thị Oxy</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('inequality')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeSubTab === 'inequality'
+                  ? 'bg-teal-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Layers size={14} />
+              <span>Miền nghiệm BPT (Oxy)</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('number_line')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeSubTab === 'number_line'
+                  ? 'bg-teal-600 text-white shadow-xs font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Ruler size={14} />
+              <span>Trục số (Khoảng, Đoạn)</span>
+            </button>
+          </div>
+
+          {onNavigateToBBT && (
+            <button
+              type="button"
+              onClick={onNavigateToBBT}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 transition cursor-pointer text-xs font-bold shadow-xs"
+              title="Chuyển sang phân hệ Bảng biến thiên & Xét dấu"
+            >
+              <Table size={14} />
+              <span>Bảng biến thiên & Xét dấu →</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -659,336 +590,17 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
 
       {/* RENDER TAB 4: TRỤC SỐ & TẬP CON CỦA R (KHOẢNG, ĐOẠN, NỬA KHOẢNG) */}
       {activeSubTab === 'number_line' && (
-        <NumberLineTool fontScale={fontScale} graphFont={graphFont} />
+        <NumberLineTool fontScale={fontScale} graphFont={graphFont} isBold={graphConfig.isBoldLabels !== false} />
       )}
 
-      {/* RENDER TAB 1 & 2: BBT VÀ ĐỒ THỊ OXY */}
-      {(activeSubTab === 'bbt' || activeSubTab === 'graph') && (
+      {/* RENDER TAB 1: ĐỒ THỊ OXY */}
+      {activeSubTab === 'graph' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* ========================================================= */}
         {/* CỘT TRÁI: ĐIỀU KHIỂN & CẤU HÌNH (5 CỘT) */}
         {/* ========================================================= */}
         <div className="lg:col-span-5 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs space-y-4">
-          {/* TAB 1: BẢNG BIẾN THIÊN */}
-          {activeSubTab === 'bbt' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sliders size={14} className="text-teal-600" />
-                  Cấu hình hàm số:
-                </span>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
-                  <button
-                    onClick={() => setBbtMode('coeffs')}
-                    className={`px-2.5 py-1 rounded-md transition ${bbtMode === 'coeffs' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-500'}`}
-                  >
-                    Nhập hệ số (a,b,c,d,e)
-                  </button>
-                  <button
-                    onClick={() => setBbtMode('text')}
-                    className={`px-2.5 py-1 rounded-md transition ${bbtMode === 'text' ? 'bg-teal-600 text-white shadow-xs' : 'text-slate-500'}`}
-                  >
-                    Gõ biểu thức f(x)
-                  </button>
-                </div>
-              </div>
-
-              {bbtMode === 'coeffs' ? (
-                <div className="space-y-3">
-                  {/* Chọn dạng hàm */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { id: 'rational_2_1', label: 'Bậc 2 / 1: (ax²+bx+c)/(dx+e)', desc: 'Chương trình mới' },
-                      { id: 'rational_1_1', label: 'Phân thức: (ax+b)/(cx+d)', desc: '1 tiệm cận đứng, 1 ngang' },
-                      { id: 'cubic', label: 'Bậc 3: ax³+bx²+cx+d', desc: 'Có 2 hoặc 0 cực trị' },
-                      { id: 'quartic', label: 'Bậc 4: ax⁴+bx²+c', desc: 'Trùng phương (1 hoặc 3 cực trị)' },
-                    ].map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          setBbtType(t.id as any);
-                          if (t.id === 'rational_2_1') setBbtCoeffs({ a: 1, b: -1, c: 1, d: 1, e: -1 });
-                          if (t.id === 'rational_1_1') setBbtCoeffs({ ...bbtCoeffs, a: 2, b: 1, c: 1, d: -1 });
-                          if (t.id === 'cubic') setBbtCoeffs({ ...bbtCoeffs, a: 1, b: 0, c: -3, d: 0 });
-                          if (t.id === 'quartic') setBbtCoeffs({ ...bbtCoeffs, a: 1, b: -2, c: -3, d: 0, e: 0 });
-                        }}
-                        className={`p-2 rounded-xl border text-left font-bold transition ${
-                          bbtType === t.id
-                            ? 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-200 border-teal-500 shadow-xs ring-1 ring-teal-400'
-                            : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="text-xs truncate">{t.label}</div>
-                        <div className="text-[10px] font-normal text-slate-400 truncate">{t.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Presets mẫu chuẩn SGK */}
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      Mẫu bài thi chuẩn SGK:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {bbtType === 'rational_2_1' && [
-                        { label: '(x²-x+1)/(x-1)', a: 1, b: -1, c: 1, d: 1, e: -1 },
-                        { label: '(x²+x+1)/(x-1)', a: 1, b: 1, c: 1, d: 1, e: -1 },
-                        { label: '(x²-2x-3)/(x-1)', a: 1, b: -2, c: -3, d: 1, e: -1 },
-                        { label: '(-x²+2x+1)/(x+1)', a: -1, b: 2, c: 1, d: 1, e: 1 },
-                      ].map((p, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setBbtCoeffs({ a: p.a, b: p.b, c: p.c, d: p.d, e: p.e })}
-                          className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-
-                      {bbtType === 'rational_1_1' && [
-                        { label: '(2x+1)/(x-1)', a: 2, b: 1, c: 1, d: -1 },
-                        { label: '(x-2)/(x+1)', a: 1, b: -2, c: 1, d: 1 },
-                        { label: '(-x+1)/(2x-3)', a: -1, b: 1, c: 2, d: -3 },
-                      ].map((p, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setBbtCoeffs({ ...bbtCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
-                          className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-
-                      {bbtType === 'cubic' && [
-                        { label: 'x³ - 3x', a: 1, b: 0, c: -3, d: 0 },
-                        { label: '-x³ + 3x² - 1', a: -1, b: 3, c: 0, d: -1 },
-                        { label: 'x³ - 3x² + 2', a: 1, b: -3, c: 0, d: 2 },
-                      ].map((p, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setBbtCoeffs({ ...bbtCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
-                          className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-
-                      {bbtType === 'quartic' && [
-                        { label: 'x⁴ - 2x² - 3', a: 1, b: -2, c: -3 },
-                        { label: '-x⁴ + 4x² + 1', a: -1, b: 4, c: 1 },
-                        { label: 'x⁴ + 2x²', a: 1, b: 2, c: 0 },
-                      ].map((p, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setBbtCoeffs({ ...bbtCoeffs, a: p.a, b: p.b, c: p.c })}
-                          className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Nhập hệ số chi tiết */}
-                  <div className={`grid gap-2 pt-1 ${bbtType === 'rational_2_1' ? 'grid-cols-5' : bbtType === 'quartic' ? 'grid-cols-3' : 'grid-cols-4'}`}>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 block mb-0.5">a:</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={bbtCoeffs.a}
-                        onChange={e => setBbtCoeffs({ ...bbtCoeffs, a: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 block mb-0.5">b:</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={bbtCoeffs.b}
-                        onChange={e => setBbtCoeffs({ ...bbtCoeffs, b: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 block mb-0.5">c:</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={bbtCoeffs.c}
-                        onChange={e => setBbtCoeffs({ ...bbtCoeffs, c: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
-                      />
-                    </div>
-                    {bbtType !== 'quartic' && (
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 block mb-0.5">d:</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={bbtCoeffs.d}
-                          onChange={e => setBbtCoeffs({ ...bbtCoeffs, d: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-2 py-1.5 text-xs text-center border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 outline-none"
-                        />
-                      </div>
-                    )}
-                    {bbtType === 'rational_2_1' && (
-                      <div>
-                        <span className="text-[10px] font-bold text-teal-600 block mb-0.5">e:</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={bbtCoeffs.e}
-                          onChange={e => setBbtCoeffs({ ...bbtCoeffs, e: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-2 py-1.5 text-xs text-center border border-teal-500 rounded-lg bg-white dark:bg-slate-800 font-mono font-bold text-teal-700 dark:text-teal-300 focus:border-teal-600 focus:ring-1 focus:ring-teal-500/20 outline-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Thông tin tiệm cận / không xác định */}
-                  {(bbtType === 'rational_2_1' || bbtType === 'rational_1_1') && (
-                    <div className="p-2.5 bg-teal-50 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-800 text-xs text-teal-800 dark:text-teal-300 font-medium">
-                      ⚡ Tiệm cận đứng:{' '}
-                      <strong>
-                        x = {bbtType === 'rational_2_1' ? formatNum(-bbtCoeffs.e / (bbtCoeffs.d || 1)) : formatNum(-bbtCoeffs.d / (bbtCoeffs.c || 1))}
-                      </strong>{' '}
-                      (thể hiện bằng vạch kép <strong className="font-mono">||</strong> và giới hạn <strong className="font-mono">±∞</strong>)
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Chế độ gõ biểu thức tự do */
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={bbtFnInput}
-                    onChange={e => setBbtFnInput(e.target.value)}
-                    placeholder="(x^2 - x + 1)/(x - 1)"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-teal-300 dark:border-teal-700 bg-white dark:bg-slate-800 text-sm font-mono font-bold text-teal-900 dark:text-teal-100 outline-none"
-                  />
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { label: 'Bậc 2/1: (x²-x+1)/(x-1)', val: '(x^2-x+1)/(x-1)' },
-                      { label: 'Phân thức: (2x+1)/(x-1)', val: '(2x+1)/(x-1)' },
-                      { label: 'Bậc 3: x³ - 3x', val: 'x^3 - 3*x' },
-                      { label: 'Bậc 4: x⁴ - 2x² - 3', val: 'x^4 - 2*x^2 - 3' },
-                    ].map((preset, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setBbtFnInput(preset.val)}
-                        className="px-2 py-0.5 text-[10px] rounded border font-semibold bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-teal-50"
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* KHẢO SÁT BBT TRÊN ĐOẠN [a; b] */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-teal-800 dark:text-teal-300">
-                    <input
-                      type="checkbox"
-                      checked={bbtUseInterval}
-                      onChange={e => setBbtUseInterval(e.target.checked)}
-                      className="rounded text-teal-600"
-                    />
-                    📊 Khảo sát BBT trên đoạn [a; b]
-                  </label>
-                  {bbtUseInterval && (
-                    <span className="text-[10px] font-mono font-bold bg-teal-100 dark:bg-teal-900/80 text-teal-800 dark:text-teal-200 px-2 py-0.5 rounded">
-                      [{bbtInterval.a}; {bbtInterval.b}]
-                    </span>
-                  )}
-                </div>
-
-                {bbtUseInterval && (
-                  <div className="p-3 bg-teal-50/70 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-800/60 space-y-2.5 animate-fade-in text-xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 block mb-1">Đầu mút a:</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={bbtInterval.a}
-                          onChange={e => setBbtInterval({ ...bbtInterval, a: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-2 py-1 text-xs text-center border rounded-lg bg-white dark:bg-slate-800 font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-500 block mb-1">Đầu mút b:</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={bbtInterval.b}
-                          onChange={e => setBbtInterval({ ...bbtInterval, b: parseFloat(e.target.value) || 0 })}
-                          className="w-full px-2 py-1 text-xs text-center border rounded-lg bg-white dark:bg-slate-800 font-mono font-bold"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Presets đoạn thường gặp */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-slate-400">Chọn nhanh:</span>
-                      {[
-                        { a: 0, b: 2 },
-                        { a: -1, b: 2 },
-                        { a: -2, b: 2 },
-                        { a: 0, b: 3 },
-                        { a: 1, b: 3 },
-                        { a: -3, b: 0 }
-                      ].map((p, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setBbtInterval({ a: p.a, b: p.b })}
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold transition ${
-                            bbtInterval.a === p.a && bbtInterval.b === p.b
-                              ? 'bg-teal-600 text-white shadow-2xs'
-                              : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-teal-50'
-                          }`}
-                        >
-                          [{p.a}; {p.b}]
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Kết quả GTLN / GTNN */}
-                    {bbtMinMax && !bbtMinMax.hasAsymptote && bbtMinMax.maxVal !== null && bbtMinMax.minVal !== null && (
-                      <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-teal-200 dark:border-teal-800 space-y-1 text-[11px]">
-                        <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 font-bold">
-                          <span>✨ GTLN (Max):</span>
-                          <span>
-                            max = {formatNum(bbtMinMax.maxVal)} (tại x = {bbtMinMax.maxAt.map(formatNum).join(', ')})
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-blue-700 dark:text-blue-400 font-bold">
-                          <span>✨ GTNN (Min):</span>
-                          <span>
-                            min = {formatNum(bbtMinMax.minVal)} (tại x = {bbtMinMax.minAt.map(formatNum).join(', ')})
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {bbtMinMax?.hasAsymptote && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                        ⚠️ Trong đoạn [{bbtInterval.a}; {bbtInterval.b}] có điểm gián đoạn (tiệm cận đứng), hàm số không đạt GTLN/GTNN hữu hạn.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: ĐỒ THỊ OXY */}
-          {activeSubTab === 'graph' && (
-            <div className="space-y-4">
+          <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                   <Sliders size={14} className="text-teal-600" />
@@ -2182,14 +1794,13 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
                 </div>
               </div>
             </div>
-          )}
 
-          {/* HÀNG NÚT TÁC VỤ SAO CHÉP & TẢI ẢNH */}
+            {/* HÀNG NÚT TÁC VỤ SAO CHÉP & TẢI ẢNH */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
             <button
               onClick={() => {
-                const currentUrl = activeSubTab === 'bbt' ? bbtDataUrl : graphDataUrl;
-                const label = activeSubTab === 'bbt' ? 'Bảng biến thiên' : 'Đồ thị Oxy';
+                const currentUrl = graphDataUrl;
+                const label = 'Đồ thị Oxy';
                 handleCopyImage(currentUrl, label);
               }}
               className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition"
@@ -2201,8 +1812,8 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
 
             <button
               onClick={() => {
-                const currentUrl = activeSubTab === 'bbt' ? bbtDataUrl : graphDataUrl;
-                const fname = activeSubTab === 'bbt' ? 'Bang_bien_thien_300dpi.png' : 'Do_thi_Oxy_300dpi.png';
+                const currentUrl = graphDataUrl;
+                const fname = 'Do_thi_Oxy_300dpi.png';
                 handleDownloadImage(currentUrl, fname);
               }}
               className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
@@ -2219,138 +1830,37 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
         {/* ========================================================= */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs flex flex-col items-center justify-center min-h-[460px]">
           <div className="w-full flex flex-col gap-2 pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
-            {/* Dòng 1: Phông chữ, Kiểu nét & Cỡ chữ */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* Cụm Phông chữ & Nút chọn nhanh */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                    <Type size={13} className="text-teal-600" />
-                    Phông:
-                  </span>
-                  <select
-                    value={graphFont}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setGraphFont(val);
-                      if (val === 'latex') {
-                        setGraphConfig(prev => ({
-                          ...prev,
-                          isBoldLabels: false,
-                          showExtremaDots: false,
-                          curveWidth: 2.0,
-                          axisWidth: 1.4
-                        }));
-                      }
-                    }}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[11px] rounded px-1.5 py-0.5 font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
-                  >
-                    <option value="latex">🖋️ LaTeX / TikZ (Computer Modern)</option>
-                    <option value="times">🏛️ Times New Roman (SGK)</option>
-                    <option value="cambria">📐 Cambria Math</option>
-                    <option value="sans">✨ Be Vietnam Pro</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGraphFont('latex');
-                      setGraphConfig(prev => ({
-                        ...prev,
-                        isBoldLabels: false,
-                        showExtremaDots: false,
-                        curveWidth: 2.0,
-                        axisWidth: 1.4
-                      }));
-                    }}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
-                      graphFont === 'latex'
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-amber-50'
-                    }`}
-                  >
-                    LaTeX (Mẫu)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGraphFont('times');
-                      setGraphConfig(prev => ({
-                        ...prev,
-                        isBoldLabels: true,
-                        curveWidth: 2.6,
-                        axisWidth: 1.8
-                      }));
-                    }}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
-                      graphFont === 'times'
-                        ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-teal-50'
-                    }`}
-                  >
-                    Times SGK
-                  </button>
-                </div>
-              </div>
-
-              {/* Cụm Nét vẽ, Chữ đậm & Cỡ chữ */}
-              <div className="flex flex-wrap items-center gap-2">
-                {activeSubTab === 'graph' && (
-                  <>
-                    {/* Nét vẽ đồ thị */}
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
-                      <span className="text-slate-400 px-1.5">Nét:</span>
-                      {[
-                        { w: 1.6, label: 'Mảnh' },
-                        { w: 2.4, label: 'Chuẩn' },
-                        { w: 3.6, label: 'Đậm' },
-                      ].map(item => (
-                        <button
-                          key={item.w}
-                          type="button"
-                          onClick={() => setGraphConfig({ ...graphConfig, curveWidth: item.w })}
-                          className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                            Math.abs((graphConfig.curveWidth ?? 2.4) - item.w) < 0.2
-                              ? 'bg-teal-600 text-white shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* In đậm chữ số */}
-                    <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setGraphConfig({ ...graphConfig, isBoldLabels: true })}
-                        className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                          graphConfig.isBoldLabels !== false
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        Chữ đậm
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setGraphConfig({ ...graphConfig, isBoldLabels: false })}
-                        className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                          graphConfig.isBoldLabels === false
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        Thường
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {/* Slider cỡ chữ */}
+            {/* Cụm Phông chữ, Nét vẽ, Độ đậm chữ & Cỡ chữ (Layout 2 dòng chuẩn mẫu) */}
+            <MathFontSelector
+              font={graphFont}
+              onFontChange={val => {
+                setGraphFont(val);
+                if (val === 'latex') {
+                  setGraphConfig(prev => ({
+                    ...prev,
+                    isBoldLabels: false,
+                    showExtremaDots: false,
+                    curveWidth: 2.0,
+                    axisWidth: 1.4
+                  }));
+                } else {
+                  setGraphConfig(prev => ({
+                    ...prev,
+                    isBoldLabels: true,
+                    curveWidth: 2.6,
+                    axisWidth: 1.8
+                  }));
+                }
+              }}
+              stroke={(graphConfig.curveWidth ?? 2.4) <= 1.8 ? 'thin' : (graphConfig.curveWidth ?? 2.4) >= 3.2 ? 'bold' : 'standard'}
+              onStrokeChange={s => {
+                const w = s === 'thin' ? 1.6 : s === 'bold' ? 3.6 : 2.4;
+                setGraphConfig(prev => ({ ...prev, curveWidth: w }));
+              }}
+              isBold={graphConfig.isBoldLabels !== false}
+              onBoldChange={b => setGraphConfig(prev => ({ ...prev, isBoldLabels: b }))}
+              size="sm"
+              extraRow1Right={
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                   <span className="text-[11px] font-bold text-slate-500">
                     Cỡ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
@@ -2381,8 +1891,8 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
+              }
+            />
 
             {/* Dòng 2 (Chỉ có ở Đồ thị Oxy): Thu phóng Oxy & Lưới tọa độ */}
             {activeSubTab === 'graph' && (
@@ -2510,13 +2020,7 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
           </div>
 
           <div className="w-full flex items-center justify-center p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 overflow-x-auto">
-            {/* Canvas BBT */}
-            <div className={activeSubTab === 'bbt' ? 'block' : 'hidden'}>
-              <canvas
-                ref={bbtCanvasRef}
-                className="max-w-full h-auto rounded-lg shadow-xs bg-white border border-slate-200"
-              />
-            </div>
+
 
             {/* Canvas Đồ thị Oxy */}
             <div className={`relative ${activeSubTab === 'graph' ? 'block' : 'hidden'}`}>
@@ -2584,71 +2088,6 @@ export default function FunctionGraphTool({ apiKey, model }: Props) {
               })()}
             </div>
           </div>
-
-          {/* Thanh công cụ Tinh chỉnh vị trí Gốc O & Nhãn số */}
-          {activeSubTab === 'graph' && (
-            <div className="w-full mt-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs shadow-2xs space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                <span className="font-extrabold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
-                  <Move size={15} className="text-teal-600" />
-                  🎯 Thao tác di chuyển Gốc O, Số trên trục & Text:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleResetLabels}
-                    className="px-2 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg transition flex items-center gap-1"
-                    title="Khôi phục vị trí mặc định của chữ O và các số trên trục"
-                  >
-                    <RotateCcw size={12} />
-                    Đặt lại vị trí nhãn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRecenterOxy}
-                    className="px-2 py-1 text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 rounded-lg transition flex items-center gap-1 border border-teal-200 dark:border-teal-800"
-                    title="Đưa tâm O về chính giữa khung vẽ"
-                  >
-                    <Crosshair size={12} />
-                    Căn giữa Oxy (0;0)
-                  </button>
-                </div>
-              </div>
-
-              {/* Chọn nhanh góc cho chữ O */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">
-                  Vị trí chữ O:
-                </span>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[11px] font-bold">
-                  {[
-                    { key: 'top-left', label: '↖ Góc II (Trên-Trái)' },
-                    { key: 'bottom-left', label: '↙ Góc III (Dưới-Trái)' },
-                    { key: 'top-right', label: '↗ Góc I (Trên-Phải)' },
-                    { key: 'bottom-right', label: '↘ Góc IV (Dưới-Phải)' },
-                    { key: 'auto', label: '🔄 Tự động né' },
-                  ].map(item => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setGraphConfig({
-                        ...graphConfig,
-                        originQuadrant: item.key as any,
-                        originOffset: { x: 0, y: 0 }
-                      })}
-                      className={`px-2 py-1 rounded-md transition ${
-                        (graphConfig.originQuadrant ?? 'auto') === item.key
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
       )}

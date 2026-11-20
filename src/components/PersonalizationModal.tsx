@@ -74,7 +74,7 @@ export default function PersonalizationModal({
 
   // Profile local state
   const [nameInput, setNameInput] = useState(profile.name || 'GV Lê Vĩnh Phúc');
-  const [schoolInput, setSchoolInput] = useState(profile.school || 'Trường THPT Thạnh Phước');
+  const [schoolInput, setSchoolInput] = useState(profile.school === 'Trường THPT Thạnh Phước' ? 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long' : (profile.school || 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long'));
   const [subjectInput, setSubjectInput] = useState(profile.subject || 'Toán học');
   const [academicYearInput, setAcademicYearInput] = useState(profile.academicYear || '2026 - 2027');
   const [showGreetingInput, setShowGreetingInput] = useState(profile.showGreeting ?? true);
@@ -134,7 +134,7 @@ export default function PersonalizationModal({
     // 2. Save Profile
     onSaveProfile({
       name: nameInput.trim() || 'GV Lê Vĩnh Phúc',
-      school: schoolInput.trim() || 'Trường THPT Thạnh Phước',
+      school: schoolInput.trim() || 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long',
       subject: subjectInput.trim() || 'Toán học',
       academicYear: academicYearInput.trim() || '2026 - 2027',
       showGreeting: showGreetingInput,
@@ -357,7 +357,7 @@ export default function PersonalizationModal({
                     type="text"
                     value={schoolInput}
                     onChange={e => setSchoolInput(e.target.value)}
-                    placeholder="VD: Trường THPT Thạnh Phước"
+                    placeholder="VD: Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long"
                     className={`w-full px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs ${theme.ring} focus:ring-2 outline-none`}
                   />
                 </div>

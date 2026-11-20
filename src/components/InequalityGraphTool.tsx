@@ -15,19 +15,20 @@ import {
   getAutoBounds
 } from '../utils/inequalityEngine';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
+import MathFontSelector, { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
   fontScale?: number;
   graphFont?: string;
 }
 
-export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0, graphFont: initialGraphFont = 'latex' }: Props) {
+export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0, graphFont: initialGraphFont = 'times' }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dataUrl, setDataUrl] = useState<string>('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   // Local font & fontScale state
-  const [graphFont, setGraphFont] = useState<string>(initialGraphFont || 'latex');
+  const [graphFont, setGraphFont] = useState<MathFontChoice>((initialGraphFont === 'latex' ? 'latex' : 'times'));
   const [fontScale, setFontScale] = useState<number>(initialFontScale || 1.0);
 
   // Cấu hình ban đầu: Mẫu 1 (x + 2y <= 400, x >= 0, y >= 0 - Hình 1) chuẩn quy cách mẫu
@@ -50,21 +51,13 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
 
   // Chuyển đổi font
   const getFontFamily = (f: string) => {
-    switch (f) {
-      case 'latex':
-        return '"KaTeX_Main", "KaTeX_Math", "Computer Modern", "Latin Modern Roman", serif';
-      case 'cambria':
-        return '"Cambria Math", "Cambria", serif';
-      case 'sans':
-        return '"Be Vietnam Pro", system-ui, sans-serif';
-      default:
-        return '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
-    }
+    if (f === 'latex') return MATH_FONT_FAMILIES.latex;
+    return MATH_FONT_FAMILIES.times;
   };
 
   // Đồng bộ props nếu có cập nhật từ cấp cha
   useEffect(() => {
-    if (initialGraphFont) setGraphFont(initialGraphFont);
+    if (initialGraphFont) setGraphFont(initialGraphFont === 'latex' ? 'latex' : 'times');
   }, [initialGraphFont]);
 
   useEffect(() => {
@@ -472,132 +465,36 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs flex flex-col items-center justify-center min-h-[460px]">
           {/* CỤM ĐIỀU KHIỂN CÔNG CỤ: PHÔNG, NÉT, CỠ CHỮ, THU PHÓNG, BƯỚC CHIA, LƯỚI */}
           <div className="w-full flex flex-col gap-2 pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
-            {/* Dòng 1: Phông chữ, Kiểu nét & Cỡ chữ */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* Cụm Phông chữ & Nút chọn nhanh */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
-                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                    <Type size={13} className="text-teal-600" />
-                    Phông:
-                  </span>
-                  <select
-                    value={graphFont}
-                    onChange={e => {
-                      const val = e.target.value;
-                      setGraphFont(val);
-                      if (val === 'latex') {
-                        setConfig(prev => ({
-                          ...prev,
-                          isBoldLabels: false,
-                          curveWidth: 2.0,
-                          axisWidth: 1.4
-                        }));
-                      }
-                    }}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[11px] rounded px-1.5 py-0.5 font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
-                  >
-                    <option value="latex">🖋️ LaTeX / TikZ (Computer Modern)</option>
-                    <option value="times">🏛️ Times New Roman (SGK)</option>
-                    <option value="cambria">📐 Cambria Math</option>
-                    <option value="sans">✨ Be Vietnam Pro</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGraphFont('latex');
-                      setConfig(prev => ({
-                        ...prev,
-                        isBoldLabels: false,
-                        curveWidth: 2.0,
-                        axisWidth: 1.4
-                      }));
-                    }}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
-                      graphFont === 'latex'
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-amber-50'
-                    }`}
-                  >
-                    LaTeX (Mẫu)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGraphFont('times');
-                      setConfig(prev => ({
-                        ...prev,
-                        isBoldLabels: true,
-                        curveWidth: 2.4,
-                        axisWidth: 1.8
-                      }));
-                    }}
-                    className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
-                      graphFont === 'times'
-                        ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-teal-50'
-                    }`}
-                  >
-                    Times SGK
-                  </button>
-                </div>
-              </div>
-
-              {/* Cụm Nét vẽ, Chữ đậm & Cỡ chữ */}
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Nét vẽ biên */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
-                  <span className="text-slate-400 px-1.5">Nét:</span>
-                  {[
-                    { w: 1.6, label: 'Mảnh' },
-                    { w: 2.4, label: 'Chuẩn' },
-                    { w: 3.6, label: 'Đậm' },
-                  ].map(item => (
-                    <button
-                      key={item.w}
-                      type="button"
-                      onClick={() => setConfig({ ...config, curveWidth: item.w })}
-                      className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                        Math.abs((config.curveWidth ?? 2.4) - item.w) < 0.2
-                          ? 'bg-teal-600 text-white shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* In đậm chữ số */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setConfig({ ...config, isBoldLabels: true })}
-                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                      config.isBoldLabels !== false
-                        ? 'bg-teal-600 text-white shadow-2xs'
-                        : 'text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    Chữ đậm
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfig({ ...config, isBoldLabels: false })}
-                    className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                      config.isBoldLabels === false
-                        ? 'bg-teal-600 text-white shadow-2xs'
-                        : 'text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    Thường
-                  </button>
-                </div>
-
-                {/* Slider cỡ chữ */}
+            {/* Cụm Phông chữ, Nét vẽ, Độ đậm chữ & Cỡ chữ (Layout 2 dòng chuẩn mẫu) */}
+            <MathFontSelector
+              font={graphFont}
+              onFontChange={val => {
+                setGraphFont(val);
+                if (val === 'latex') {
+                  setConfig(prev => ({
+                    ...prev,
+                    isBoldLabels: false,
+                    curveWidth: 2.0,
+                    axisWidth: 1.4
+                  }));
+                } else {
+                  setConfig(prev => ({
+                    ...prev,
+                    isBoldLabels: true,
+                    curveWidth: 2.4,
+                    axisWidth: 1.8
+                  }));
+                }
+              }}
+              stroke={(config.curveWidth ?? 2.4) <= 1.8 ? 'thin' : (config.curveWidth ?? 2.4) >= 3.2 ? 'bold' : 'standard'}
+              onStrokeChange={s => {
+                const w = s === 'thin' ? 1.6 : s === 'bold' ? 3.6 : 2.4;
+                setConfig(prev => ({ ...prev, curveWidth: w }));
+              }}
+              isBold={config.isBoldLabels !== false}
+              onBoldChange={b => setConfig(prev => ({ ...prev, isBoldLabels: b }))}
+              size="sm"
+              extraRow1Right={
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                   <span className="text-[11px] font-bold text-slate-500">
                     Cỡ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
@@ -628,8 +525,8 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
+              }
+            />
 
             {/* Dòng 2: Thu phóng Oxy & Lưới tọa độ */}
             <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">

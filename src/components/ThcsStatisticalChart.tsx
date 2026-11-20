@@ -18,6 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/dpiUtils';
+import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export type ChartType = 'bar' | 'grouped_bar' | 'line' | 'pie';
 
@@ -44,7 +45,7 @@ export interface StatisticalChartConfig {
   individualBarColors: boolean;
   individualColors: string[];
   individualPatterns: string[];
-  fontFamily: 'times' | 'sans';
+  fontFamily: MathFontChoice;
 }
 
 interface ThcsStatisticalChartProps {
@@ -199,7 +200,9 @@ export default function ThcsStatisticalChart({
   const [individualBarColors, setIndividualBarColors] = useState<boolean>(initialConfig?.individualBarColors ?? false);
   const [individualColors, setIndividualColors] = useState<string[]>(initialConfig?.individualColors || PRESET_COLORS);
   const [individualPatterns, setIndividualPatterns] = useState<string[]>(initialConfig?.individualPatterns || ['diag-right', 'diag-left', 'cross', 'dots']);
-  const [fontFamily, setFontFamily] = useState<'times' | 'sans'>(initialConfig?.fontFamily || 'times');
+  const [fontFamily, setFontFamily] = useState<MathFontChoice>(initialConfig?.fontFamily || 'times');
+  const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
+  const [isBold, setIsBold] = useState<boolean>(true);
 
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -907,17 +910,17 @@ export default function ThcsStatisticalChart({
                 <span>Khung viền</span>
               </label>
 
-              <label className="flex items-center gap-2 text-slate-700 dark:text-slate-300 cursor-pointer">
-                <span className="text-slate-500">Phông chữ:</span>
-                <select
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value as any)}
-                  className="text-xs bg-slate-100 dark:bg-slate-800 border rounded px-1.5 py-0.5 text-slate-700 dark:text-slate-300"
-                >
-                  <option value="times">Times New Roman (SGK)</option>
-                  <option value="sans">Be Vietnam Pro (Không chân)</option>
-                </select>
-              </label>
+              <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                <MathFontSelector
+                  font={fontFamily}
+                  onFontChange={setFontFamily}
+                  stroke={strokeChoice}
+                  onStrokeChange={setStrokeChoice}
+                  isBold={isBold}
+                  onBoldChange={setIsBold}
+                  size="sm"
+                />
+              </div>
             </div>
           </div>
 
@@ -1036,7 +1039,7 @@ export default function ThcsStatisticalChart({
               height="100%"
               className="max-h-[460px] select-none"
               style={{
-                fontFamily: fontFamily === 'times' ? '"Times New Roman", Times, serif' : 'system-ui, -apple-system, sans-serif',
+                fontFamily: MATH_FONT_FAMILIES[fontFamily],
                 background: '#FFFFFF'
               }}
             >
@@ -1095,7 +1098,7 @@ export default function ThcsStatisticalChart({
                   y={26}
                   textAnchor="middle"
                   fontSize="15"
-                  fontWeight="bold"
+                  fontWeight={isBold ? 'bold' : 'normal'}
                   fill="#0f172a"
                 >
                   {title}
@@ -1202,7 +1205,7 @@ export default function ThcsStatisticalChart({
                             textAnchor="middle"
                             dominantBaseline="central"
                             fontSize="12"
-                            fontWeight="bold"
+                            fontWeight={isBold ? 'bold' : 'normal'}
                             fill={isBlackAndWhite ? '#000000' : '#FFFFFF'}
                             stroke={isBlackAndWhite ? '#FFFFFF' : 'none'}
                             strokeWidth={isBlackAndWhite ? 3 : 0}
@@ -1283,7 +1286,7 @@ export default function ThcsStatisticalChart({
                       y={padding.top - 20}
                       textAnchor="middle"
                       fontSize="12"
-                      fontWeight="bold"
+                      fontWeight={isBold ? 'bold' : 'normal'}
                       fill="#0f172a"
                     >
                       {yAxisLabel}
@@ -1307,7 +1310,7 @@ export default function ThcsStatisticalChart({
                       y={padding.top + plotHeight + 4}
                       textAnchor="start"
                       fontSize="12"
-                      fontWeight="bold"
+                      fontWeight={isBold ? 'bold' : 'normal'}
                       fill="#0f172a"
                     >
                       {xAxisLabel}
@@ -1380,7 +1383,7 @@ export default function ThcsStatisticalChart({
                                       y={barY - 5}
                                       textAnchor="middle"
                                       fontSize="11"
-                                      fontWeight="bold"
+                                      fontWeight={isBold ? 'bold' : 'normal'}
                                       fill="#1e293b"
                                     >
                                       {val}
@@ -1469,7 +1472,7 @@ export default function ThcsStatisticalChart({
                                     y={pt.y - 7}
                                     textAnchor="middle"
                                     fontSize="11"
-                                    fontWeight="bold"
+                                    fontWeight={isBold ? 'bold' : 'normal'}
                                     fill="#1e293b"
                                   >
                                     {pt.val}

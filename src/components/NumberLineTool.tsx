@@ -13,13 +13,15 @@ import {
   parseIntervalString 
 } from '../utils/numberLineEngine';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
+import { MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
   fontScale?: number;
   graphFont?: string;
+  isBold?: boolean;
 }
 
-export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times' }: Props) {
+export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', isBold = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dataUrl, setDataUrl] = useState<string>('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
@@ -58,16 +60,8 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times' }:
   const [opType, setOpType] = useState<'intersection' | 'union' | 'difference'>('intersection');
 
   const getFontFamily = (f: string) => {
-    switch (f) {
-      case 'latex':
-        return '"KaTeX_Main", "KaTeX_Math", "Computer Modern", serif';
-      case 'cambria':
-        return '"Cambria Math", "Cambria", serif';
-      case 'sans':
-        return '"Be Vietnam Pro", system-ui, sans-serif';
-      default:
-        return '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
-    }
+    if (f === 'latex') return MATH_FONT_FAMILIES.latex;
+    return MATH_FONT_FAMILIES.times;
   };
 
   // Render canvas
@@ -76,9 +70,10 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times' }:
       try {
         const fontFam = getFontFamily(graphFont);
         if (mode === 'single') {
-          renderNumberLineToCanvas({ interval, fontFamily: fontFam, fontSizeScale: fontScale }, canvasRef.current, 2.4, {
+          renderNumberLineToCanvas({ interval, fontFamily: fontFam, fontSizeScale: fontScale, isBold }, canvasRef.current, 2.4, {
             fontFamily: fontFam,
             fontSizeScale: fontScale,
+            isBold,
             width: 640,
             height: 125
           });
@@ -86,12 +81,14 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times' }:
           renderSummaryTableToCanvas(canvasRef.current, 2.4, {
             fontFamily: fontFam,
             fontSizeScale: fontScale,
+            isBold,
             width: 680
           });
         } else if (mode === 'operation') {
           renderSetOperationsToCanvas(setA, setB, opType, canvasRef.current, 2.4, {
             fontFamily: fontFam,
             fontSizeScale: fontScale,
+            isBold,
             width: 580
           });
         }
@@ -100,7 +97,7 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times' }:
         console.error('Lỗi render trục số:', err);
       }
     }
-  }, [mode, interval, setA, setB, opType, fontScale, graphFont]);
+  }, [mode, interval, setA, setB, opType, fontScale, graphFont, isBold]);
 
   // Copy ảnh 300 DPI (Auto-crop sát viền để hình luôn to lớn như BBT)
   const handleCopy = async () => {

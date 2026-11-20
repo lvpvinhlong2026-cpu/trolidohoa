@@ -29,6 +29,7 @@ export interface NumberLineConfig {
   title?: string;
   fontFamily?: string;
   fontSizeScale?: number;
+  isBold?: boolean;
   labelColor?: string;     // Màu nhãn a, b (mặc định '#0284C7' xanh cyan chuẩn SGK)
   hatchColor?: string;     // Màu nét gạch chéo /////// (mặc định '#334155' Slate-700)
   bracketColor?: string;   // Màu ngoặc (mặc định '#000000')
@@ -117,6 +118,7 @@ export function drawSingleNumberLine(
   options?: {
     fontFamily?: string;
     fontSizeScale?: number;
+    isBold?: boolean;
     labelColor?: string;
     hatchColor?: string;
     bracketColor?: string;
@@ -127,6 +129,7 @@ export function drawSingleNumberLine(
   }
 ) {
   const fontScale = options?.fontSizeScale ?? 1.0;
+  const isBold = options?.isBold !== false;
   const fontFam = options?.fontFamily ?? '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
   const labelColor = options?.labelColor ?? '#0284C7'; // Cyan chuẩn SGK
   const hatchColor = options?.hatchColor ?? '#334155'; // Nét gạch đậm nét chuẩn SGK
@@ -255,7 +258,7 @@ export function drawSingleNumberLine(
     ctx.stroke();
 
     const fSize = Math.round(18 * fontScale);
-    ctx.font = `italic 600 ${fSize}px ${fontFam}`;
+    ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${fSize}px ${fontFam}`;
     ctx.fillStyle = labelColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -267,7 +270,7 @@ export function drawSingleNumberLine(
   // 4. Ghi nhãn giá trị a, b dưới chân các dấu ngoặc
   ctx.save();
   const labelFontSz = Math.round(22 * fontScale);
-  ctx.font = `italic 600 ${labelFontSz}px ${fontFam}`;
+  ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${labelFontSz}px ${fontFam}`;
   ctx.fillStyle = labelColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -307,13 +310,14 @@ export function renderNumberLineToCanvas(
   config: NumberLineConfig,
   canvas: HTMLCanvasElement,
   dpiScale = 2.4,
-  options?: { width?: number; height?: number; fontFamily?: string; fontSizeScale?: number }
+  options?: { width?: number; height?: number; fontFamily?: string; fontSizeScale?: number; isBold?: boolean }
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   const width = options?.width ?? 640;
   const height = options?.height ?? 125;
+  const isBold = options?.isBold ?? config.isBold !== false;
 
   canvas.width = Math.round(width * dpiScale);
   canvas.height = Math.round(height * dpiScale);
@@ -340,6 +344,7 @@ export function renderNumberLineToCanvas(
   drawSingleNumberLine(ctx, interval, 24, width - 20, midY, {
     fontFamily: options?.fontFamily ?? config.fontFamily,
     fontSizeScale: options?.fontSizeScale ?? config.fontSizeScale,
+    isBold,
     labelColor: config.labelColor,
     hatchColor: config.hatchColor,
     showOrigin: config.showOrigin
@@ -433,13 +438,14 @@ export const SUBSET_DEFINITIONS: {
 export function renderSummaryTableToCanvas(
   canvas: HTMLCanvasElement,
   dpiScale = 2.4,
-  options?: { width?: number; fontFamily?: string; fontSizeScale?: number }
+  options?: { width?: number; fontFamily?: string; fontSizeScale?: number; isBold?: boolean }
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
   const fontFam = options?.fontFamily ?? '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
   const fontScale = options?.fontSizeScale ?? 1.0;
+  const isBold = options?.isBold !== false;
 
   const width = options?.width ?? 660;
   const rowHeight = 44;
@@ -462,7 +468,7 @@ export function renderSummaryTableToCanvas(
   ctx.fillRect(0, 0, width, totalHeight);
 
   // Tiêu đề bảng: "Một số tập con thường dùng của tập số thực ℝ:"
-  ctx.font = `600 ${Math.round(20 * fontScale)}px ${fontFam}`;
+  ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(20 * fontScale)}px ${fontFam}`;
   ctx.fillStyle = '#0F172A';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -496,6 +502,7 @@ export function renderSummaryTableToCanvas(
     drawSingleNumberLine(ctx, item.interval, lineStartX, lineEndX, curY + rowHeight / 2 - 2, {
       fontFamily: fontFam,
       fontSizeScale: fontScale * 0.95,
+      isBold,
       showOrigin: true
     });
 
@@ -514,7 +521,7 @@ export function renderSetOperationsToCanvas(
   opType: 'intersection' | 'union' | 'difference',
   canvas: HTMLCanvasElement,
   dpiScale = 2.4,
-  options?: { width?: number; fontFamily?: string; fontSizeScale?: number }
+  options?: { width?: number; fontFamily?: string; fontSizeScale?: number; isBold?: boolean }
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -535,6 +542,7 @@ export function renderSetOperationsToCanvas(
 
   const fontFam = options?.fontFamily ?? '"Times New Roman", "STIX Two Text", "Cambria Math", serif';
   const fontScale = options?.fontSizeScale ?? 1.0;
+  const isBold = options?.isBold !== false;
 
   // Tính phạm vi min/max chung cho cả 3 trục
   const vals: number[] = [];
@@ -549,16 +557,16 @@ export function renderSetOperationsToCanvas(
   const opLabel = opType === 'intersection' ? 'Giao A ∩ B' : opType === 'union' ? 'Hợp A ∪ B' : 'Hiệu A \\ B';
 
   // 1. Trục A
-  ctx.font = `bold ${Math.round(17 * fontScale)}px ${fontFam}`;
+  ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(17 * fontScale)}px ${fontFam}`;
   ctx.fillStyle = '#0F172A';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('Tập A:', 18, 40);
-  drawSingleNumberLine(ctx, setA, 90, width - 20, 40, { valMin: minV, valMax: maxV, fontFamily: fontFam });
+  drawSingleNumberLine(ctx, setA, 90, width - 20, 40, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
 
   // 2. Trục B
   ctx.fillText('Tập B:', 18, 115);
-  drawSingleNumberLine(ctx, setB, 90, width - 20, 115, { valMin: minV, valMax: maxV, fontFamily: fontFam });
+  drawSingleNumberLine(ctx, setB, 90, width - 20, 115, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
 
   // Đường phân cách mờ
   ctx.strokeStyle = '#E2E8F0';
@@ -629,6 +637,7 @@ export function renderSetOperationsToCanvas(
     valMin: minV,
     valMax: maxV,
     fontFamily: fontFam,
+    isBold,
     bracketColor: '#DC2626',
     labelColor: '#DC2626'
   });

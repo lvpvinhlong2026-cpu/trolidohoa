@@ -752,7 +752,7 @@ export function renderGraphToCanvas(
       const isNeg = fracMatch[1] === '-' || fracMatch[1] === '−' || fracMatch[1] === '\u2212';
       const fracFSize = Math.max(14, Math.round(fSize * 0.8));
       ctx.save();
-      ctx.font = `${isBoldLabels ? 'bold ' : ''}${fracFSize}px ${numFontFam}`;
+      ctx.font = `${isBoldLabels ? 'bold ' : 'normal '}${fracFSize}px ${numFontFam}`;
       const numW = ctx.measureText(fracMatch[2].trim()).width;
       const denW = ctx.measureText(fracMatch[3].trim()).width;
       ctx.restore();
@@ -761,7 +761,7 @@ export function renderGraphToCanvas(
       return minusW + barW;
     }
     ctx.save();
-    ctx.font = `${isBoldLabels ? 'bold ' : ''}${fSize}px ${numFontFam}`;
+    ctx.font = `${isBoldLabels ? 'bold ' : 'normal '}${fSize}px ${numFontFam}`;
     const w = ctx.measureText(trimmed.replace(/-/g, '−')).width;
     ctx.restore();
     return Math.max(14, w);
@@ -1306,18 +1306,23 @@ export function renderGraphToCanvas(
 
         ctx.save();
         const sFontSz = Math.round(24 * fontScale);
-        ctx.font = `italic bold ${sFontSz}px ${mathFontFam}`;
+        ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${sFontSz}px ${mathFontFam}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
         // Viền trắng bảo vệ chữ không bị gạch sọc đè
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 5;
+        ctx.lineWidth = isBoldLabels ? 5 : 3.2;
         ctx.lineJoin = 'round';
         ctx.strokeText(sText, sX, sY);
 
         ctx.fillStyle = doHatch ? '#000000' : '#0d9488';
         ctx.fillText(sText, sX, sY);
+        if (isBoldLabels) {
+          ctx.strokeStyle = doHatch ? '#000000' : '#0d9488';
+          ctx.lineWidth = 0.6;
+          ctx.strokeText(sText, sX, sY);
+        }
         ctx.restore();
       }
     }
@@ -1398,7 +1403,7 @@ export function renderGraphToCanvas(
 
   // 4. Nhãn trục Ox, Oy, gốc O (Font to rõ, chuẩn in ấn SGK & Word có viền Halo trắng)
   const axisLabelFontSz = Math.round(25 * fontScale);
-  ctx.font = `italic ${isBoldLabels ? 'bold ' : '500 '}${axisLabelFontSz}px ${mathFontFam}`;
+  ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
 
   // Nhãn x nằm ngay phía trên mũi tên trục Ox
   if (axY >= 10 && axY <= height - 10) {
@@ -1407,11 +1412,16 @@ export function renderGraphToCanvas(
     const labelX_x = (width - 10) + (config.axisLabelXOffset?.x ?? 0);
     const labelX_y = Math.max(16, Math.min(height - 10, axY - 5)) + (config.axisLabelXOffset?.y ?? 0);
     ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = isBoldLabels ? 5.5 : 3.8;
+    ctx.lineWidth = isBoldLabels ? 5.5 : 3.0;
     ctx.lineJoin = 'round';
     ctx.strokeText('x', labelX_x, labelX_y);
     ctx.fillStyle = '#000000';
     ctx.fillText('x', labelX_x, labelX_y);
+    if (isBoldLabels) {
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = '#000000';
+      ctx.strokeText('x', labelX_x, labelX_y);
+    }
 
     hitboxes.push({
       id: 'axis_x',
@@ -1426,17 +1436,22 @@ export function renderGraphToCanvas(
 
   // Nhãn y nằm ngay bên phải mũi tên trục Oy
   if (axX >= 10 && axX <= width - 10) {
-    ctx.font = `italic ${isBoldLabels ? 'bold ' : '500 '}${axisLabelFontSz}px ${mathFontFam}`;
+    ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     const labelY_x = Math.min(width - 14, Math.max(14, axX + 8)) + (config.axisLabelYOffset?.x ?? 0);
     const labelY_y = 14 + (config.axisLabelYOffset?.y ?? 0);
     ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = isBoldLabels ? 5.5 : 3.8;
+    ctx.lineWidth = isBoldLabels ? 5.5 : 3.0;
     ctx.lineJoin = 'round';
     ctx.strokeText('y', labelY_x, labelY_y);
     ctx.fillStyle = '#000000';
     ctx.fillText('y', labelY_x, labelY_y);
+    if (isBoldLabels) {
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = '#000000';
+      ctx.strokeText('y', labelY_x, labelY_y);
+    }
 
     hitboxes.push({
       id: 'axis_y',
@@ -1476,15 +1491,20 @@ export function renderGraphToCanvas(
     const drawOX = bestO.x + (config.originOffset?.x ?? 0);
     const drawOY = bestO.y + (config.originOffset?.y ?? 0);
 
-    ctx.font = `italic ${isBoldLabels ? 'bold ' : '500 '}${axisLabelFontSz}px ${mathFontFam}`;
+    ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
     ctx.textAlign = bestO.align;
     ctx.textBaseline = bestO.baseline;
     ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.4, Math.round(2.8 * fontScale));
+    ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.0, Math.round(2.2 * fontScale));
     ctx.lineJoin = 'round';
     ctx.strokeText('O', drawOX, drawOY);
     ctx.fillStyle = '#000000';
     ctx.fillText('O', drawOX, drawOY);
+    if (isBoldLabels) {
+      ctx.lineWidth = 0.6;
+      ctx.strokeStyle = '#000000';
+      ctx.strokeText('O', drawOX, drawOY);
+    }
 
     hitboxes.push({
       id: 'O',
@@ -1658,16 +1678,21 @@ export function renderGraphToCanvas(
 
       // Ghi nhãn chữ A, B cạnh đầu mút (vị trí tối ưu không bao giờ đè đồ thị)
       const pointLabelFontSz = Math.round(21 * fontScale);
-      ctx.font = `italic ${isBoldLabels ? 'bold ' : '500 '}${pointLabelFontSz}px ${mathFontFam}`;
+      ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
       const bestPos = getBestPointLabelPos(sx, sy, ep.label, pointLabelFontSz);
       ctx.textAlign = bestPos.align;
       ctx.textBaseline = bestPos.baseline;
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.4, Math.round(2.8 * fontScale));
+      ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.0, Math.round(2.2 * fontScale));
       ctx.lineJoin = 'round';
       ctx.strokeText(ep.label, bestPos.x, bestPos.y);
       ctx.fillStyle = '#000000';
       ctx.fillText(ep.label, bestPos.x, bestPos.y);
+      if (isBoldLabels) {
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = '#000000';
+        ctx.strokeText(ep.label, bestPos.x, bestPos.y);
+      }
     }
     ctx.restore();
   }
@@ -1777,16 +1802,21 @@ export function renderGraphToCanvas(
       if (cp.label && cp.label.trim()) {
         const lbl = cp.label.trim();
         const pointLabelFontSz = Math.round(21 * fontScale);
-        ctx.font = `italic ${isBoldLabels ? 'bold ' : '500 '}${pointLabelFontSz}px ${mathFontFam}`;
+        ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
         const bestPos = getBestPointLabelPos(sx, sy, lbl, pointLabelFontSz);
         ctx.textAlign = bestPos.align;
         ctx.textBaseline = bestPos.baseline;
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.4, Math.round(2.8 * fontScale));
+        ctx.lineWidth = isBoldLabels ? Math.max(3, Math.round(3.5 * fontScale)) : Math.max(2.0, Math.round(2.2 * fontScale));
         ctx.lineJoin = 'round';
         ctx.strokeText(lbl, bestPos.x, bestPos.y);
         ctx.fillStyle = '#000000';
         ctx.fillText(lbl, bestPos.x, bestPos.y);
+        if (isBoldLabels) {
+          ctx.lineWidth = 0.6;
+          ctx.strokeStyle = '#000000';
+          ctx.strokeText(lbl, bestPos.x, bestPos.y);
+        }
       }
     }
     ctx.restore();

@@ -95,7 +95,7 @@ export const NAV_CATEGORIES: NavCategory[] = [
       {
         id: 'bbt',
         label: 'Bảng biến thiên & Xét dấu',
-        sub: 'Lập BBT & dấu tam thức bậc 2, 3 chuẩn SGK',
+        sub: 'Tự động từ hàm số & Tùy biến BBT, xét dấu chuẩn SGK',
         icon: Table,
         badge: 'SGK Mới',
       },
@@ -185,11 +185,18 @@ export default function App() {
   const [profile, setProfile] = useState<TeacherProfile>(() => {
     try {
       const saved = localStorage.getItem('lvp_teacher_profile');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.school === 'Trường THPT Thạnh Phước' || !parsed.school) {
+          parsed.school = 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long';
+          localStorage.setItem('lvp_teacher_profile', JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch {}
     return {
       name: 'GV Lê Vĩnh Phúc',
-      school: 'Trường THPT Thạnh Phước',
+      school: 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long',
       subject: 'Toán học',
       academicYear: '2026 - 2027',
       showGreeting: true,
@@ -358,16 +365,11 @@ export default function App() {
                   TRỢ LÝ ĐỒ HỌA TOÁN HỌC
                 </h1>
               </div>
-              {!isCompactMode && (
+              {!isCompactMode && profile.showGreeting && profile.name && (
                 <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  <span className={`${theme.primaryText} font-semibold truncate`}>
-                    Phân hệ 4 • Tác giả: GV Lê Vĩnh Phúc (0944405124)
+                  <span className="text-slate-500 dark:text-slate-400 truncate">
+                    <strong className="text-slate-700 dark:text-slate-200">{profile.name}</strong> ({profile.school})
                   </span>
-                  {profile.showGreeting && profile.name && (
-                    <span className="hidden xl:inline text-slate-400">
-                      • <strong className="text-slate-700 dark:text-slate-200">{profile.name}</strong> ({profile.school})
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -426,19 +428,6 @@ export default function App() {
             </button>
           </div>
         </div>
-
-        {/* Thanh Ghim Nhanh (Quick Favorites Bar) */}
-        {!isCompactMode && pinnedTabs.length > 0 && (
-          <div className="pt-1.5 mt-1 border-t border-slate-100 dark:border-slate-800/80">
-            <QuickFavoritesBar
-              activeTab={activeTab}
-              onSelectTab={handleSelectTab}
-              pinnedTabs={pinnedTabs}
-              onOpenSearch={() => setShowCommandPalette(true)}
-              accentColor={accentColor}
-            />
-          </div>
-        )}
       </header>
 
       {/* =====================================================================
@@ -566,7 +555,11 @@ export default function App() {
             {/* 1.1 ĐỒ THỊ OXY, MIỀN NGHIỆM BPT & TRỤC SỐ */}
             {visitedTabs.has('bbt_graph') && (
               <div className={activeTab === 'bbt_graph' ? 'block animate-fade-in' : 'hidden'}>
-                <FunctionGraphTool apiKey={apiKey} model={preferredModel} />
+                <FunctionGraphTool 
+                  apiKey={apiKey} 
+                  model={preferredModel} 
+                  onNavigateToBBT={() => handleSelectTab('bbt')}
+                />
               </div>
             )}
 
