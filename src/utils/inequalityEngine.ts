@@ -5,6 +5,7 @@
  */
 
 import { addDpiToBlob } from './dpiUtils';
+import { drawMathText, toFraction } from './bbtEngine';
 
 export interface LinearInequality {
   id: string;
@@ -48,10 +49,54 @@ export interface InequalityConfig {
   isBoldLabels?: boolean;
   showTicks?: boolean;
   showTickLabels?: boolean;
+  showAxisIntersections?: boolean; // Hiện giao điểm của đường thẳng với Ox, Oy (mặc định true)
   showGrid?: boolean;
   curveWidth?: number;
   axisWidth?: number;
   title?: string;
+  // Offset điều chỉnh kéo thả (drag & drop) cho nhãn và số
+  originOffset?: { x: number; y: number };
+  axisLabelXOffset?: { x: number; y: number };
+  axisLabelYOffset?: { x: number; y: number };
+  oxLabelOffsets?: Record<string, { offsetX?: number; offsetY?: number }>;
+  oyLabelOffsets?: Record<string, { offsetX?: number; offsetY?: number }>;
+  lineLabelOffsets?: Record<string, { offsetX?: number; offsetY?: number }>;
+  pointLabelOffsets?: Record<string, { offsetX?: number; offsetY?: number }>;
+}
+
+export interface InequalityLabelHitbox {
+  id: string; // 'O', 'ox_<text>', 'oy_<text>', 'axis_x', 'axis_y', 'line_<id>', 'point_<index>'
+  text: string;
+  type: 'origin' | 'ox' | 'oy' | 'axis_x' | 'axis_y' | 'line_label' | 'point_label';
+  val?: number;
+  lineId?: string;
+  pointIndex?: number;
+  x: number;      // CSS pixel x
+  y: number;      // CSS pixel y
+  width: number;  // CSS pixel width
+  height: number; // CSS pixel height
+}
+
+export interface RenderInequalityResult {
+  hitboxes: InequalityLabelHitbox[];
+  unitScale: number;
+}
+
+/**
+ * Chuyển số thực thành chuỗi toán học chuẩn (phân số tối giản có dấu gạch ngang hoặc số nguyên)
+ * Ví dụ: 150 -> "150", 1.5 -> "3/2", -0.5 -> "-1/2", 1.3333 -> "4/3"
+ */
+export function formatNumberMath(val: number): string {
+  if (Math.abs(val) < 1e-6) return '0';
+  const rounded = Math.round(val);
+  if (Math.abs(val - rounded) < 1e-4) {
+    return rounded.toString();
+  }
+  const frac = toFraction(val, 120, 1e-4);
+  if (frac && frac.den > 1 && frac.den <= 60) {
+    return `${frac.num}/${frac.den}`;
+  }
+  return (Math.round(val * 100) / 100).toString();
 }
 
 export interface Point2D {
@@ -353,9 +398,10 @@ export function renderInequalityToCanvas(
   canvas: HTMLCanvasElement,
   dpiScale = 2.4,
   options?: { width?: number; height?: number; fontFamily?: string; fontSizeScale?: number }
-): { unitScale: number } {
+): RenderInequalityResult {
+  const hitboxes: InequalityLabelHitbox[] = [];
   const ctx = canvas.getContext('2d');
-  if (!ctx) return { unitScale: 36 };
+  if (!ctx) return { hitboxes, unitScale: 36 };
 
   const width = options?.width ?? 540;
   const height = options?.height ?? 460;
@@ -581,8 +627,12 @@ export function renderInequalityToCanvas(
       if (angle > Math.PI / 2) angle -= Math.PI;
       else if (angle < -Math.PI / 2) angle += Math.PI;
 
+      const customOff = config.lineLabelOffsets?.[ineq.id];
+      const posX = midSX + (customOff?.offsetX ?? 0);
+      const posY = midSY + (customOff?.offsetY ?? 0);
+
       ctx.save();
-      ctx.translate(midSX, midSY);
+      ctx.translate(posX, posY);
       ctx.rotate(angle);
 
       const fSize = Math.round(18 * fontScale);
@@ -605,6 +655,24 @@ export function renderInequalityToCanvas(
       }
 
       ctx.restore();
+
+      const textW = Math.max(30, lbl.length * fSize * 0.65);
+      const textH = fSize * 1.4;
+      const cosA = Math.abs(Math.cos(angle));
+      const sinA = Math.abs(Math.sin(angle));
+      const boxW = textW * cosA + textH * sinA + 12;
+      const boxH = textW * sinA + textH * cosA + 12;
+
+      hitboxes.push({
+        id: `line_${ineq.id}`,
+        text: lbl,
+        type: 'line_label',
+        lineId: ineq.id,
+        x: posX - boxW / 2,
+        y: posY - boxH / 2,
+        width: boxW,
+        height: boxH
+      });
     }
 
     ctx.restore();
@@ -616,7 +684,8 @@ export function renderInequalityToCanvas(
   // =========================================================================
   if (config.points && config.points.length > 0) {
     ctx.save();
-    for (const pt of config.points) {
+    for (let ptIdx = 0; ptIdx < config.points.length; ptIdx++) {
+      const pt = config.points[ptIdx];
       const sx = toScreenX(pt.x);
       const sy = toScreenY(pt.y);
 
@@ -675,10 +744,35 @@ export function renderInequalityToCanvas(
           baseline = 'top';
         }
 
+        const ptKey = pt.label || `pt_${ptIdx}`;
+        const customOff = config.pointLabelOffsets?.[ptKey] || config.pointLabelOffsets?.[`pt_${ptIdx}`];
+        if (customOff) {
+          lx += customOff.offsetX ?? 0;
+          ly += customOff.offsetY ?? 0;
+        }
+
         ctx.textAlign = align;
         ctx.textBaseline = baseline;
         ctx.strokeText(pLabel, lx, ly);
         ctx.fillText(pLabel, lx, ly);
+        if (isBold) {
+          ctx.strokeStyle = '#0284C7';
+          ctx.lineWidth = 0.6;
+          ctx.strokeText(pLabel, lx, ly);
+        }
+
+        const pW = Math.max(18, pLabel.length * fSize * 0.65);
+        const pH = fSize * 1.3;
+        hitboxes.push({
+          id: `point_${ptIdx}`,
+          text: pLabel,
+          type: 'point_label',
+          pointIndex: ptIdx,
+          x: (align === 'right' ? lx - pW : lx) - 4,
+          y: (baseline === 'top' ? ly : ly - pH) - 4,
+          width: pW + 8,
+          height: pH + 8
+        });
       }
     }
     ctx.restore();
@@ -743,117 +837,312 @@ export function renderInequalityToCanvas(
     }
   }
 
-  // Ghi số tọa độ trên các trục Ox và Oy (Halo trắng sắc nét)
-  const numFontSz = Math.round(21 * fontScale);
-  ctx.font = `${isBold ? 'bold ' : 'normal '}${numFontSz}px ${fontFam}`;
-  ctx.fillStyle = '#0284C7'; // Màu xanh cyan số tọa độ như SGK Hình 1 & 2
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = isBold ? 4.0 : 2.6;
-  ctx.lineJoin = 'round';
+  // =========================================================================
+  // 8. VẼ CÁC SỐ TỌA ĐỘ VÀ GIAO ĐIỂM TRÊN TRỤC Ox VÀ Oy (DẠNG TOÁN HỌC & DRAG)
+  // =========================================================================
+  interface AxisItem {
+    val: number;
+    text: string;
+    screenX: number;
+    screenY: number;
+    axis: 'ox' | 'oy';
+    isIntersection?: boolean;
+    lineId?: string;
+  }
 
-  // Thu thập các mốc cần ghi số (giao điểm trục, điểm kiểm tra, hoặc các vạch chia chính)
-  const numbersToDrawX = new Set<number>();
-  const numbersToDrawY = new Set<number>();
+  const oxItems: AxisItem[] = [];
+  const oyItems: AxisItem[] = [];
 
-  // Giao điểm với các trục
-  for (const ineq of config.inequalities) {
-    const { a, b, c } = ineq;
-    if (Math.abs(a) > 1e-6) {
-      const xr = Math.round((c / a) * 100) / 100;
-      if (xr >= xMin && xr <= xMax && Math.abs(xr) > 1e-4) numbersToDrawX.add(xr);
-    }
-    if (Math.abs(b) > 1e-6) {
-      const yr = Math.round((c / b) * 100) / 100;
-      if (yr >= yMin && yr <= yMax && Math.abs(yr) > 1e-4) numbersToDrawY.add(yr);
+  const showIntersects = config.showAxisIntersections !== false; // Mặc định true
+
+  // 1. Tự động tính toán các giao điểm của các đường thẳng với Ox và Oy
+  if (showIntersects) {
+    for (const ineq of config.inequalities) {
+      const isAxisY = Math.abs(ineq.a - 1) < 1e-4 && Math.abs(ineq.b) < 1e-4 && Math.abs(ineq.c) < 1e-4; // x = 0
+      const isAxisX = Math.abs(ineq.a) < 1e-4 && Math.abs(ineq.b - 1) < 1e-4 && Math.abs(ineq.c) < 1e-4; // y = 0
+      if (isAxisX || isAxisY) continue;
+
+      const { a, b, c } = ineq;
+
+      // Giao điểm Ox: y = 0 => x = c / a
+      if (Math.abs(a) > 1e-6) {
+        const xVal = c / a;
+        if (xVal >= xMin - 0.05 && xVal <= xMax + 0.05 && Math.abs(xVal) > 1e-4) {
+          if (!oxItems.some(item => Math.abs(item.val - xVal) < 1e-4)) {
+            oxItems.push({
+              val: xVal,
+              text: formatNumberMath(xVal),
+              screenX: toScreenX(xVal),
+              screenY: axY,
+              axis: 'ox',
+              isIntersection: true,
+              lineId: ineq.id
+            });
+          }
+        }
+      }
+
+      // Giao điểm Oy: x = 0 => y = c / b
+      if (Math.abs(b) > 1e-6) {
+        const yVal = c / b;
+        if (yVal >= yMin - 0.05 && yVal <= yMax + 0.05 && Math.abs(yVal) > 1e-4) {
+          if (!oyItems.some(item => Math.abs(item.val - yVal) < 1e-4)) {
+            oyItems.push({
+              val: yVal,
+              text: formatNumberMath(yVal),
+              screenX: axX,
+              screenY: toScreenY(yVal),
+              axis: 'oy',
+              isIntersection: true,
+              lineId: ineq.id
+            });
+          }
+        }
+      }
     }
   }
 
-  // Điểm kiểm tra
+  // 2. Điểm kiểm tra / Tọa độ gióng
   if (config.points) {
     for (const pt of config.points) {
-      if (Math.abs(pt.x) > 1e-4) numbersToDrawX.add(pt.x);
-      if (Math.abs(pt.y) > 1e-4) numbersToDrawY.add(pt.y);
+      if (pt.showProjection !== false) {
+        if (Math.abs(pt.x) > 1e-4 && pt.x >= xMin && pt.x <= xMax) {
+          if (!oxItems.some(item => Math.abs(item.val - pt.x) < 1e-4)) {
+            oxItems.push({
+              val: pt.x,
+              text: formatNumberMath(pt.x),
+              screenX: toScreenX(pt.x),
+              screenY: axY,
+              axis: 'ox'
+            });
+          }
+        }
+        if (Math.abs(pt.y) > 1e-4 && pt.y >= yMin && pt.y <= yMax) {
+          if (!oyItems.some(item => Math.abs(item.val - pt.y) < 1e-4)) {
+            oyItems.push({
+              val: pt.y,
+              text: formatNumberMath(pt.y),
+              screenX: axX,
+              screenY: toScreenY(pt.y),
+              axis: 'oy'
+            });
+          }
+        }
+      }
     }
   }
 
-  // Nếu ít số quá, thêm các mốc stepX, stepY
-  if (numbersToDrawX.size === 0) {
-    for (let k = -2; k <= 3; k++) {
-      if (k !== 0) numbersToDrawX.add(k * stepX);
+  // 3. Nếu bật "Đánh số" (showTickLabels), thêm các mốc stepX, stepY
+  if (config.showTickLabels) {
+    const kMinX = Math.ceil(xMin / stepX);
+    const kMaxX = Math.floor(xMax / stepX);
+    for (let k = kMinX; k <= kMaxX; k++) {
+      if (k === 0) continue;
+      const v = k * stepX;
+      if (!oxItems.some(item => Math.abs(item.val - v) < 1e-4)) {
+        oxItems.push({
+          val: v,
+          text: formatNumberMath(v),
+          screenX: toScreenX(v),
+          screenY: axY,
+          axis: 'ox'
+        });
+      }
     }
-  }
-  if (numbersToDrawY.size === 0) {
-    for (let k = -2; k <= 3; k++) {
-      if (k !== 0) numbersToDrawY.add(k * stepY);
+
+    const kMinY = Math.ceil(yMin / stepY);
+    const kMaxY = Math.floor(yMax / stepY);
+    for (let k = kMinY; k <= kMaxY; k++) {
+      if (k === 0) continue;
+      const v = k * stepY;
+      if (!oyItems.some(item => Math.abs(item.val - v) < 1e-4)) {
+        oyItems.push({
+          val: v,
+          text: formatNumberMath(v),
+          screenX: axX,
+          screenY: toScreenY(v),
+          axis: 'oy'
+        });
+      }
     }
   }
 
-  // Ghi số tọa độ trên Ox và Oy (nếu bật Đánh số)
-  if (config.showTickLabels !== false) {
-    // Ghi số trên Ox
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    for (const num of numbersToDrawX) {
-      if (num < xMin || num > xMax) continue;
-      const sx = toScreenX(num);
-      const text = num.toString();
-      ctx.strokeText(text, sx, axY + 6);
-      ctx.fillText(text, sx, axY + 6);
-    }
+  // Ghi số tọa độ và vạch trên Ox và Oy (Halo trắng sắc nét)
+  const numFontSz = Math.round(21 * fontScale);
 
-    // Ghi số trên Oy
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    for (const num of numbersToDrawY) {
-      if (num < yMin || num > yMax) continue;
-      const sy = toScreenY(num);
-      const text = num.toString();
-      ctx.strokeText(text, axX - 7, sy);
-      ctx.fillText(text, axX - 7, sy);
-    }
+  // Vẽ các vạch và số trên Ox
+  for (const item of oxItems) {
+    if (item.screenX < 14 || item.screenX > width - 18) continue;
+
+    // Vạch tick trên trục Ox
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(item.screenX, axY - 4);
+    ctx.lineTo(item.screenX, axY + 4);
+    ctx.stroke();
+
+    // Điểm số dạng toán học
+    const customOff = config.oxLabelOffsets?.[item.text] || config.oxLabelOffsets?.[String(item.val)];
+    const isFrac = item.text.includes('/');
+    const defaultOffsetY = isFrac ? 19 : 14;
+    const drawX = item.screenX + (customOff?.offsetX ?? 0);
+    const drawY = axY + defaultOffsetY + (customOff?.offsetY ?? 0);
+
+    drawMathText(ctx, item.text, drawX, drawY, {
+      fontSize: numFontSz,
+      fontFamily: fontFam,
+      align: 'center',
+      color: '#0284C7', // Xanh cyan chuẩn SGK
+      isBold,
+      withHalo: true,
+      haloColor: '#FFFFFF',
+      haloWidth: isBold ? 3.5 : 2.4
+    });
+
+    const estW = Math.max(16, item.text.length * numFontSz * 0.65);
+    const estH = isFrac ? numFontSz * 1.6 : numFontSz * 1.1;
+    hitboxes.push({
+      id: `ox_${item.text}`,
+      text: item.text,
+      type: 'ox',
+      val: item.val,
+      x: drawX - estW / 2 - 4,
+      y: drawY - estH / 2 - 4,
+      width: estW + 8,
+      height: estH + 8
+    });
+  }
+
+  // Vẽ các vạch và số trên Oy
+  for (const item of oyItems) {
+    if (item.screenY < 18 || item.screenY > height - 14) continue;
+
+    // Vạch tick trên trục Oy
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(axX - 4, item.screenY);
+    ctx.lineTo(axX + 4, item.screenY);
+    ctx.stroke();
+
+    // Điểm số dạng toán học
+    const customOff = config.oyLabelOffsets?.[item.text] || config.oyLabelOffsets?.[String(item.val)];
+    const isFrac = item.text.includes('/');
+    const defaultOffsetX = -10;
+    const drawX = axX + defaultOffsetX + (customOff?.offsetX ?? 0);
+    const drawY = item.screenY + (customOff?.offsetY ?? 0);
+
+    drawMathText(ctx, item.text, drawX, drawY, {
+      fontSize: numFontSz,
+      fontFamily: fontFam,
+      align: 'right',
+      color: '#0284C7',
+      isBold,
+      withHalo: true,
+      haloColor: '#FFFFFF',
+      haloWidth: isBold ? 3.5 : 2.4
+    });
+
+    const estW = Math.max(16, item.text.length * numFontSz * 0.65);
+    const estH = isFrac ? numFontSz * 1.6 : numFontSz * 1.1;
+    hitboxes.push({
+      id: `oy_${item.text}`,
+      text: item.text,
+      type: 'oy',
+      val: item.val,
+      x: drawX - estW - 4,
+      y: drawY - estH / 2 - 4,
+      width: estW + 8,
+      height: estH + 8
+    });
   }
 
   // Nhãn trục x và y
   const axisLabelFontSz = Math.round(25 * fontScale);
   ctx.font = `italic ${isBold ? 'bold ' : 'normal '}${axisLabelFontSz}px ${fontFam}`;
-  ctx.fillStyle = '#0284C7';
 
   // Chữ x
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.strokeText('x', width - 8, axY + 12);
-  ctx.fillText('x', width - 8, axY + 12);
+  const drawX_x = (width - 8) + (config.axisLabelXOffset?.x ?? 0);
+  const drawX_y = (axY + 12) + (config.axisLabelXOffset?.y ?? 0);
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = isBold ? 4.0 : 2.6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText('x', drawX_x, drawX_y);
+  ctx.fillStyle = '#0284C7';
+  ctx.fillText('x', drawX_x, drawX_y);
   if (isBold) {
     ctx.strokeStyle = '#0284C7';
     ctx.lineWidth = 0.6;
-    ctx.strokeText('x', width - 8, axY + 12);
+    ctx.strokeText('x', drawX_x, drawX_y);
   }
+  hitboxes.push({
+    id: 'axis_x',
+    text: 'x',
+    type: 'axis_x',
+    x: drawX_x - 4,
+    y: drawX_y - 14,
+    width: 24,
+    height: 24
+  });
 
   // Chữ y
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.strokeText('y', axX - 14, 14);
-  ctx.fillText('y', axX - 14, 14);
+  const drawY_x = (axX - 14) + (config.axisLabelYOffset?.x ?? 0);
+  const drawY_y = 14 + (config.axisLabelYOffset?.y ?? 0);
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = isBold ? 4.0 : 2.6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText('y', drawY_x, drawY_y);
+  ctx.fillStyle = '#0284C7';
+  ctx.fillText('y', drawY_x, drawY_y);
   if (isBold) {
     ctx.strokeStyle = '#0284C7';
     ctx.lineWidth = 0.6;
-    ctx.strokeText('y', axX - 14, 14);
+    ctx.strokeText('y', drawY_x, drawY_y);
   }
+  hitboxes.push({
+    id: 'axis_y',
+    text: 'y',
+    type: 'axis_y',
+    x: drawY_x - 12,
+    y: drawY_y - 20,
+    width: 24,
+    height: 24
+  });
 
   // Gốc O
   ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.strokeText('O', axX - 5, axY + 4);
-  ctx.fillText('O', axX - 5, axY + 4);
+  const drawOX = (axX - 5) + (config.originOffset?.x ?? 0);
+  const drawOY = (axY + 4) + (config.originOffset?.y ?? 0);
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = isBold ? 4.0 : 2.6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText('O', drawOX, drawOY);
+  ctx.fillStyle = '#0284C7';
+  ctx.fillText('O', drawOX, drawOY);
   if (isBold) {
     ctx.strokeStyle = '#0284C7';
     ctx.lineWidth = 0.6;
-    ctx.strokeText('O', axX - 5, axY + 4);
+    ctx.strokeText('O', drawOX, drawOY);
   }
+  hitboxes.push({
+    id: 'O',
+    text: 'O',
+    type: 'origin',
+    x: drawOX - 22,
+    y: drawOY - 4,
+    width: 26,
+    height: 26
+  });
 
   ctx.restore();
 
-  return { unitScale };
+  return { hitboxes, unitScale };
 }
 
 function drawArrowHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
