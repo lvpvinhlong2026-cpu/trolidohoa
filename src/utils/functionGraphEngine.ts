@@ -522,6 +522,7 @@ export function renderGraphToCanvas(
   // Kích thước chuẩn đề thi Word và SGK (hệ trục trực chuẩn 1:1)
   const width = options?.width ?? 440;
   const height = options?.height ?? 400;
+  const isBoldLabels = config.isBoldLabels ?? true;
 
   canvas.width = Math.round(width * dpiScale);
   canvas.height = Math.round(height * dpiScale);
@@ -1167,7 +1168,7 @@ export function renderGraphToCanvas(
         const y = f(x);
         if (y !== null && !isNaN(y)) {
           const sx = toScreenX(x);
-          const sy = toScreenY(y);
+          const sy = Math.max(-100, Math.min(height + 100, toScreenY(y)));
           if (first) {
             ctx.moveTo(sx, sy);
             first = false;
@@ -1330,7 +1331,6 @@ export function renderGraphToCanvas(
 
   // 2. Vẽ Hệ trục tọa độ Oxy chuẩn mực SGK (nét đậm, mũi tên sắc sảo)
   const axisWidth = config.axisWidth ?? 1.8;
-  const isBoldLabels = config.isBoldLabels ?? true;
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = axisWidth;
 

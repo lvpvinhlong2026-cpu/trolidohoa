@@ -25,7 +25,8 @@ import {
   analyzeFunctionOnInterval, 
   renderBBTToCanvas, 
   BBTData, 
-  formatNum 
+  formatNum,
+  IntervalMinMaxInfo
 } from '../utils/bbtEngine';
 import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
@@ -395,7 +396,10 @@ export default function TableVariationTool() {
   const [autoCoeffs, setAutoCoeffs] = useState({ a: 1, b: -1, c: 1, d: 1, e: -1 });
   const [autoFnInput, setAutoFnInput] = useState<string>('x^3 - 3*x + 1');
   const [autoUseInterval, setAutoUseInterval] = useState<boolean>(false);
-  const [autoInterval, setAutoInterval] = useState({ min: -2, max: 2, minInclusive: true, maxInclusive: true });
+  const [autoInterval, setAutoInterval] = useState({ min: -3, max: 2, minInclusive: true, maxInclusive: true });
+  const [rawIntervalMin, setRawIntervalMin] = useState<string>('-3');
+  const [rawIntervalMax, setRawIntervalMax] = useState<string>('2');
+  const [minMaxResult, setMinMaxResult] = useState<IntervalMinMaxInfo | null>(null);
   const [analyzedData, setAnalyzedData] = useState<BBTData | null>(null);
 
   const autoCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -415,7 +419,7 @@ export default function TableVariationTool() {
     try {
       if (autoUseInterval) {
         if (autoInputMode === 'coeffs') {
-          result = analyzeFromCoeffsOnInterval(
+          const res = analyzeFromCoeffsOnInterval(
             autoFnType,
             autoCoeffs.a,
             autoCoeffs.b,
@@ -423,20 +427,21 @@ export default function TableVariationTool() {
             autoCoeffs.d,
             autoCoeffs.e,
             autoInterval.min,
-            autoInterval.max,
-            autoInterval.minInclusive,
-            autoInterval.maxInclusive
+            autoInterval.max
           );
+          result = res.bbt;
+          setMinMaxResult(res.minMax);
         } else {
-          result = analyzeFunctionOnInterval(
+          const res = analyzeFunctionOnInterval(
             autoFnInput,
             autoInterval.min,
-            autoInterval.max,
-            autoInterval.minInclusive,
-            autoInterval.maxInclusive
+            autoInterval.max
           );
+          result = res.bbt;
+          setMinMaxResult(res.minMax);
         }
       } else {
+        setMinMaxResult(null);
         if (autoInputMode === 'coeffs') {
           result = analyzeFromCoeffs(
             autoFnType,
@@ -1012,27 +1017,68 @@ export default function TableVariationTool() {
               </label>
 
               {autoUseInterval && (
-                <div className="grid grid-cols-2 gap-2 pt-1 animate-fade-in">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block mb-0.5">Mút trái a:</span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={autoInterval.min}
-                      onChange={e => setAutoInterval({ ...autoInterval, min: parseFloat(e.target.value) || 0 })}
-                      className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
-                    />
+                <div className="space-y-2 pt-1 animate-fade-in">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block mb-0.5">Mút trái a:</span>
+                      <input
+                        type="text"
+                        value={rawIntervalMin}
+                        onChange={e => {
+                          setRawIntervalMin(e.target.value);
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) {
+                            setAutoInterval(prev => ({ ...prev, min: val }));
+                          }
+                        }}
+                        className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
+                        placeholder="-3"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block mb-0.5">Mút phải b:</span>
+                      <input
+                        type="text"
+                        value={rawIntervalMax}
+                        onChange={e => {
+                          setRawIntervalMax(e.target.value);
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) {
+                            setAutoInterval(prev => ({ ...prev, max: val }));
+                          }
+                        }}
+                        className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
+                        placeholder="2"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block mb-0.5">Mút phải b:</span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={autoInterval.max}
-                      onChange={e => setAutoInterval({ ...autoInterval, max: parseFloat(e.target.value) || 0 })}
-                      className="w-full p-1.5 text-center font-bold bg-slate-50 dark:bg-slate-800 border rounded"
-                    />
-                  </div>
+
+                  {minMaxResult && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] space-y-1">
+                      {minMaxResult.hasAsymptote ? (
+                        <div className="text-amber-600 dark:text-amber-400 font-semibold">
+                          ⚠️ Hàm số có tiệm cận đứng trên đoạn/khoảng khảo sát.
+                        </div>
+                      ) : (
+                        <div className="bg-teal-50/80 dark:bg-teal-950/40 p-2 rounded-lg border border-teal-200 dark:border-teal-800 space-y-1">
+                          {minMaxResult.maxVal !== null && (
+                            <div className="text-teal-900 dark:text-teal-100">
+                              <strong>GTLN (max y):</strong>{' '}
+                              <span className="font-bold text-teal-700 dark:text-teal-300">{formatNum(minMaxResult.maxVal)}</span>{' '}
+                              tại <span className="font-mono">x = {minMaxResult.maxAt.map(x => formatNum(x)).join('; ')}</span>
+                            </div>
+                          )}
+                          {minMaxResult.minVal !== null && (
+                            <div className="text-teal-900 dark:text-teal-100">
+                              <strong>GTNN (min y):</strong>{' '}
+                              <span className="font-bold text-teal-700 dark:text-teal-300">{formatNum(minMaxResult.minVal)}</span>{' '}
+                              tại <span className="font-mono">x = {minMaxResult.minAt.map(x => formatNum(x)).join('; ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

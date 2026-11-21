@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Ruler, Copy, Download, CheckCircle2, RotateCcw, 
-  Sparkles, Layers, Check, Table
+  Sparkles, Layers, Check
 } from 'lucide-react';
 import { 
   renderNumberLineToCanvas, 
-  renderSummaryTableToCanvas, 
   renderSetOperationsToCanvas,
   IntervalItem, 
   NumberLineConfig, 
@@ -26,8 +25,8 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
   const [dataUrl, setDataUrl] = useState<string>('');
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
-  // Chế độ: 'single' (trục số đơn), 'summary_table' (bảng tổng hợp SGK Hình 3), 'operation' (phép toán tập hợp)
-  const [mode, setMode] = useState<'single' | 'summary_table' | 'operation'>('single');
+  // Chế độ: 'single' (trục số đơn), 'operation' (phép toán tập hợp)
+  const [mode, setMode] = useState<'single' | 'operation'>('single');
 
   // Chế độ trục số đơn
   const [interval, setInterval] = useState<IntervalItem>({
@@ -57,7 +56,7 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
     startLabel: '1',
     endLabel: '5'
   });
-  const [opType, setOpType] = useState<'intersection' | 'union' | 'difference'>('intersection');
+  const [opType, setOpType] = useState<'intersection' | 'union' | 'difference' | 'difference_ba'>('intersection');
 
   const getFontFamily = (f: string) => {
     if (f === 'latex') return MATH_FONT_FAMILIES.latex;
@@ -76,13 +75,6 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
             isBold,
             width: 640,
             height: 125
-          });
-        } else if (mode === 'summary_table') {
-          renderSummaryTableToCanvas(canvasRef.current, 2.4, {
-            fontFamily: fontFam,
-            fontSizeScale: fontScale,
-            isBold,
-            width: 680
           });
         } else if (mode === 'operation') {
           renderSetOperationsToCanvas(setA, setB, opType, canvasRef.current, 2.4, {
@@ -129,7 +121,7 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
       const url = URL.createObjectURL(blobWithDpi);
       const a = document.createElement('a');
       a.href = url;
-      a.download = mode === 'summary_table' ? 'Bang_cac_tap_con_R_300dpi.png' : 'Truc_so_300dpi.png';
+      a.download = 'Truc_so_300dpi.png';
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -172,18 +164,6 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
             }`}
           >
             📏 Trục số đơn (Tập tùy biến)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('summary_table')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-              mode === 'summary_table'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
-          >
-            <Table size={13} />
-            <span>📋 Bảng tổng hợp SGK (Hình 3)</span>
           </button>
           <button
             type="button"
@@ -362,35 +342,22 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
             </>
           )}
 
-          {mode === 'summary_table' && (
-            <div className="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-800 text-xs space-y-2">
-              <span className="font-extrabold text-teal-900 dark:text-teal-200 block">
-                📋 Bảng tổng hợp đầy đủ các tập con của ℝ:
-              </span>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
-                Bao gồm toàn bộ 9 dạng tập hợp chuẩn SGK: <strong>Khoảng</strong> (4 dạng), <strong>Đoạn</strong> (1 dạng) và <strong>Nửa khoảng</strong> (4 dạng).
-              </p>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
-                Mỗi hàng có công thức định nghĩa tập hợp (ví dụ: (a; b) = {"{x ∈ ℝ | a < x < b}"}) và hình vẽ trục số tương ứng bên cạnh giống hệt sách giáo khoa.
-              </p>
-            </div>
-          )}
-
           {mode === 'operation' && (
             <div className="space-y-3 text-xs">
               <div className="space-y-1">
                 <span className="font-bold text-slate-700 dark:text-slate-300 block">Chọn phép toán:</span>
-                <div className="grid grid-cols-3 gap-1.5 font-bold">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-bold">
                   {[
                     { type: 'intersection', label: 'Giao A ∩ B' },
                     { type: 'union', label: 'Hợp A ∪ B' },
-                    { type: 'difference', label: 'Hiệu A \\ B' }
+                    { type: 'difference', label: 'Hiệu A \\ B' },
+                    { type: 'difference_ba', label: 'Hiệu B \\ A' },
                   ].map(op => (
                     <button
                       key={op.type}
                       type="button"
                       onClick={() => setOpType(op.type as any)}
-                      className={`py-1.5 rounded-lg border transition cursor-pointer text-center ${
+                      className={`py-1.5 px-1 rounded-lg border transition cursor-pointer text-center text-xs ${
                         opType === op.type ? 'bg-teal-600 text-white border-teal-600' : 'bg-slate-50 dark:bg-slate-800'
                       }`}
                     >
@@ -402,7 +369,29 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
 
               {/* Nhập Tập A */}
               <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
-                <span className="font-bold text-slate-700 dark:text-slate-300 block">Tập A: [{setA.start}; {setA.end}]</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 block">
+                    Tập A: {setA.startInclusive ? '[' : '('}{setA.start}; {setA.end}{setA.endInclusive ? ']' : ')'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSetA(prev => ({ ...prev, startInclusive: !prev.startInclusive }))}
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      title="Đổi dấu ngoặc đầu mút trái"
+                    >
+                      {setA.startInclusive ? '[' : '('}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSetA(prev => ({ ...prev, endInclusive: !prev.endInclusive }))}
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      title="Đổi dấu ngoặc đầu mút phải"
+                    >
+                      {setA.endInclusive ? ']' : ')'}
+                    </button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -423,7 +412,29 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
 
               {/* Nhập Tập B */}
               <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
-                <span className="font-bold text-slate-700 dark:text-slate-300 block">Tập B: ({setB.start}; {setB.end})</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 block">
+                    Tập B: {setB.startInclusive ? '[' : '('}{setB.start}; {setB.end}{setB.endInclusive ? ']' : ')'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSetB(prev => ({ ...prev, startInclusive: !prev.startInclusive }))}
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      title="Đổi dấu ngoặc đầu mút trái"
+                    >
+                      {setB.startInclusive ? '[' : '('}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSetB(prev => ({ ...prev, endInclusive: !prev.endInclusive }))}
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      title="Đổi dấu ngoặc đầu mút phải"
+                    >
+                      {setB.endInclusive ? ']' : ')'}
+                    </button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="number"

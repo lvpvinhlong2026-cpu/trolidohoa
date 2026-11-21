@@ -13,6 +13,7 @@ export interface IntervalItem {
   endInclusive: boolean;   // true: ], false: )
   startLabel?: string;     // e.g. 'a', '-2', '0'
   endLabel?: string;       // e.g. 'b', '3'
+  isEmpty?: boolean;       // Tập rỗng
 }
 
 export interface NumberLineConfig {
@@ -22,7 +23,7 @@ export interface NumberLineConfig {
   operation?: {
     setA: IntervalItem;
     setB: IntervalItem;
-    type: 'union' | 'intersection' | 'difference'; // A U B, A giao B, A \ B
+    type: 'union' | 'intersection' | 'difference' | 'difference_ba'; // A U B, A giao B, A \ B, B \ A
   };
   minDisplayVal?: number;
   maxDisplayVal?: number;
@@ -138,6 +139,42 @@ export function drawSingleNumberLine(
 
   const lineLen = endX - startX - 25; // Chừa chỗ cho mũi tên
   const arrowX = endX - 10;
+
+  // Nếu là tập rỗng: gạch bỏ toàn bộ trục số và hiển thị ký hiệu ∅
+  if (interval.isEmpty) {
+    ctx.save();
+    ctx.strokeStyle = hatchColor;
+    ctx.lineWidth = 1.3;
+    const hatchStep = 4.5;
+    const hatchHeight = 7.5;
+    const hatchSlant = 4.0;
+    for (let hx = startX + 2; hx <= arrowX - 12; hx += hatchStep) {
+      ctx.beginPath();
+      ctx.moveTo(hx - hatchSlant, y + hatchHeight);
+      ctx.lineTo(hx + hatchSlant, y - hatchHeight);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(startX, y);
+    ctx.lineTo(arrowX, y);
+    ctx.stroke();
+    drawArrowHeadHorizontal(ctx, arrowX, y);
+    ctx.restore();
+
+    ctx.save();
+    ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(17 * fontScale)}px ${fontFam}`;
+    ctx.fillStyle = options?.bracketColor ?? '#DC2626';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('∅ (Tập rỗng)', (startX + arrowX) / 2, y - 10);
+    ctx.restore();
+    return;
+  }
 
   // Tính tọa độ pixel cho mốc start và end
   const isStartInf = interval.start === '-inf';
@@ -513,12 +550,85 @@ export function renderSummaryTableToCanvas(
 }
 
 /**
- * Render phép toán tập hợp: Trục 1 (A), Trục 2 (B), Trục 3 (Kết quả A ∩ B hoặc A ∪ B hoặc A \ B)
+ * Tính hiệu của hai khoảng X \ Y:
+ */
+export function computeIntervalDifference(setX: IntervalItem, setY: IntervalItem): IntervalItem {
+  const xStart = typeof setX.start === 'number' ? setX.start : -Infinity;
+  const xEnd = typeof setX.end === 'number' ? setX.end : Infinity;
+  const yStart = typeof setY.start === 'number' ? setY.start : -Infinity;
+  const yEnd = typeof setY.end === 'number' ? setY.end : Infinity;
+
+  // 1. Y nằm hoàn toàn bên phải X (rời nhau) hoặc bên trái X (rời nhau)
+  const yRightOfX = yStart > xEnd || (yStart === xEnd && (!setY.startInclusive || !setX.endInclusive));
+  const yLeftOfX = yEnd < xStart || (yEnd === xStart && (!setY.endInclusive || !setX.startInclusive));
+
+  if (yRightOfX || yLeftOfX) {
+    return {
+      start: setX.start,
+      end: setX.end,
+      startInclusive: setX.startInclusive,
+      endInclusive: setX.endInclusive,
+      startLabel: setX.startLabel ?? (typeof setX.start === 'number' ? setX.start.toString() : '-∞'),
+      endLabel: setX.endLabel ?? (typeof setX.end === 'number' ? setX.end.toString() : '+∞')
+    };
+  }
+
+  // 2. Y bao trùm toàn bộ X -> Tập rỗng
+  const yCoversLeft = yStart < xStart || (yStart === xStart && (setY.startInclusive || !setX.startInclusive));
+  const yCoversRight = yEnd > xEnd || (yEnd === xEnd && (setY.endInclusive || !setX.endInclusive));
+  if (yCoversLeft && yCoversRight) {
+    return {
+      start: 0,
+      end: 0,
+      startInclusive: false,
+      endInclusive: false,
+      startLabel: '∅',
+      isEmpty: true
+    };
+  }
+
+  // 3. Y phủ phần bên phải của X (xStart < yStart < xEnd)
+  if (xStart < yStart && yStart < xEnd) {
+    return {
+      start: setX.start,
+      end: yStart,
+      startInclusive: setX.startInclusive,
+      endInclusive: !setY.startInclusive,
+      startLabel: setX.startLabel ?? (typeof setX.start === 'number' ? setX.start.toString() : '-∞'),
+      endLabel: yStart.toString()
+    };
+  }
+
+  // 4. Y phủ phần bên trái của X (xStart < yEnd < xEnd)
+  if (yEnd > xStart && yEnd < xEnd) {
+    return {
+      start: yEnd,
+      end: setX.end,
+      startInclusive: !setY.endInclusive,
+      endInclusive: setX.endInclusive,
+      startLabel: yEnd.toString(),
+      endLabel: setX.endLabel ?? (typeof setX.end === 'number' ? setX.end.toString() : '+∞')
+    };
+  }
+
+  // Fallback
+  return {
+    start: setX.start,
+    end: isFinite(yStart) ? yStart : setX.end,
+    startInclusive: setX.startInclusive,
+    endInclusive: !setY.startInclusive,
+    startLabel: typeof setX.start === 'number' ? setX.start.toString() : '-∞',
+    endLabel: isFinite(yStart) ? yStart.toString() : ''
+  };
+}
+
+/**
+ * Render phép toán tập hợp: Trục 1 (A), Trục 2 (B), Trục 3 (Kết quả A ∩ B hoặc A ∪ B hoặc A \ B hoặc B \ A)
  */
 export function renderSetOperationsToCanvas(
   setA: IntervalItem,
   setB: IntervalItem,
-  opType: 'intersection' | 'union' | 'difference',
+  opType: 'intersection' | 'union' | 'difference' | 'difference_ba',
   canvas: HTMLCanvasElement,
   dpiScale = 2.4,
   options?: { width?: number; fontFamily?: string; fontSizeScale?: number; isBold?: boolean }
@@ -554,19 +664,28 @@ export function renderSetOperationsToCanvas(
   const minV = Math.min(...vals, -3) - 1.5;
   const maxV = Math.max(...vals, 4) + 1.5;
 
-  const opLabel = opType === 'intersection' ? 'Giao A ∩ B' : opType === 'union' ? 'Hợp A ∪ B' : 'Hiệu A \\ B';
+  const opLabel = opType === 'intersection' 
+    ? 'Giao A ∩ B' 
+    : opType === 'union' 
+      ? 'Hợp A ∪ B' 
+      : opType === 'difference' 
+        ? 'Hiệu A \\ B' 
+        : 'Hiệu B \\ A';
+
+  const axisStartX = 110;
+  const axisEndX = width - 20;
 
   // 1. Trục A
-  ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(17 * fontScale)}px ${fontFam}`;
+  ctx.font = `${isBold ? 'bold ' : 'normal '}${Math.round(16 * fontScale)}px ${fontFam}`;
   ctx.fillStyle = '#0F172A';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText('Tập A:', 18, 40);
-  drawSingleNumberLine(ctx, setA, 90, width - 20, 40, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
+  drawSingleNumberLine(ctx, setA, axisStartX, axisEndX, 40, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
 
   // 2. Trục B
   ctx.fillText('Tập B:', 18, 115);
-  drawSingleNumberLine(ctx, setB, 90, width - 20, 115, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
+  drawSingleNumberLine(ctx, setB, axisStartX, axisEndX, 115, { valMin: minV, valMax: maxV, fontFamily: fontFam, isBold });
 
   // Đường phân cách mờ
   ctx.strokeStyle = '#E2E8F0';
@@ -596,17 +715,28 @@ export function renderSetOperationsToCanvas(
   if (opType === 'intersection') {
     const interStart = Math.max(aStart, bStart);
     const interEnd = Math.min(aEnd, bEnd);
-    const startInc = interStart === aStart ? setA.startInclusive : setB.startInclusive;
-    const endInc = interEnd === aEnd ? setA.endInclusive : setB.endInclusive;
+    if (interStart > interEnd || (interStart === interEnd && (!setA.startInclusive || !setB.startInclusive || !setA.endInclusive || !setB.endInclusive))) {
+      resInterval = {
+        start: 0,
+        end: 0,
+        startInclusive: false,
+        endInclusive: false,
+        startLabel: '∅',
+        isEmpty: true
+      };
+    } else {
+      const startInc = interStart === aStart ? setA.startInclusive : setB.startInclusive;
+      const endInc = interEnd === aEnd ? setA.endInclusive : setB.endInclusive;
 
-    resInterval = {
-      start: isFinite(interStart) ? interStart : '-inf',
-      end: isFinite(interEnd) ? interEnd : '+inf',
-      startInclusive: startInc,
-      endInclusive: endInc,
-      startLabel: isFinite(interStart) ? interStart.toString() : '-∞',
-      endLabel: isFinite(interEnd) ? interEnd.toString() : '+∞'
-    };
+      resInterval = {
+        start: isFinite(interStart) ? interStart : '-inf',
+        end: isFinite(interEnd) ? interEnd : '+inf',
+        startInclusive: startInc,
+        endInclusive: endInc,
+        startLabel: isFinite(interStart) ? interStart.toString() : '-∞',
+        endLabel: isFinite(interEnd) ? interEnd.toString() : '+∞'
+      };
+    }
   } else if (opType === 'union') {
     const uniStart = Math.min(aStart, bStart);
     const uniEnd = Math.max(aEnd, bEnd);
@@ -621,19 +751,14 @@ export function renderSetOperationsToCanvas(
       startLabel: isFinite(uniStart) ? uniStart.toString() : '-∞',
       endLabel: isFinite(uniEnd) ? uniEnd.toString() : '+∞'
     };
+  } else if (opType === 'difference') {
+    resInterval = computeIntervalDifference(setA, setB);
   } else {
-    // Difference A \ B
-    resInterval = {
-      start: setA.start,
-      end: isFinite(bStart) ? bStart : setA.end,
-      startInclusive: setA.startInclusive,
-      endInclusive: !setB.startInclusive,
-      startLabel: typeof setA.start === 'number' ? setA.start.toString() : '-∞',
-      endLabel: isFinite(bStart) ? bStart.toString() : ''
-    };
+    // difference_ba: B \ A
+    resInterval = computeIntervalDifference(setB, setA);
   }
 
-  drawSingleNumberLine(ctx, resInterval, 90, width - 20, 205, {
+  drawSingleNumberLine(ctx, resInterval, axisStartX, axisEndX, 205, {
     valMin: minV,
     valMax: maxV,
     fontFamily: fontFam,
