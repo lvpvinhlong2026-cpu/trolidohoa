@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   BarChart2, 
   BarChart,
@@ -295,7 +295,7 @@ export default function StatisticsChartTool() {
         ctx.drawImage(img, 0, 0);
         urlObj.revokeObjectURL(blobURL);
 
-        const targetCanvas = cropCanvasToContent(canvas, 36);
+        const targetCanvas = cropCanvasToContent(canvas, 6);
         const blob = await new Promise<Blob | null>(resolve => targetCanvas.toBlob(resolve, 'image/png'));
         if (!blob) return;
 
@@ -396,6 +396,37 @@ export default function StatisticsChartTool() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Lắng nghe sự kiện từ thanh Ribbon Word
+  useEffect(() => {
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (!ce.detail) return;
+      const { type } = ce.detail;
+      if (type === 'copy_word') {
+        handleCopyImage();
+      } else if (type === 'download_png') {
+        handleDownloadPng();
+      } else if (type === 'select_stat_chart') {
+        const c = ce.detail.chart;
+        if (c === 'box') {
+          setActiveMode('thpt');
+          setChartType('box');
+        } else if (c === 'bar') {
+          setActiveMode('thcs');
+          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'bar' } }));
+        } else if (c === 'pie') {
+          setActiveMode('thcs');
+          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'pie' } }));
+        } else if (c === 'line') {
+          setActiveMode('thcs');
+          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'line' } }));
+        }
+      }
+    };
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+  }, []);
 
   // Font family
   const fontFamilyStyle = MATH_FONT_FAMILIES[fontChoice];

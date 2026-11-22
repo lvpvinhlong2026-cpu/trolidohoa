@@ -18,7 +18,7 @@ import {
   RefreshCw,
   Crop
 } from 'lucide-react';
-import { addDpiToBlob } from '../utils/dpiUtils';
+import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
 import { 
   analyzeFunction, 
   analyzeFromCoeffs, 
@@ -595,15 +595,16 @@ export default function TableVariationTool() {
     setPoints(points.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
-  // SAO CHÉP ẢNH TỰ ĐỘNG
+  // SAO CHÉP ẢNH TỰ ĐỘNG (CẮT KHÔNG CHỪA KHOẢNG TRẮNG)
   const handleCopyAutoImage = async () => {
     if (!autoCanvasRef.current) return;
     try {
-      const blob = await new Promise<Blob | null>(resolve => autoCanvasRef.current!.toBlob(resolve, 'image/png'));
+      const croppedCanvas = cropCanvasToContent(autoCanvasRef.current, 4);
+      const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Không tạo được blob');
       const blobWithDpi = await addDpiToBlob(blob, 300);
-      const dataUrl = autoCanvasRef.current.toDataURL('image/png');
-      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${autoCanvasRef.current.width / 2.4}" height="${autoCanvasRef.current.height / 2.4}" style="display:inline-block; max-width:100%; height:auto;" />`;
+      const dataUrl = croppedCanvas.toDataURL('image/png');
+      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${croppedCanvas.width / 2.4}" height="${croppedCanvas.height / 2.4}" style="display:inline-block; max-width:100%; height:auto;" />`;
       const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
 
       try {
@@ -629,7 +630,8 @@ export default function TableVariationTool() {
   const handleDownloadAutoPng = async () => {
     if (!autoCanvasRef.current) return;
     try {
-      const blob = await new Promise<Blob | null>(resolve => autoCanvasRef.current!.toBlob(resolve, 'image/png'));
+      const croppedCanvas = cropCanvasToContent(autoCanvasRef.current, 4);
+      const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
       if (blob) {
         const blobWithDpi = await addDpiToBlob(blob, 300);
         const url = URL.createObjectURL(blobWithDpi);
@@ -644,18 +646,19 @@ export default function TableVariationTool() {
     }
   };
 
-  // SAO CHÉP ẢNH TÙY BIẾN
+  // SAO CHÉP ẢNH TÙY BIẾN (CẮT KHÔNG CHỪA KHOẢNG TRẮNG)
   const handleCopyImage = async () => {
     try {
       const canvas = document.createElement('canvas');
       drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
+      const croppedCanvas = cropCanvasToContent(canvas, 4);
 
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Không thể tạo blob PNG');
 
       const blobWithDpi = await addDpiToBlob(blob, 300);
-      const dataUrl = canvas.toDataURL('image/png');
-      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${canvas.width / 3}" height="${canvas.height / 3}" style="display:inline-block; max-width:100%; height:auto;" />`;
+      const dataUrl = croppedCanvas.toDataURL('image/png');
+      const htmlSnippet = `<img src="${dataUrl}" alt="Bang bien thien" width="${croppedCanvas.width / 3}" height="${croppedCanvas.height / 3}" style="display:inline-block; max-width:100%; height:auto;" />`;
       const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
 
       try {
@@ -683,7 +686,8 @@ export default function TableVariationTool() {
     try {
       const canvas = document.createElement('canvas');
       drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      const croppedCanvas = cropCanvasToContent(canvas, 4);
+      const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
       if (blob) {
         const blobWithDpi = await addDpiToBlob(blob, 300);
         const url = URL.createObjectURL(blobWithDpi);
@@ -744,11 +748,15 @@ export default function TableVariationTool() {
       } else if (type === 'open_crop') {
         let dataUrl: string | null = null;
         if (masterMode === 'auto') {
-          dataUrl = autoCanvasRef.current?.toDataURL('image/png') || null;
+          if (autoCanvasRef.current) {
+            const cropped = cropCanvasToContent(autoCanvasRef.current, 4);
+            dataUrl = cropped.toDataURL('image/png');
+          }
         } else {
           const canvas = document.createElement('canvas');
           drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
-          dataUrl = canvas.toDataURL('image/png');
+          const cropped = cropCanvasToContent(canvas, 4);
+          dataUrl = cropped.toDataURL('image/png');
         }
         if (dataUrl) {
           window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
@@ -1120,22 +1128,9 @@ export default function TableVariationTool() {
                 <Sparkles size={15} />
                 <span>Bản vẽ Bảng biến thiên tự động (Độ nét cao 300 DPI)</span>
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const dataUrl = autoCanvasRef.current?.toDataURL('image/png');
-                  if (dataUrl) {
-                    window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-                      detail: { dataUrl, title: 'Bảng biến thiên tự động' }
-                    }));
-                  }
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition cursor-pointer shadow-2xs"
-                title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
-              >
-                <Crop size={13} className="text-amber-600 dark:text-amber-400" />
-                <span>Cắt nhanh (Dán Word)</span>
-              </button>
+              <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
+                Chép Word, Cắt nhanh & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
+              </span>
             </div>
 
             {/* VÙNG HIỂN THỊ CANVAS */}
@@ -1385,24 +1380,9 @@ export default function TableVariationTool() {
                   <Table size={15} />
                   <span>Bản vẽ Bảng biến thiên tùy biến (Độ nét cao 300 DPI)</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const canvas = document.createElement('canvas');
-                    drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
-                    const dataUrl = canvas.toDataURL('image/png');
-                    if (dataUrl) {
-                      window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-                        detail: { dataUrl, title: 'Bảng biến thiên tùy biến' }
-                      }));
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition cursor-pointer shadow-2xs"
-                  title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
-                >
-                  <Crop size={13} className="text-amber-600 dark:text-amber-400" />
-                  <span>Cắt nhanh (Dán Word)</span>
-                </button>
+                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
+                  Chép Word, Cắt nhanh & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
+                </span>
               </div>
 
               {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}

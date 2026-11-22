@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Sliders, Eye, Palette, Check, HelpCircle
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
+import { cropCanvasToContent } from '../utils/dpiUtils';
 import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export interface Stage2Branch {
@@ -678,7 +679,8 @@ export default function ProbabilityTreeTool() {
   const handleCopy300Dpi = async () => {
     try {
       const offscreen = renderToOffscreenCanvas(3);
-      offscreen.toBlob(async (blob) => {
+      const croppedCanvas = cropCanvasToContent(offscreen, 6);
+      croppedCanvas.toBlob(async (blob) => {
         if (!blob) return;
         const dpiBlob = await addDpiToBlob(blob, 300);
         await navigator.clipboard.write([
@@ -694,7 +696,8 @@ export default function ProbabilityTreeTool() {
 
   const handleDownloadPng = async () => {
     const offscreen = renderToOffscreenCanvas(3);
-    offscreen.toBlob(async (blob) => {
+    const croppedCanvas = cropCanvasToContent(offscreen, 6);
+    croppedCanvas.toBlob(async (blob) => {
       if (!blob) return;
       const dpiBlob = await addDpiToBlob(blob, 300);
       const url = URL.createObjectURL(dpiBlob);
@@ -707,6 +710,31 @@ export default function ProbabilityTreeTool() {
       setTimeout(() => setCopyStatus(null), 3500);
     }, 'image/png');
   };
+
+  // Lắng nghe sự kiện từ Ribbon Word
+  useEffect(() => {
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (!ce.detail) return;
+      const { type } = ce.detail;
+      if (type === 'copy_word') {
+        handleCopy300Dpi();
+      } else if (type === 'download_png') {
+        handleDownloadPng();
+      } else if (type === 'tree_select_type') {
+        const structure = ce.detail.structure;
+        if (structure === 'Định lý Bayes' || structure?.includes('Bayes')) {
+          handleApplyPreset(TREE_PRESETS[0]);
+        } else if (structure === 'Xác suất toàn phần' || structure?.includes('toàn phần')) {
+          handleApplyPreset(TREE_PRESETS[1]);
+        } else if (TREE_PRESETS.length > 2) {
+          handleApplyPreset(TREE_PRESETS[2]);
+        }
+      }
+    };
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+  }, []);
 
   return (
     <div className="space-y-4 animate-fade-in">

@@ -7,6 +7,7 @@ import {
   Box, FolderKanban, BarChart2, Crop
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
+import { cropCanvasToContent } from '../utils/dpiUtils';
 import Gsp3DViewerModal from './Gsp3DViewerModal';
 import ThcsStatisticalChart, { StatisticalChartConfig } from './ThcsStatisticalChart';
 
@@ -154,6 +155,7 @@ export default function GspSketchpad({
   const [lineStyle, setLineStyle] = useState<'solid' | 'dashed'>('solid');
   const [ellipseStyle, setEllipseStyle] = useState<'half_dashed' | 'solid' | 'dashed'>('half_dashed');
   const [pointDisplayMode, setPointDisplayMode] = useState<'all' | 'labels_only' | 'hidden'>('all');
+  const [pointSize, setPointSize] = useState<'small' | 'tiny' | 'medium'>('small');
   const [activeColor, setActiveColor] = useState<string>('#000000');
   const [showGrid, setShowGrid] = useState<boolean>(true);
 
@@ -2049,7 +2051,7 @@ export default function GspSketchpad({
 
     if (!hasContent) return offscreen;
 
-    const pad = 24;
+    const pad = 4;
     const cropX = Math.max(0, Math.floor(minX - pad));
     const cropY = Math.max(0, Math.floor(minY - pad));
     const cropW = Math.min(LOGICAL_WIDTH - cropX, Math.ceil(maxX - minX + 2 * pad));
@@ -2077,7 +2079,8 @@ export default function GspSketchpad({
       croppedCanvas.height
     );
 
-    return croppedCanvas;
+    // Cắt tinh chỉnh bằng pixel quét thực tế để loại bỏ 100% khoảng trắng thừa
+    return cropCanvasToContent(croppedCanvas, 4);
   };
 
   const handleCopyImage = async () => {
@@ -2141,7 +2144,12 @@ export default function GspSketchpad({
     e.target.value = '';
   };
 
-  // Lắng nghe sự kiện từ Ribbon Bar (Chép Word, Tải PNG, Cắt khung chữ nhật)
+  // Đồng bộ trạng thái công cụ lên toàn hệ thống (Ribbon Bar)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('lvp_gsp_tool_changed', { detail: { tool: activeTool } }));
+  }, [activeTool]);
+
+  // Lắng nghe sự kiện từ Ribbon Bar (Chép Word, Tải PNG, Cắt nhanh, Chọn công cụ vẽ, Nạp mẫu SGK)
   useEffect(() => {
     const handleRibbonAction = (e: Event) => {
       const ce = e as CustomEvent;
@@ -2157,11 +2165,80 @@ export default function GspSketchpad({
         window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
           detail: { dataUrl, title: 'Hình học GSP' }
         }));
+      } else if (type === 'gsp_select_tool') {
+        const tool = ce.detail.tool;
+        if (tool === 'clear') {
+          handleClearAll();
+        } else if (['select', 'point', 'point_on_segment', 'segment', 'vector', 'circle', 'ellipse', 'right_angle', 'text', 'eraser'].includes(tool)) {
+          setActiveTool(tool as any);
+          setDrawingStartPointId(null);
+          setAngleVertices([]);
+          showNotice(`Đã kích hoạt: ${
+            tool === 'select' ? 'Chọn & Dời đối tượng' :
+            tool === 'point' ? 'Chấm điểm tự do' :
+            tool === 'point_on_segment' ? 'Điểm trên cạnh (phụ thuộc)' :
+            tool === 'segment' ? 'Vẽ đoạn thẳng' :
+            tool === 'vector' ? 'Vẽ véc-tơ' :
+            tool === 'circle' ? 'Vẽ đường tròn' :
+            tool === 'ellipse' ? 'Vẽ đáy Elip không gian' :
+            tool === 'right_angle' ? 'Ký hiệu góc vuông' :
+            tool === 'text' ? 'Thêm ký hiệu chữ / nhãn' : 'Tẩy xóa điểm / cạnh'
+          }`);
+        }
+      } else if (type === 'gsp_load_sample') {
+        const sample = ce.detail.sample;
+        const sampleMap: Record<string, string> = {
+          'Tam giác': 'tam_giac_vuong_cao',
+          'triangle': 'tam_giac_vuong_cao',
+          'triangle_right': 'triangle_right',
+          'triangle_equi': 'triangle_equi',
+          'tam_giac_vuong_cao': 'tam_giac_vuong_cao',
+          'Tứ giác': 'parallelogram',
+          'quad': 'parallelogram',
+          'parallelogram': 'parallelogram',
+          'Hình chóp': 'pyramid_regular_quad',
+          'pyramid': 'pyramid_regular_quad',
+          'pyramid_regular_quad': 'pyramid_regular_quad',
+          'pyramid_regular_tri': 'pyramid_regular_tri',
+          'chop_sa_vuong_day': 'chop_sa_vuong_day',
+          'chop_tam_giac': 'chop_tam_giac',
+          'Lăng trụ': 'lang_tru_tam_giac',
+          'prism': 'lang_tru_tam_giac',
+          'lang_tru_tam_giac': 'lang_tru_tam_giac',
+          'box_abcd': 'box_abcd',
+          'Nón - Trụ - Cầu': 'cone',
+          'cone': 'cone',
+          'cylinder': 'cylinder',
+          'hinh_cau': 'hinh_cau',
+        };
+        const presetKey = sampleMap[sample] || sample;
+        loadPreset(presetKey);
+      } else if (type === 'gsp_toggle_grid') {
+        setShowGrid(prev => !prev);
+        showNotice('Đã đổi chế độ lưới toạ độ');
+      } else if (type === 'gsp_set_line_style') {
+        const style = ce.detail.style === 'dashed' ? 'dashed' : 'solid';
+        setLineStyle(style);
+        showNotice(`Nét vẽ chuyển sang: ${style === 'dashed' ? 'Nét đứt' : 'Nét liền'}`);
+      } else if (type === 'gsp_toggle_point_mode') {
+        const next = pointDisplayMode === 'all' ? 'labels_only' : pointDisplayMode === 'labels_only' ? 'hidden' : 'all';
+        setPointDisplayMode(next);
+        showNotice(
+          next === 'all'
+            ? 'Chấm điểm: Nhỏ SGK vừa đủ nhìn (2.0px)'
+            : next === 'labels_only'
+            ? 'Chấm điểm: Ẩn chấm tròn • (Chỉ hiện chữ nhãn A, B, C)'
+            : 'Chấm điểm: Ẩn toàn bộ điểm'
+        );
+      } else if (type === 'gsp_set_point_size') {
+        const sz = ce.detail.size;
+        setPointSize(sz);
+        showNotice(`Cỡ chấm điểm: ${sz === 'tiny' ? 'Siêu nhỏ (1.4px)' : sz === 'medium' ? 'Vừa (2.8px)' : 'Nhỏ SGK vừa đủ nhìn (2.0px)'}`);
       }
     };
     window.addEventListener('lvp_ribbon_action', handleRibbonAction);
     return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
-  }, [points, segments, circles, ellipses, rightAngles, texts]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, activeTool]);
 
   // ==========================================
   // HÀM VẼ TOÀN BỘ BẢN VẼ GSP LÊN CANVAS
@@ -2487,20 +2564,23 @@ export default function GspSketchpad({
         ctx.fillText(`${angleStepIdx + 1}`, p.x, p.y - 18);
       } else if (isInteractive && (isSelected || isHovered || isDrawingStart)) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, isSelected ? 12 : 9, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, isSelected ? 8 : 6, 0, Math.PI * 2);
         ctx.fillStyle = isSelected ? 'rgba(13, 148, 136, 0.35)' : 'rgba(13, 148, 136, 0.2)';
         ctx.fill();
       }
 
       if (shouldDrawDot) {
         ctx.beginPath();
-        ctx.arc(p.x, p.y, (isSelected || angleStepIdx >= 0) ? 5.2 : 3.8, 0, Math.PI * 2);
+        // Chấm tròn điểm nhỏ chuẩn SGK, vừa đủ nhìn (bán kính mặc định 2.0px)
+        const baseR = pointSize === 'tiny' ? 1.4 : pointSize === 'medium' ? 2.8 : 2.0;
+        const dotR = (isSelected || angleStepIdx >= 0) ? (baseR + 0.9) : (isHovered ? (baseR + 0.4) : baseR);
+        ctx.arc(p.x, p.y, dotR, 0, Math.PI * 2);
         ctx.fillStyle = angleStepIdx >= 0 ? '#f59e0b' : ((isSelected || isHovered) ? '#0d9488' : (p.color || '#000000'));
         ctx.fill();
       } else if (isInteractive) {
         // Nếu bị ẩn chấm, trong lúc sửa vẽ một viền mờ đứt đoạn nhỏ để người dùng vẫn biết vị trí kéo thả
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
         ctx.lineWidth = 1;
         ctx.setLineDash([2, 2]);
@@ -2702,7 +2782,7 @@ export default function GspSketchpad({
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
     renderGspScene(ctx, true);
-  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, selectedPointId, hoveredPointId, hoveredLabelPointId, draggedLabelPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, pointSize, selectedPointId, hoveredPointId, hoveredLabelPointId, draggedLabelPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
 
   // Nạp sẵn mẫu hình ban đầu nếu trống hoặc khi externalPreset thay đổi
   useEffect(() => {
@@ -3435,21 +3515,6 @@ export default function GspSketchpad({
                 <span>Copy ảnh (Dán Word)</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const offscreen = renderToOffscreenCanvas(3);
-                  const dataUrl = offscreen.toDataURL('image/png');
-                  window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-                    detail: { dataUrl, title: 'Hình học GSP' }
-                  }));
-                }}
-                className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
-              >
-                <Crop size={14} className="text-amber-600 dark:text-amber-400" />
-                <span>Cắt nhanh (Dán Word)</span>
-              </button>
 
               <button
                 onClick={handleDownloadPng}

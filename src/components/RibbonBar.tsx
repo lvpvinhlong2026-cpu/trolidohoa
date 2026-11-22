@@ -25,7 +25,11 @@ import {
   Play,
   Pause,
   Grid,
-  Crop
+  Crop,
+  Dot,
+  CornerDownRight,
+  Type,
+  Eraser
 } from 'lucide-react';
 import { TabId } from '../App';
 import { AccentColor, ACCENT_THEMES } from '../types/personalization';
@@ -46,6 +50,7 @@ export interface RibbonBarProps {
   bbtStroke: 'thin' | 'standard' | 'thick';
   bbtIsBold: boolean;
   bbtFontSize?: 'standard' | 'large' | 'extra';
+  gspActiveTool?: string;
   onRibbonAction: (action: { type: string; [key: string]: any }) => void;
 }
 
@@ -77,6 +82,7 @@ export default function RibbonBar({
   bbtStroke,
   bbtIsBold,
   bbtFontSize = 'large',
+  gspActiveTool = 'select',
   onRibbonAction,
 }: RibbonBarProps) {
   const theme = ACCENT_THEMES[accentColor] || ACCENT_THEMES.teal;
@@ -590,6 +596,7 @@ export default function RibbonBar({
               ========================================================================= */}
           {currentTab === 'geometry' && (
             <div className="flex items-stretch gap-2 shrink-0">
+              {/* Nhóm 1: XUẤT BẢN WORD */}
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
@@ -614,41 +621,62 @@ export default function RibbonBar({
                     <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction({ type: 'download_png' })}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
-                    title="Tải ảnh PNG"
-                  >
-                    <Download size={13} className="text-teal-600" />
-                    <span className="text-[11px]">PNG</span>
-                  </button>
+                  <div className="flex flex-col gap-1 justify-center">
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'download_png' })}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      title="Tải ảnh PNG độ phân giải 300 DPI"
+                    >
+                      <Download size={12} className="text-teal-600" />
+                      <span>PNG</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'gsp_select_tool', tool: 'clear' })}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer"
+                      title="Xóa sạch bản vẽ để vẽ hình mới"
+                    >
+                      <RotateCcw size={12} className="text-rose-600" />
+                      <span>Làm mới</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
                   XUẤT BẢN WORD
                 </div>
               </div>
 
-              {/* Nhóm tương tác GSP */}
+              {/* Nhóm 2: CÔNG CỤ DỰNG HÌNH GSP (TƯƠNG TÁC CHUỘT) */}
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
-                    { id: 'select', label: 'Chọn & Dời', icon: MousePointer },
-                    { id: 'point', label: 'Vẽ điểm', icon: CircleDot },
-                    { id: 'segment', label: 'Đoạn thẳng', icon: Minus },
-                    { id: 'circle', label: 'Đường tròn', icon: Circle },
-                    { id: 'box', label: 'Hình không gian', icon: Box },
+                    { id: 'select', label: 'Chọn & Dời', icon: MousePointer, tip: 'Chọn & di chuyển đỉnh, nhãn chữ' },
+                    { id: 'point', label: 'Vẽ điểm', icon: CircleDot, tip: 'Chấm điểm tự do (A, B, C...)' },
+                    { id: 'point_on_segment', label: 'Điểm trên cạnh', icon: Dot, tip: 'Lấy điểm nằm trên cạnh (phụ thuộc)' },
+                    { id: 'segment', label: 'Đoạn thẳng', icon: Minus, tip: 'Nối đoạn thẳng giữa 2 điểm' },
+                    { id: 'circle', label: 'Đường tròn', icon: Circle, tip: 'Vẽ đường tròn tâm và bán kính' },
+                    { id: 'ellipse', label: 'Đáy Elip', icon: Circle, tip: 'Vẽ hình elip làm đáy hình không gian' },
+                    { id: 'right_angle', label: 'Góc vuông', icon: CornerDownRight, tip: 'Đánh dấu ký hiệu góc vuông' },
+                    { id: 'text', label: 'Chữ / Nhãn', icon: Type, tip: 'Thêm chữ ký hiệu hoặc công thức' },
+                    { id: 'eraser', label: 'Tẩy xóa', icon: Eraser, tip: 'Nhấp đối tượng để xóa nhanh' },
                   ].map(item => {
                     const ItemIcon = item.icon;
+                    const isActive = gspActiveTool === item.id;
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => onRibbonAction({ type: 'gsp_select_tool', tool: item.id })}
-                        className="flex flex-col items-center justify-center px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 text-xs font-bold h-[66px] min-w-[70px] cursor-pointer"
+                        className={`flex flex-col items-center justify-center px-2 py-1 rounded-xl text-xs font-bold transition cursor-pointer h-[66px] min-w-[62px] border ${
+                          isActive
+                            ? `${theme.softBg} ${theme.primaryText} border-teal-500 shadow-2xs ring-2 ring-teal-400/50`
+                            : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        }`}
+                        title={item.tip}
                       >
-                        <ItemIcon size={16} className="text-teal-600 mb-0.5" />
-                        <span className="text-[10px] leading-tight text-center">{item.label}</span>
+                        <ItemIcon size={16} className={`mb-0.5 ${isActive ? theme.primaryText : 'text-slate-600 dark:text-slate-400'}`} />
+                        <span className="text-[10px] leading-tight text-center whitespace-nowrap">{item.label}</span>
                       </button>
                     );
                   })}
@@ -658,22 +686,98 @@ export default function RibbonBar({
                 </div>
               </div>
 
-              {/* Nhóm thư viện mẫu */}
-              <div className="flex flex-col justify-between px-2">
+              {/* Nhóm 3: KHO MẪU HÌNH SGK (BẤM NẠP NGAY) */}
+              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
-                  {['Tam giác', 'Tứ giác', 'Hình chóp', 'Lăng trụ', 'Nón - Trụ - Cầu'].map(sample => (
+                  {[
+                    { id: 'pyramid_regular_quad', label: 'Chóp S.ABCD', desc: 'Chóp tứ giác đều (SO ⊥ đáy)' },
+                    { id: 'pyramid_regular_tri', label: 'Chóp S.ABC', desc: 'Chóp tam giác đều (SG ⊥ đáy)' },
+                    { id: 'chop_sa_vuong_day', label: 'Chóp SA ⊥ đáy', desc: 'Góc vuông tại đỉnh A' },
+                    { id: 'lang_tru_tam_giac', label: 'Lăng trụ tam giác', desc: "Lăng trụ ABC.A'B'C'" },
+                    { id: 'box_abcd', label: 'Hình hộp chữ nhật', desc: "Hình hộp ABCD.A'B'C'D'" },
+                    { id: 'tam_giac_vuong_cao', label: 'Tam giác (AH)', desc: 'Tam giác vuông đường cao AH' },
+                    { id: 'triangle_equi', label: 'Tam giác đều', desc: 'Tam giác đều ABC' },
+                    { id: 'parallelogram', label: 'Hình bình hành', desc: 'Bình hành ABCD đáy không gian' },
+                    { id: 'cone', label: 'Hình nón', desc: 'Đỉnh S & đáy tròn' },
+                    { id: 'cylinder', label: 'Hình trụ', desc: 'Hai đáy tròn song song' },
+                    { id: 'hinh_cau', label: 'Hình cầu', desc: 'Tâm O & đường vĩ tuyến' },
+                  ].map(sample => (
                     <button
-                      key={sample}
+                      key={sample.id}
                       type="button"
-                      onClick={() => onRibbonAction({ type: 'gsp_load_sample', sample })}
-                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 text-[11px] font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                      onClick={() => onRibbonAction({ type: 'gsp_load_sample', sample: sample.id })}
+                      className="flex flex-col items-start justify-center px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:border-teal-300 text-slate-700 dark:text-slate-300 transition cursor-pointer h-[66px] min-w-[105px]"
+                      title={`Bấm để nạp mẫu: ${sample.desc}`}
                     >
-                      {sample}
+                      <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300 truncate w-full">{sample.label}</span>
+                      <span className="text-[9px] text-slate-400 truncate w-full mt-0.5">{sample.desc}</span>
                     </button>
                   ))}
                 </div>
                 <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
-                  KHO MẪU HÌNH SGK
+                  KHO MẪU HÌNH SGK (BẤM NẠP NGAY)
+                </div>
+              </div>
+
+              {/* Nhóm 4: ĐỊNH DẠNG ĐƯỜNG NÉT & CỠ ĐIỂM */}
+              <div className="flex flex-col justify-between px-2">
+                <div className="flex items-center gap-1.5 flex-1">
+                  {/* Điều khiển Cỡ chấm điểm tròn */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'gsp_set_point_size', size: 'small' })}
+                      className="px-2 py-1 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-700 cursor-pointer flex items-center gap-1"
+                      title="Chấm tròn điểm nhỏ chuẩn SGK, vừa đủ nhìn (bán kính 2.0px)"
+                    >
+                      <CircleDot size={12} className="text-teal-600 shrink-0" />
+                      <span>Chấm nhỏ SGK</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'gsp_toggle_point_mode' })}
+                      className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                      title="Chuyển đổi: Hiện chấm tròn nhỏ • / Ẩn chấm chỉ giữ chữ nhãn A, B, C..."
+                    >
+                      <span>Ẩn/Hiện chấm •</span>
+                    </button>
+                  </div>
+
+                  {/* Nét liền / Nét đứt */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'gsp_set_line_style', style: 'solid' })}
+                      className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                      title="Vẽ nét liền cho cạnh nhìn thấy"
+                    >
+                      <Minus size={12} className="text-slate-800 dark:text-slate-200 shrink-0" />
+                      <span>Nét liền</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRibbonAction({ type: 'gsp_set_line_style', style: 'dashed' })}
+                      className="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer flex items-center gap-1"
+                      title="Vẽ nét đứt cho cạnh khuất"
+                    >
+                      <Minus size={12} className="border-b border-dashed border-slate-800 shrink-0" />
+                      <span>Nét đứt</span>
+                    </button>
+                  </div>
+
+                  {/* Lưới tọa độ */}
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'gsp_toggle_grid' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 text-xs font-bold h-[66px] min-w-[50px] cursor-pointer"
+                    title="Bật / Tắt lưới toạ độ nền GSP"
+                  >
+                    <Grid size={16} className="text-teal-600 mb-0.5" />
+                    <span className="text-[10px] leading-tight">Lưới</span>
+                  </button>
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                  ĐƯỜNG NÉT & CỠ ĐIỂM
                 </div>
               </div>
             </div>
@@ -727,19 +831,19 @@ export default function RibbonBar({
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
-                    { id: 'bar', label: 'Biểu đồ Cột', desc: 'Đơn / Kép' },
+                    { id: 'bar', label: 'Biểu đồ Cột', desc: 'Đơn / Kép (THCS)' },
                     { id: 'pie', label: 'Quạt tròn', desc: 'Tỉ lệ phần trăm %' },
-                    { id: 'box', label: 'Biểu đồ Hộp', desc: 'Tứ phân vị Q1-Q3' },
+                    { id: 'box', label: 'Biểu đồ Hộp', desc: 'Tứ phân vị Q1-Q3 (THPT)' },
                     { id: 'line', label: 'Đoạn thẳng', desc: 'Biến thiên chuỗi' },
                   ].map(c => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => onRibbonAction({ type: 'select_stat_chart', chart: c.id })}
-                      className="flex flex-col items-start justify-center px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-300 text-xs font-bold h-[66px] min-w-[100px] cursor-pointer"
+                      className="flex flex-col items-start justify-center px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer h-[66px] min-w-[105px]"
                     >
-                      <span className="text-[11px] font-bold truncate w-full">{c.label}</span>
-                      <span className="text-[9px] font-normal text-teal-600 truncate w-full">{c.desc}</span>
+                      <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300 truncate w-full">{c.label}</span>
+                      <span className="text-[9px] font-normal text-slate-400 truncate w-full mt-0.5">{c.desc}</span>
                     </button>
                   ))}
                 </div>

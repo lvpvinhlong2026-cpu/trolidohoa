@@ -18,6 +18,7 @@ import {
   parseFunctionCoeffs,
   formatPolyExpr
 } from '../utils/bbtEngine';
+import { cropCanvasToContent } from '../utils/dpiUtils';
 import { 
   renderGraphToCanvas, 
   GraphConfig, 
@@ -219,7 +220,10 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
         if (result && result.unitScale) {
           currentUnitScaleRef.current = result.unitScale;
         }
-        setGraphDataUrl(graphCanvasRef.current.toDataURL('image/png'));
+        if (graphCanvasRef.current) {
+          const cropped = cropCanvasToContent(graphCanvasRef.current, 6);
+          setGraphDataUrl(cropped.toDataURL('image/png'));
+        }
       } catch (err) {
         console.error('Lỗi render đồ thị Oxy:', err);
       }
@@ -471,16 +475,43 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
     return 'cursor-crosshair';
   };
 
-  // Sao chép ảnh vào Clipboard (PNG có nhúng 300 DPI tối ưu Word)
+  // Sao chép ảnh vào Clipboard (Tự động cắt sạch khoảng trắng thừa, nhúng 300 DPI tối ưu Word)
   const handleCopyImage = async (dataUrl: string, title: string) => {
     try {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const blobWithDpi = await addDpiToBlob(blob, 300);
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blobWithDpi })
-      ]);
-      setCopySuccess(`Đã copy ảnh "${title}"! Dán (Ctrl+V) vào Word ảnh sẽ có kích thước vừa vặn và chữ to rõ nét chuẩn in ấn.`);
+      let canvasToUse: HTMLCanvasElement | null = null;
+      if (graphCanvasRef.current) {
+        canvasToUse = cropCanvasToContent(graphCanvasRef.current, 6);
+      }
+
+      if (canvasToUse) {
+        const blob = await new Promise<Blob | null>(resolve => canvasToUse!.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Không tạo được blob');
+        const blobWithDpi = await addDpiToBlob(blob, 300);
+        const croppedDataUrl = canvasToUse.toDataURL('image/png');
+        const wordW = Math.round(canvasToUse.width / 2.5);
+        const wordH = Math.round(canvasToUse.height / 2.5);
+        const htmlSnippet = `<img src="${croppedDataUrl}" alt="${title}" width="${wordW}" height="${wordH}" style="display:inline-block; max-width:100%; height:auto;" />`;
+        const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
+
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blobWithDpi, 'text/html': htmlBlob })
+          ]);
+        } catch {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blobWithDpi })
+          ]);
+        }
+      } else {
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const blobWithDpi = await addDpiToBlob(blob, 300);
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blobWithDpi })
+        ]);
+      }
+
+      setCopySuccess(`✅ Đã copy ảnh "${title}" (cắt sát viền, không chừa khoảng trắng)! Dán (Ctrl+V) vào Word ảnh sẽ to rõ chuẩn in ấn.`);
       setTimeout(() => setCopySuccess(null), 4500);
     } catch (err) {
       console.error('Lỗi copy ảnh:', err);
@@ -489,9 +520,24 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
     }
   };
 
-  // Tải ảnh PNG có nhúng 300 DPI
+  // Tải ảnh PNG có nhúng 300 DPI (Cắt sạch khoảng trắng thừa)
   const handleDownloadImage = async (dataUrl: string, filename: string) => {
     try {
+      if (graphCanvasRef.current) {
+        const croppedCanvas = cropCanvasToContent(graphCanvasRef.current, 6);
+        const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
+        if (blob) {
+          const blobWithDpi = await addDpiToBlob(blob, 300);
+          const url = URL.createObjectURL(blobWithDpi);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          return;
+        }
+      }
+
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       const blobWithDpi = await addDpiToBlob(blob, 300);
@@ -533,10 +579,15 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
           handleCopyImage(graphDataUrl, 'Đồ thị Oxy');
         }
       } else if (type === 'open_crop') {
-        if (graphDataUrl) {
+        let urlToUse = graphDataUrl;
+        if (graphCanvasRef.current) {
+          const cropped = cropCanvasToContent(graphCanvasRef.current, 6);
+          urlToUse = cropped.toDataURL('image/png');
+        }
+        if (urlToUse) {
           window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
             detail: {
-              dataUrl: graphDataUrl,
+              dataUrl: urlToUse,
               title: activeSubTab === 'graph' ? 'Đồ thị Oxy' : activeSubTab === 'inequality' ? 'Miền nghiệm BPT' : 'Trục số thực R'
             }
           }));
@@ -1787,22 +1838,6 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
             >
               <Copy size={15} />
               Copy ảnh (Ctrl+V vào Word)
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (graphDataUrl) {
-                  window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-                    detail: { dataUrl: graphDataUrl, title: 'Đồ thị Oxy' }
-                  }));
-                }
-              }}
-              className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-              title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
-            >
-              <Crop size={15} className="text-amber-600 dark:text-amber-400" />
-              <span>Cắt nhanh (Dán Word)</span>
             </button>
 
             <button

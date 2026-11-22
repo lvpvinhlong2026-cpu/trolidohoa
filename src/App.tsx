@@ -186,6 +186,18 @@ export default function App() {
   const [bbtStroke, setBbtStroke] = useState<'thin' | 'standard' | 'thick'>('standard');
   const [bbtIsBold, setBbtIsBold] = useState<boolean>(true);
   const [bbtFontSize, setBbtFontSize] = useState<'standard' | 'large' | 'extra'>('large');
+  const [gspActiveTool, setGspActiveTool] = useState<string>('select');
+
+  useEffect(() => {
+    const handleGspToolChange = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail?.tool) {
+        setGspActiveTool(ce.detail.tool);
+      }
+    };
+    window.addEventListener('lvp_gsp_tool_changed', handleGspToolChange);
+    return () => window.removeEventListener('lvp_gsp_tool_changed', handleGspToolChange);
+  }, []);
 
   // 3. Chế độ Tinh gọn (Zen / Compact Mode)
   const [isCompactMode, setIsCompactMode] = useState<boolean>(() => {
@@ -396,6 +408,10 @@ export default function App() {
       setBbtIsBold(action.bold);
     } else if (action.type === 'set_font_size') {
       setBbtFontSize(action.size);
+    } else if (action.type === 'gsp_select_tool') {
+      if (action.tool !== 'clear') {
+        setGspActiveTool(action.tool);
+      }
     }
   };
 
@@ -472,16 +488,6 @@ export default function App() {
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Nút Cắt nhanh dán Word (Alt + C) */}
-            <button
-              onClick={() => handleRibbonAction({ type: 'open_crop' })}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition shadow-2xs cursor-pointer"
-              title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
-            >
-              <Crop size={14} className="text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">Cắt nhanh Word</span>
-            </button>
-
             {/* Quick Command Palette Search (Ctrl + K) */}
             <button
               onClick={() => setShowCommandPalette(true)}
@@ -553,6 +559,7 @@ export default function App() {
         bbtStroke={bbtStroke}
         bbtIsBold={bbtIsBold}
         bbtFontSize={bbtFontSize}
+        gspActiveTool={gspActiveTool}
         onRibbonAction={handleRibbonAction}
       />
 

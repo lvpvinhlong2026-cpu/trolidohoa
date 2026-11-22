@@ -17,7 +17,7 @@ import {
   Settings2,
   Sparkles
 } from 'lucide-react';
-import { addDpiToBlob } from '../utils/dpiUtils';
+import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
 import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export type ChartType = 'bar' | 'grouped_bar' | 'line' | 'pie';
@@ -219,6 +219,8 @@ export default function ThcsStatisticalChart({
     }
   };
 
+
+
   // Chọn mẫu có sẵn
   const handleSelectPreset = (sampleId: string) => {
     const found = PRESET_SAMPLES.find(s => s.id === sampleId);
@@ -239,6 +241,30 @@ export default function ThcsStatisticalChart({
     if (found.individualPatterns.length) setIndividualPatterns([...found.individualPatterns]);
   };
 
+  // Lắng nghe sự kiện từ thanh Ribbon Word
+  useEffect(() => {
+    const handleThcsType = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail?.type) {
+        handleSelectChartType(ce.detail.type);
+      }
+    };
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail?.type === 'copy_word') {
+        handleCopy300Dpi();
+      } else if (ce.detail?.type === 'download_png') {
+        handleDownloadPng();
+      }
+    };
+    window.addEventListener('lvp_stat_thcs_type', handleThcsType);
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    return () => {
+      window.removeEventListener('lvp_stat_thcs_type', handleThcsType);
+      window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+    };
+  }, []);
+
   // Thêm dòng dữ liệu mới
   const handleAddRow = () => {
     const nextIdx = categories.length + 1;
@@ -249,6 +275,8 @@ export default function ThcsStatisticalChart({
       values: [...s.values, 0]
     })));
   };
+
+
 
   // Thêm dãy số liệu (cột số liệu mới)
   const handleAddSeries = (customName?: string) => {
@@ -265,17 +293,23 @@ export default function ThcsStatisticalChart({
       color,
       pattern
     };
+
+
     setSeries(prev => [...prev, newSeries]);
     if (series.length >= 1) {
       setShowLegend(true);
     }
   };
 
+
+
   // Xóa dãy số liệu
   const handleDeleteSeries = (seriesId: string) => {
     if (series.length <= 1) return;
     setSeries(prev => prev.filter(s => s.id !== seriesId));
   };
+
+
 
   // Xóa dòng dữ liệu
   const handleDeleteRow = (index: number) => {
@@ -287,10 +321,14 @@ export default function ThcsStatisticalChart({
     })));
   };
 
+
+
   // Cập nhật tên mục category
   const handleUpdateCategory = (index: number, val: string) => {
     setCategories(prev => prev.map((c, i) => i === index ? val : c));
   };
+
+
 
   // Cập nhật giá trị một ô
   const handleUpdateValue = (seriesIndex: number, rowIndex: number, rawVal: string) => {
@@ -306,11 +344,15 @@ export default function ThcsStatisticalChart({
     }));
   };
 
+
+
   // Xóa trắng bảng số liệu
   const handleClearAll = () => {
     setCategories(['Mục 1', 'Mục 2']);
     setSeries(prev => prev.map(s => ({ ...s, values: [0, 0] })));
   };
+
+
 
   // Hỗ trợ Paste từ Word / Excel / TSV
   const handlePasteTable = (e: React.ClipboardEvent) => {
@@ -367,6 +409,8 @@ export default function ThcsStatisticalChart({
     }
   };
 
+
+
   // =========================================================================
   // TÍNH TOÁN TOẠ ĐỘ & BỐ CỤC SVG
   // =========================================================================
@@ -407,6 +451,8 @@ export default function ThcsStatisticalChart({
       return { maxY: niceMax, yTicks: ticks };
     };
 
+
+
     return getNiceMaxAndStep(max);
   }, [series]);
 
@@ -415,6 +461,8 @@ export default function ThcsStatisticalChart({
     const clamped = Math.max(0, val);
     return padding.top + plotHeight - (clamped / maxY) * plotHeight;
   };
+
+
 
   // Dữ liệu cho biểu đồ Quạt tròn (Pie Chart)
   const pieData = useMemo(() => {
@@ -443,6 +491,8 @@ export default function ThcsStatisticalChart({
         color: individualColors[i % individualColors.length] || PRESET_COLORS[i % PRESET_COLORS.length],
         pattern: individualPatterns[i % individualPatterns.length] || 'diag-right'
       };
+
+
     });
   }, [chartType, series, categories, individualColors, individualPatterns]);
 
@@ -462,6 +512,8 @@ export default function ThcsStatisticalChart({
     }
     return str;
   };
+
+
 
   // Sao chép ảnh 300 DPI vào Clipboard
   const handleCopy300Dpi = async () => {
@@ -488,7 +540,8 @@ export default function ThcsStatisticalChart({
         ctx.scale(scale, scale);
         ctx.drawImage(img, 0, 0);
 
-        canvas.toBlob(async (blob) => {
+        const croppedCanvas = cropCanvasToContent(canvas, 6);
+        croppedCanvas.toBlob(async (blob) => {
           if (!blob) return;
           const blobWithDpi = await addDpiToBlob(blob, 300);
           await navigator.clipboard.write([
@@ -499,6 +552,8 @@ export default function ThcsStatisticalChart({
           URL.revokeObjectURL(url);
         }, 'image/png');
       };
+
+
       img.src = url;
     } catch (err) {
       console.error('Lỗi sao chép ảnh:', err);
@@ -506,6 +561,8 @@ export default function ThcsStatisticalChart({
       setTimeout(() => setCopyStatus(null), 3000);
     }
   };
+
+
 
   // Tải ảnh PNG 300 DPI
   const handleDownloadPng = async () => {
@@ -538,11 +595,15 @@ export default function ThcsStatisticalChart({
           URL.revokeObjectURL(url);
         }, 'image/png');
       };
+
+
       img.src = url;
     } catch (e) {
       console.error('Lỗi tải ảnh:', e);
     }
   };
+
+
 
   // Tải file SVG Vector
   const handleDownloadSvg = () => {
@@ -553,6 +614,8 @@ export default function ThcsStatisticalChart({
     a.download = `Bieu_do_vector_${Date.now()}.svg`;
     a.click();
   };
+
+
 
   // Chèn vào hình GSP
   const handleInsertToCanvas = () => {
@@ -574,8 +637,12 @@ export default function ThcsStatisticalChart({
       individualPatterns,
       fontFamily
     };
+
+
     onInsertToCanvas(getFullSvgString(), config);
   };
+
+
 
   return (
     <div className={`flex flex-col h-full bg-slate-50 dark:bg-slate-900 ${isModal ? 'p-1' : 'p-3 sm:p-5'}`}>

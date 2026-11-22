@@ -83,15 +83,35 @@ export async function addDpiToBlob(blob: Blob, dpi = 300): Promise<Blob> {
   }
 }
 
-export async function copyCanvasToClipboard300Dpi(canvas: HTMLCanvasElement, dpi = 300): Promise<boolean> {
+export async function copyCanvasToClipboard300Dpi(
+  canvas: HTMLCanvasElement,
+  dpi = 300,
+  padding = 4
+): Promise<boolean> {
   try {
-    const cropped = cropCanvasToContent(canvas, 32);
+    const cropped = cropCanvasToContent(canvas, padding);
     const blob = await new Promise<Blob | null>(resolve => cropped.toBlob(resolve, 'image/png'));
     if (!blob) return false;
     const blobWithDpi = await addDpiToBlob(blob, dpi);
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/png': blobWithDpi })
-    ]);
+    const dataUrl = cropped.toDataURL('image/png');
+
+    const wordWidth = Math.round(cropped.width / 2.5);
+    const wordHeight = Math.round(cropped.height / 2.5);
+    const htmlSnippet = `<img src="${dataUrl}" alt="Do hoa toan hoc" width="${wordWidth}" height="${wordHeight}" style="display:inline-block; max-width:100%; height:auto;" />`;
+    const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blobWithDpi,
+          'text/html': htmlBlob
+        })
+      ]);
+    } catch {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blobWithDpi })
+      ]);
+    }
     return true;
   } catch (err) {
     console.error('Lỗi copy ảnh vào Clipboard:', err);
@@ -100,11 +120,11 @@ export async function copyCanvasToClipboard300Dpi(canvas: HTMLCanvasElement, dpi
 }
 
 /**
- * Tự động cắt bỏ viền trắng thừa xung quanh nội dung vẽ của canvas (Auto-crop to content).
- * Giúp hình vẽ (hình học không gian, đồ thị, biểu đồ, trục số) luôn to lớn, sát viền
- * tương tự như Bảng biến thiên khi dán vào Microsoft Word.
+ * Tự động cắt bỏ triệt để mọi khoảng trắng thừa xung quanh nội dung vẽ của canvas (Zero-Whitespace Auto-Crop).
+ * Giúp hình vẽ (đồ thị, bảng biến thiên, hình học không gian, biểu đồ) khi dán vào Word luôn to lớn,
+ * ôm sát mép viền ngoài cùng của hình vẽ, không lãng phí trang in Word.
  */
-export function cropCanvasToContent(sourceCanvas: HTMLCanvasElement, padding = 32): HTMLCanvasElement {
+export function cropCanvasToContent(sourceCanvas: HTMLCanvasElement, padding = 4): HTMLCanvasElement {
   try {
     const ctx = sourceCanvas.getContext('2d');
     if (!ctx) return sourceCanvas;
@@ -120,16 +140,16 @@ export function cropCanvasToContent(sourceCanvas: HTMLCanvasElement, padding = 3
     let maxY = 0;
     let found = false;
 
-    // Quét với bước nhảy 3px để siêu nhanh (< 2ms)
-    for (let y = 0; y < h; y += 3) {
-      for (let x = 0; x < w; x += 3) {
+    // Quét chính xác từng bước 1-2px để bắt đúng mép nét vẽ
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
         const idx = (y * w + x) * 4;
         const r = data[idx];
         const g = data[idx + 1];
         const b = data[idx + 2];
         const a = data[idx + 3];
 
-        // Nếu pixel không phải là màu trắng hoặc trong suốt
+        // Nếu pixel không phải là màu trắng (#FFFFFF) hoặc trong suốt
         if (a > 10 && (r < 248 || g < 248 || b < 248)) {
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -149,7 +169,7 @@ export function cropCanvasToContent(sourceCanvas: HTMLCanvasElement, padding = 3
     const cropW = Math.min(w - cropX, maxX - minX + 2 * padding);
     const cropH = Math.min(h - cropY, maxY - minY + 2 * padding);
 
-    if (cropW <= 20 || cropH <= 20) {
+    if (cropW <= 10 || cropH <= 10) {
       return sourceCanvas;
     }
 
@@ -320,7 +340,9 @@ export async function copyCroppedRegionToClipboard(
   options: CropExportOptions = {}
 ): Promise<boolean> {
   try {
-    const croppedCanvas = cropRegionToCanvas(source, rect, options);
+    const rawCroppedCanvas = cropRegionToCanvas(source, rect, options);
+    // Tự động cắt bỏ triệt để khoảng trắng thừa xung quanh vùng chọn (padding = 4px)
+    const croppedCanvas = cropCanvasToContent(rawCroppedCanvas, 4);
     const dpi = options.dpi || 300;
 
     const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
