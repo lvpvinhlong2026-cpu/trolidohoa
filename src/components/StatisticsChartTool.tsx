@@ -433,22 +433,15 @@ export default function StatisticsChartTool() {
         <ThcsStatisticalChart />
       ) : (
         <div className="space-y-6">
-          {/* HEADER */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-600 dark:text-teal-400">
-              <BarChart2 size={20} />
-            </div>
-            <span>Vẽ Biểu Đồ Hộp & Thống Kê (SGK Mới GDPT 2018)</span>
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
-            Tính toán tự động tứ phân vị ($Q_1, Q_2, Q_3$), vẽ Biểu đồ hộp (Box plot) và Biểu đồ cột ghép nhóm (Histogram) chuẩn mực đề thi Toán 10, 11, 12.
-          </p>
-        </div>
+          {/* THANH CHUYỂN DỮ LIỆU */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <span className="text-xs font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1.5">
+              <BarChart2 size={16} />
+              <span>Biểu đồ Hộp & Thống kê Ghép nhóm (Toán 10, 11, 12 - 300 DPI)</span>
+            </span>
 
-        {/* Nút bấm chuyển chế độ Dữ liệu */}
-        <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+            {/* Nút bấm chuyển chế độ Dữ liệu */}
+            <div className="flex items-center gap-2 self-start md:self-auto bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
           <button
             onClick={() => setDataType('raw')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${

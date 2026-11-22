@@ -25,7 +25,9 @@ import {
   Maximize2,
   Minimize2,
   Grid,
-  GitFork
+  GitFork,
+  LayoutGrid,
+  Check
 } from 'lucide-react';
 
 import { 
@@ -34,9 +36,9 @@ import {
   TeacherProfile 
 } from './types/personalization';
 import CommandPalette from './components/CommandPalette';
-import QuickFavoritesBar from './components/QuickFavoritesBar';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
+import RibbonBar from './components/RibbonBar';
 
 // =====================================================================
 // CHỈ GIỮ LẠI CÁC PHÂN HỆ CỐT LÕI ĐỒ HỌA TOÁN HỌC (300 DPI)
@@ -54,8 +56,8 @@ const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'
 const UserGuide = lazy(() => import('./components/UserGuide'));
 
 export type TabId =
-  | 'bbt'
   | 'bbt_graph'
+  | 'bbt'
   | 'statistics'
   | 'geometry'
   | 'geogebra'
@@ -73,7 +75,6 @@ export interface NavCategory {
     label: string;
     sub: string;
     icon: React.ComponentType<{ size?: number; className?: string }>;
-    badge?: string;
   }[];
 }
 
@@ -83,56 +84,49 @@ export interface NavCategory {
 export const NAV_CATEGORIES: NavCategory[] = [
   {
     id: 'do_hoa',
-    title: 'Đồ Họa Toán Học (300 DPI)',
+    title: 'Công Cụ Đồ Họa Toán Học',
     tools: [
       {
         id: 'bbt_graph',
         label: 'Đồ thị, BPT & Trục số',
-        sub: 'Hệ toạ độ Oxy, tương tác trực quan 300 DPI',
+        sub: 'Khảo sát hàm số Oxy, miền nghiệm BPT & trục số',
         icon: TrendingUp,
-        badge: 'Trọng tâm',
       },
       {
         id: 'bbt',
         label: 'Bảng biến thiên & Xét dấu',
-        sub: 'Tự động từ hàm số & Tùy biến BBT, xét dấu chuẩn SGK',
+        sub: 'BBT tự động từ hàm số & BBT tùy biến chuẩn SGK',
         icon: Table,
-        badge: 'SGK Mới',
       },
       {
         id: 'statistics',
-        label: 'Biểu đồ Thống kê (Cột, Quạt, Hộp)',
-        sub: 'Cột, cột kép, đoạn thẳng, hình quạt tròn & hộp 300 DPI',
+        label: 'Biểu đồ Thống kê',
+        sub: 'Biểu đồ cột, quạt tròn, đoạn thẳng & biểu đồ hộp',
         icon: BarChart2,
-        badge: 'Mới',
       },
       {
         id: 'geometry',
         label: 'Hình học 2D & 3D (GSP)',
-        sub: 'GSP Sketchpad 5 + Kho mẫu hình học tương tác',
+        sub: 'Vẽ hình học phẳng & không gian GSP Sketchpad',
         icon: Compass,
-        badge: 'GSP 5',
       },
       {
         id: 'geogebra',
         label: 'GeoGebra 3D AI',
-        sub: 'Không gian Oxyz, mặt cầu, khối đa diện AI',
+        sub: 'Không gian Oxyz & vật thể tròn xoay',
         icon: Layers,
-        badge: 'AI 3D',
       },
       {
         id: 'simulation',
         label: 'Mô phỏng Khái niệm',
-        sub: 'Minh họa động định lý Toán & Khoa học',
+        sub: 'Minh họa động định lý & khái niệm Toán học',
         icon: MonitorPlay,
-        badge: 'Mô phỏng',
       },
       {
         id: 'probability_tree',
-        label: 'Sơ đồ Cây Xác suất (Bayes)',
-        sub: 'Xác suất có điều kiện, toàn phần & Bayes 300 DPI',
+        label: 'Sơ đồ Cây Xác suất',
+        sub: 'Xác suất có điều kiện, toàn phần & Bayes',
         icon: GitFork,
-        badge: 'Toán 12',
       },
     ],
   },
@@ -143,9 +137,8 @@ export const NAV_CATEGORIES: NavCategory[] = [
       {
         id: 'guide',
         label: 'Hướng dẫn Sử dụng',
-        sub: 'Tài liệu hướng dẫn, video & phím tắt hệ thống',
+        sub: 'Tài liệu hướng dẫn, phím tắt & in ấn 300 DPI',
         icon: HelpCircle,
-        badge: 'Trợ giúp',
       },
     ],
   },
@@ -171,10 +164,26 @@ export default function App() {
   // Track các tab đã được truy cập để Keep-Alive (giữ trạng thái hình vẽ khi chuyển tab)
   const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(() => new Set([activeTab]));
 
-  // 2. Chế độ Thu gọn Sidebar
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('lvp_sidebar_collapsed_4') === 'true';
+  // 2. Trạng thái Thu gọn Dải công cụ Ribbon (Ctrl + F1)
+  const [isRibbonCollapsed, setIsRibbonCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('lvp_ribbon_collapsed_4') === 'true';
   });
+
+  // 2b. Toast thông báo Xuất bản Word
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 2c. Trạng thái đồng bộ từ các phân hệ con lên Ribbon Bar
+  const [graphSubTab, setGraphSubTab] = useState<'graph' | 'inequality' | 'number_line'>('graph');
+  const [graphFnType, setGraphFnType] = useState<string>('rational_2_1');
+  const [graphMode, setGraphMode] = useState<'coeffs' | 'text'>('coeffs');
+
+  const [bbtMasterMode, setBbtMasterMode] = useState<'auto' | 'variation' | 'sign_chart'>('auto');
+  const [bbtFnType, setBbtFnType] = useState<'rational_2_1' | 'rational_1_1' | 'cubic' | 'quartic'>('rational_2_1');
+  const [bbtInputMode, setBbtInputMode] = useState<'coeffs' | 'text'>('coeffs');
+  const [bbtFont, setBbtFont] = useState<'times' | 'latex'>('times');
+  const [bbtStroke, setBbtStroke] = useState<'thin' | 'standard' | 'thick'>('standard');
+  const [bbtIsBold, setBbtIsBold] = useState<boolean>(true);
+  const [bbtFontSize, setBbtFontSize] = useState<'standard' | 'large' | 'extra'>('large');
 
   // 3. Chế độ Tinh gọn (Zen / Compact Mode)
   const [isCompactMode, setIsCompactMode] = useState<boolean>(() => {
@@ -268,33 +277,90 @@ export default function App() {
     setVisitedTabs(prev => new Set([...prev, activeTab]));
   }, [activeTab]);
 
-  // Lưu trạng thái sidebar
+  // Lưu trạng thái thu gọn Ribbon
   useEffect(() => {
-    localStorage.setItem('lvp_sidebar_collapsed_4', isSidebarCollapsed ? 'true' : 'false');
-  }, [isSidebarCollapsed]);
+    localStorage.setItem('lvp_ribbon_collapsed_4', isRibbonCollapsed ? 'true' : 'false');
+  }, [isRibbonCollapsed]);
 
   // Lưu trạng thái compact mode
   useEffect(() => {
     localStorage.setItem('lvp_compact_mode_4', isCompactMode ? 'true' : 'false');
   }, [isCompactMode]);
 
-  // Lắng nghe phím tắt toàn cục
+  // Lắng nghe đồng bộ trạng thái từ các phân hệ con lên Ribbon Bar
+  useEffect(() => {
+    const handleGraphState = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail) {
+        if (ce.detail.activeSubTab) setGraphSubTab(ce.detail.activeSubTab);
+        if (ce.detail.graphConfigType) setGraphFnType(ce.detail.graphConfigType);
+        if (ce.detail.graphMode) setGraphMode(ce.detail.graphMode);
+      }
+    };
+    const handleBbtState = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (ce.detail) {
+        if (ce.detail.masterMode) setBbtMasterMode(ce.detail.masterMode);
+        if (ce.detail.autoFnType) setBbtFnType(ce.detail.autoFnType);
+        if (ce.detail.autoInputMode) setBbtInputMode(ce.detail.autoInputMode);
+        if (ce.detail.fontChoice) setBbtFont(ce.detail.fontChoice);
+        if (ce.detail.strokeChoice) setBbtStroke(ce.detail.strokeChoice);
+        if (ce.detail.isBoldLabels !== undefined) setBbtIsBold(ce.detail.isBoldLabels);
+        if (ce.detail.fontSizeMode) setBbtFontSize(ce.detail.fontSizeMode);
+      }
+    };
+    window.addEventListener('lvp_graph_state_change', handleGraphState);
+    window.addEventListener('lvp_bbt_state_change', handleBbtState);
+    return () => {
+      window.removeEventListener('lvp_graph_state_change', handleGraphState);
+      window.removeEventListener('lvp_bbt_state_change', handleBbtState);
+    };
+  }, []);
+
+  // Lắng nghe phím tắt toàn cục (Ctrl + F1 hoặc Alt + B thu gọn Ribbon kiểu MS Word)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if (((e.ctrlKey || e.metaKey) && e.key === 'F1') || (e.altKey && e.key.toLowerCase() === 'b')) {
+        e.preventDefault();
+        setIsRibbonCollapsed(prev => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowCommandPalette(prev => !prev);
       } else if (e.altKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         setIsCompactMode(prev => !prev);
-      } else if (e.altKey && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        setIsSidebarCollapsed(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
+
+  // Xử lý các lệnh hành động phát ra từ thanh Ribbon
+  const handleRibbonAction = (action: { type: string; [key: string]: any }) => {
+    window.dispatchEvent(new CustomEvent('lvp_ribbon_action', { detail: action }));
+    if (action.type === 'copy_word') {
+      setToastMessage('Đã sao chép ảnh 300 DPI! Thầy/Cô mở Word và nhấn phím Ctrl + V để dán ngay.');
+      setTimeout(() => setToastMessage(null), 4500);
+    } else if (action.type === 'switch_subtab') {
+      setGraphSubTab(action.subtab);
+    } else if (action.type === 'switch_bbt_mode') {
+      setBbtMasterMode(action.mode);
+    } else if (action.type === 'select_fn_type') {
+      setBbtFnType(action.fnType);
+      setGraphFnType(action.fnType);
+    } else if (action.type === 'switch_input_mode') {
+      setBbtInputMode(action.inputMode);
+      setGraphMode(action.inputMode);
+    } else if (action.type === 'set_font') {
+      setBbtFont(action.font);
+    } else if (action.type === 'set_stroke') {
+      setBbtStroke(action.stroke);
+    } else if (action.type === 'set_bold') {
+      setBbtIsBold(action.bold);
+    } else if (action.type === 'set_font_size') {
+      setBbtFontSize(action.size);
+    }
+  };
 
   const handleSaveApiKey = (key: string, model: string) => {
     const trimmed = key.trim();
@@ -345,16 +411,8 @@ export default function App() {
       }`}>
         <div className="flex items-center justify-between gap-3">
           
-          {/* Left: Sidebar Toggle + Brand Logo + Title + Author info */}
+          {/* Left: Brand Logo + Title + Author info */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <button
-              onClick={() => setIsSidebarCollapsed(prev => !prev)}
-              className="p-1.5 -ml-1 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer shrink-0"
-              title={isSidebarCollapsed ? "Mở danh mục công cụ (Alt + B)" : "Thu gọn danh mục công cụ (Alt + B)"}
-            >
-              <Menu size={19} />
-            </button>
-
             <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl ${theme.primaryBg} text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0`}>
               <Palette size={18} />
             </div>
@@ -377,7 +435,6 @@ export default function App() {
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            
             {/* Quick Command Palette Search (Ctrl + K) */}
             <button
               onClick={() => setShowCommandPalette(true)}
@@ -396,7 +453,7 @@ export default function App() {
               onClick={() => setShowSettingsModal(true)}
               className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border cursor-pointer ${
                 !apiKey.trim()
-                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900 animate-pulse'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900'
                   : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
               }`}
               title="Mở Cài đặt & Cá nhân hóa"
@@ -431,124 +488,33 @@ export default function App() {
       </header>
 
       {/* =====================================================================
-          2. KHÔNG GIAN LÀM VIỆC: SIDEBAR TINH GỌN + WORKSPACE
+          2. THANH CÔNG CỤ RIBBON THEO PHONG CÁCH MICROSOFT WORD (DUY NHẤT & TOÀN DIỆN)
           ===================================================================== */}
-      <div className="flex flex-1 overflow-hidden">
-        
-        {/* SIDEBAR NAVIGATION (Collapsible w-64/w-72 hoặc w-16) */}
-        <aside
-          className={`shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-200 z-10 select-none ${
-            isSidebarCollapsed ? 'w-16' : 'w-64 sm:w-72'
-          }`}
-        >
-          {/* Header Sidebar */}
-          <div className="p-2.5 sm:p-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            {!isSidebarCollapsed ? (
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex items-center gap-1.5">
-                <Palette size={13} className={theme.primaryText} />
-                Công cụ Đồ họa Toán học
-              </span>
-            ) : (
-              <div className="w-full flex justify-center">
-                <Palette size={15} className={theme.primaryText} />
-              </div>
-            )}
-            <button
-              onClick={() => setIsSidebarCollapsed(prev => !prev)}
-              className={`p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer ${
-                isSidebarCollapsed ? 'hidden' : ''
-              }`}
-              title="Thu gọn menu (Alt + B)"
-            >
-              <ChevronLeft size={15} />
-            </button>
-          </div>
+      <RibbonBar
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        isRibbonCollapsed={isRibbonCollapsed}
+        onToggleRibbonCollapse={() => setIsRibbonCollapsed(prev => !prev)}
+        accentColor={accentColor}
+        graphSubTab={graphSubTab}
+        graphFnType={graphFnType}
+        graphMode={graphMode}
+        bbtMasterMode={bbtMasterMode}
+        bbtFnType={bbtFnType}
+        bbtInputMode={bbtInputMode}
+        bbtFont={bbtFont}
+        bbtStroke={bbtStroke}
+        bbtIsBold={bbtIsBold}
+        bbtFontSize={bbtFontSize}
+        onRibbonAction={handleRibbonAction}
+      />
 
-          {/* Danh mục công cụ Đồ Họa Toán Học */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-4 scrollbar-thin">
-            {NAV_CATEGORIES.map(category => (
-              <div key={category.id} className="space-y-1">
-                {/* Tiêu đề nhóm */}
-                {!isSidebarCollapsed ? (
-                  <div className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${theme.primaryText} opacity-90`}>
-                    {category.title}
-                  </div>
-                ) : (
-                  <div className="my-1.5 border-t border-slate-100 dark:border-slate-800" />
-                )}
-
-                {/* Các công cụ trong nhóm */}
-                {category.tools.map(tool => {
-                  const ToolIcon = tool.icon;
-                  const isActive = activeTab === tool.id || (tool.id === 'geometry' && (activeTab === 'gsp' || activeTab === 'quick3d'));
-
-                  return (
-                    <button
-                      key={tool.id}
-                      onClick={() => handleSelectTab(tool.id)}
-                      title={isSidebarCollapsed ? `${tool.label} • ${tool.sub}` : undefined}
-                      className={`w-full flex items-center gap-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                        isSidebarCollapsed ? 'justify-center p-2.5' : 'px-3 py-2'
-                      } ${
-                        isActive
-                          ? `${theme.softBg} ${theme.primaryText} border ${theme.softBorder} shadow-2xs ring-1 ${theme.ring}`
-                          : 'bg-transparent text-slate-600 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200 border border-transparent'
-                      }`}
-                    >
-                      <span className={`shrink-0 flex items-center justify-center rounded-lg transition-transform ${
-                        isSidebarCollapsed ? 'w-8 h-8' : 'w-7 h-7'
-                      } ${
-                        isActive 
-                          ? `${theme.primaryBg} text-white shadow-2xs scale-105` 
-                          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400'
-                      }`}>
-                        <ToolIcon size={15} />
-                      </span>
-
-                      {!isSidebarCollapsed && (
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className={`truncate leading-snug ${
-                              isActive ? `${theme.primaryText} font-extrabold` : 'text-slate-800 dark:text-slate-200'
-                            }`}>
-                              {tool.label}
-                            </span>
-                            {tool.badge && (
-                              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold shrink-0 ${
-                                isActive
-                                  ? `${theme.primaryBg} text-white`
-                                  : `${theme.badgeBg} ${theme.badgeText} border ${theme.badgeBorder}`
-                              }`}>
-                                {tool.badge}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] font-normal text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                            {tool.sub}
-                          </div>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* Bridge link to TRO_LI_VAN_BAN */}
-          {/* Footer Sidebar */}
-          {!isSidebarCollapsed && (
-            <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
-              <span>Đồ họa Toán học LVP</span>
-              <kbd className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono">
-                Ctrl+K
-              </kbd>
-            </div>
-          )}
-        </aside>
-
-        {/* WORKSPACE AREA (Mở rộng toàn bộ phần còn lại của màn hình) */}
-        <main className={`flex-1 overflow-y-auto ${isCompactMode ? 'p-2 sm:p-3' : 'p-3 sm:p-5'}`}>
+      {/* =====================================================================
+          3. KHÔNG GIAN LÀM VIỆC: WORKSPACE TOÀN MÀN HÌNH 100%
+          ===================================================================== */}
+      <div className="flex flex-1 overflow-hidden w-full">
+        {/* WORKSPACE AREA (Mở rộng toàn bộ 100% màn hình, không bị Sidebar chiếm chỗ) */}
+        <main className={`flex-1 w-full overflow-y-auto ${isCompactMode ? 'p-2 sm:p-3' : 'p-3 sm:p-5'}`}>
           <Suspense fallback={<TabLoadingSkeleton title="Đang nạp phân hệ công cụ..." accentColor={accentColor} />}>
             
             {/* NHÓM 1: ĐỒ HỌA TOÁN HỌC */}
@@ -646,6 +612,14 @@ export default function App() {
         startupTab={startupTabSetting}
         onSelectStartupTab={handleSelectStartupTab}
       />
+
+      {/* Floating Toast Thông báo Sao chép Word 300 DPI */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-emerald-700 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-fade-in border border-emerald-500">
+          <Check size={18} className="text-emerald-200 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -712,6 +712,71 @@ export default function TableVariationTool() {
     URL.revokeObjectURL(url);
   };
 
+  // Lắng nghe sự kiện từ Ribbon Bar (kiểu Microsoft Word)
+  useEffect(() => {
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (!ce.detail) return;
+      const { type, mode, presetKey, font, stroke, bold, fnType, inputMode, size } = ce.detail;
+      if (type === 'switch_bbt_mode' && mode) {
+        if (['auto', 'variation', 'sign_chart'].includes(mode)) {
+          setMasterMode(mode);
+          if (mode === 'sign_chart') setBbtMode('sign_chart');
+          else if (mode === 'variation') setBbtMode('variation');
+        }
+      } else if (type === 'select_fn_type' && fnType) {
+        setAutoFnType(fnType);
+        if (fnType === 'rational_2_1') setAutoCoeffs({ a: 1, b: -1, c: 1, d: 1, e: -1 });
+        if (fnType === 'rational_1_1') setAutoCoeffs({ a: 2, b: 1, c: 1, d: -1, e: 0 });
+        if (fnType === 'cubic') setAutoCoeffs({ a: 1, b: 0, c: -3, d: 0, e: 0 });
+        if (fnType === 'quartic') setAutoCoeffs({ a: 1, b: -2, c: -3, d: 0, e: 0 });
+      } else if (type === 'switch_input_mode' && inputMode) {
+        setAutoInputMode(inputMode);
+      } else if (type === 'set_font_size' && size) {
+        setFontSizeMode(size);
+      } else if (type === 'copy_word') {
+        if (masterMode === 'auto') {
+          handleCopyAutoImage();
+        } else {
+          handleCopyImage();
+        }
+      } else if (type === 'download_png') {
+        if (masterMode === 'auto') {
+          handleDownloadAutoPng();
+        } else {
+          handleDownloadPng();
+        }
+      } else if (type === 'download_svg') {
+        handleDownloadSvg();
+      } else if (type === 'set_font' && font) {
+        setFontChoice(font);
+      } else if (type === 'set_stroke' && stroke) {
+        setStrokeChoice(stroke);
+      } else if (type === 'set_bold' !== undefined && bold !== undefined) {
+        setIsBoldLabels(bold);
+      } else if (type === 'select_bbt_preset' && presetKey) {
+        loadPreset(presetKey);
+      }
+    };
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+  }, [masterMode, autoInputMode, autoFnType, autoCoeffs, autoFnInput, fontChoice, strokeChoice, isBoldLabels, fontSizeMode]);
+
+  // Báo trạng thái lên Ribbon
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('lvp_bbt_state_change', {
+      detail: {
+        masterMode,
+        autoFnType,
+        autoInputMode,
+        fontChoice,
+        strokeChoice,
+        isBoldLabels,
+        fontSizeMode,
+      }
+    }));
+  }, [masterMode, autoFnType, autoInputMode, fontChoice, strokeChoice, isBoldLabels, fontSizeMode]);
+
   const fontFamilyStyle = MATH_FONT_FAMILIES[fontChoice];
   const isMono = colorStyle === 'monochrome';
   const strokeColor = '#000000';
@@ -720,69 +785,8 @@ export default function TableVariationTool() {
   const minusColor = isMono ? '#000000' : '#e11d48';
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 animate-fade-in">
+    <div className="w-full max-w-[1600px] mx-auto p-2 sm:p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in">
       
-      {/* HEADER: TIÊU ĐỀ */}
-      <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
-            <Table size={20} />
-          </div>
-          <span>Bảng Biến Thiên & Bảng Xét Dấu Toán Học</span>
-        </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Hỗ trợ tự động phân tích hàm số SGK mới và tùy chỉnh thủ công từng điểm mốc 300 DPI dán trực tiếp vào Word
-        </p>
-      </div>
-
-      {/* DÒNG DƯỚI: 3 CHẾ ĐỘ TÍCH HỢP TOÀN DIỆN */}
-      <div className="flex items-center justify-start flex-wrap gap-2 pt-0.5">
-        <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold shadow-xs">
-          <button
-            onClick={() => setMasterMode('auto')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              masterMode === 'auto'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
-            }`}
-          >
-            <Sparkles size={15} />
-            <span>Tự động từ hàm số</span>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-white/20">1-Click</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setMasterMode('variation');
-              setBbtMode('variation');
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              masterMode === 'variation' && bbtMode === 'variation'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
-            }`}
-          >
-            <Table size={15} />
-            <span>Tùy biến BBT đầy đủ</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setMasterMode('sign_chart');
-              setBbtMode('sign_chart');
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition cursor-pointer whitespace-nowrap ${
-              masterMode === 'sign_chart' || bbtMode === 'sign_chart'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
-            }`}
-          >
-            <Sliders size={15} />
-            <span>Bảng xét dấu</span>
-          </button>
-        </div>
-      </div>
-
       {/* THÔNG BÁO COPY & STATUS */}
       {copyStatus && (
         <div className={`p-3 rounded-2xl flex items-center justify-between gap-3 text-xs font-bold animate-fade-in ${
@@ -834,98 +838,92 @@ export default function TableVariationTool() {
 
             {autoInputMode === 'coeffs' ? (
               <div className="space-y-3">
-                {/* Chọn dạng hàm */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'rational_2_1', label: 'Bậc 2 / 1', formula: '(ax²+bx+c)/(dx+e)', desc: 'SGK Mới Toán 12' },
-                    { id: 'rational_1_1', label: 'Phân thức 1 / 1', formula: '(ax+b)/(cx+d)', desc: 'Tiệm cận đứng, ngang' },
-                    { id: 'cubic', label: 'Hàm bậc 3', formula: 'ax³+bx²+cx+d', desc: 'Có 2 hoặc 0 cực trị' },
-                    { id: 'quartic', label: 'Bậc 4 trùng phương', formula: 'ax⁴+bx²+c', desc: '1 hoặc 3 cực trị' },
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setAutoFnType(t.id as any);
-                        if (t.id === 'rational_2_1') setAutoCoeffs({ a: 1, b: -1, c: 1, d: 1, e: -1 });
-                        if (t.id === 'rational_1_1') setAutoCoeffs({ a: 2, b: 1, c: 1, d: -1, e: 0 });
-                        if (t.id === 'cubic') setAutoCoeffs({ a: 1, b: 0, c: -3, d: 0, e: 0 });
-                        if (t.id === 'quartic') setAutoCoeffs({ a: 1, b: -2, c: -3, d: 0, e: 0 });
-                      }}
-                      className={`p-2.5 rounded-xl border text-left font-bold transition cursor-pointer ${
-                        autoFnType === t.id
-                          ? 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-200 border-teal-500 shadow-xs ring-1 ring-teal-400'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <div className="text-xs">{t.label}</div>
-                      <div className="text-[10px] font-mono text-teal-700 dark:text-teal-400">{t.formula}</div>
-                    </button>
-                  ))}
+                {/* Dạng hàm hiện tại (Đổi dạng tại thanh Ribbon Word ở trên) */}
+                <div className="flex items-center justify-between p-2.5 bg-teal-50/70 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-800 text-xs font-bold text-teal-800 dark:text-teal-200">
+                  <span className="truncate">
+                    Dạng: {autoFnType === 'rational_2_1' ? 'Bậc 2 / 1: (ax²+bx+c)/(dx+e)' : autoFnType === 'rational_1_1' ? 'Phân thức: (ax+b)/(cx+d)' : autoFnType === 'cubic' ? 'Bậc 3: ax³+bx²+cx+d' : 'Bậc 4: ax⁴+bx²+c'}
+                  </span>
+                  <span className="text-[10px] text-teal-600 dark:text-teal-400 font-normal shrink-0 ml-2">Đổi trên Ribbon</span>
                 </div>
 
-                {/* Presets bài thi chuẩn SGK */}
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                    Mẫu bài thi chuẩn SGK (1-Click):
+                {/* Mẫu bài thi chuẩn SGK (1-Click) */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                    Mẫu SGK:
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {autoFnType === 'rational_2_1' && [
-                      { label: '(x²-x+1)/(x-1)', a: 1, b: -1, c: 1, d: 1, e: -1 },
-                      { label: '(x²+x+1)/(x-1)', a: 1, b: 1, c: 1, d: 1, e: -1 },
-                      { label: '(x²-2x-3)/(x-1)', a: 1, b: -2, c: -3, d: 1, e: -1 },
-                      { label: '(-x²+2x+1)/(x+1)', a: -1, b: 2, c: 1, d: 1, e: 1 },
-                    ].map((p, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setAutoCoeffs({ a: p.a, b: p.b, c: p.c, d: p.d, e: p.e })}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-
-                    {autoFnType === 'rational_1_1' && [
-                      { label: '(2x+1)/(x-1)', a: 2, b: 1, c: 1, d: -1 },
-                      { label: '(x-2)/(x+1)', a: 1, b: -2, c: 1, d: 1 },
-                      { label: '(-x+1)/(2x-3)', a: -1, b: 1, c: 2, d: -3 },
-                    ].map((p, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-
-                    {autoFnType === 'cubic' && [
-                      { label: 'x³ - 3x', a: 1, b: 0, c: -3, d: 0 },
-                      { label: '-x³ + 3x² - 1', a: -1, b: 3, c: 0, d: -1 },
-                      { label: 'x³ - 3x² + 2', a: 1, b: -3, c: 0, d: 2 },
-                    ].map((p, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d })}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-
-                    {autoFnType === 'quartic' && [
-                      { label: 'x⁴ - 2x² - 3', a: 1, b: -2, c: -3 },
-                      { label: '-x⁴ + 4x² + 1', a: -1, b: 4, c: 1 },
-                      { label: 'x⁴ + 2x²', a: 1, b: 2, c: 0 },
-                    ].map((p, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c })}
-                        className="px-2.5 py-1 text-[11px] rounded-lg border font-semibold bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-50 transition cursor-pointer"
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      if (autoFnType === 'rational_2_1') {
+                        const presets = [
+                          { id: '1', a: 1, b: -1, c: 1, d: 1, e: -1 },
+                          { id: '2', a: 1, b: 1, c: 1, d: 1, e: -1 },
+                          { id: '3', a: 1, b: -2, c: -3, d: 1, e: -1 },
+                          { id: '4', a: -1, b: 2, c: 1, d: 1, e: 1 },
+                        ];
+                        const p = presets.find(x => x.id === val);
+                        if (p) setAutoCoeffs({ a: p.a, b: p.b, c: p.c, d: p.d, e: p.e });
+                      } else if (autoFnType === 'rational_1_1') {
+                        const presets = [
+                          { id: '1', a: 2, b: 1, c: 1, d: -1 },
+                          { id: '2', a: 1, b: -2, c: 1, d: 1 },
+                          { id: '3', a: -1, b: 1, c: 2, d: -3 },
+                        ];
+                        const p = presets.find(x => x.id === val);
+                        if (p) setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d });
+                      } else if (autoFnType === 'cubic') {
+                        const presets = [
+                          { id: '1', a: 1, b: 0, c: -3, d: 0 },
+                          { id: '2', a: -1, b: 3, c: 0, d: -1 },
+                          { id: '3', a: 1, b: -3, c: 0, d: 2 },
+                        ];
+                        const p = presets.find(x => x.id === val);
+                        if (p) setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c, d: p.d });
+                      } else if (autoFnType === 'quartic') {
+                        const presets = [
+                          { id: '1', a: 1, b: -2, c: -3 },
+                          { id: '2', a: -1, b: 4, c: 1 },
+                          { id: '3', a: 1, b: 2, c: 0 },
+                        ];
+                        const p = presets.find(x => x.id === val);
+                        if (p) setAutoCoeffs({ ...autoCoeffs, a: p.a, b: p.b, c: p.c });
+                      }
+                    }}
+                    className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    <option value="">-- Chọn hàm mẫu SGK nhanh --</option>
+                    {autoFnType === 'rational_2_1' && (
+                      <>
+                        <option value="1">(x²-x+1)/(x-1)</option>
+                        <option value="2">(x²+x+1)/(x-1)</option>
+                        <option value="3">(x²-2x-3)/(x-1)</option>
+                        <option value="4">(-x²+2x+1)/(x+1)</option>
+                      </>
+                    )}
+                    {autoFnType === 'rational_1_1' && (
+                      <>
+                        <option value="1">(2x+1)/(x-1)</option>
+                        <option value="2">(x-2)/(x+1)</option>
+                        <option value="3">(-x+1)/(2x-3)</option>
+                      </>
+                    )}
+                    {autoFnType === 'cubic' && (
+                      <>
+                        <option value="1">x³ - 3x</option>
+                        <option value="2">-x³ + 3x² - 1</option>
+                        <option value="3">x³ - 3x² + 2</option>
+                      </>
+                    )}
+                    {autoFnType === 'quartic' && (
+                      <>
+                        <option value="1">x⁴ - 2x² - 3</option>
+                        <option value="2">-x⁴ + 4x² + 1</option>
+                        <option value="3">x⁴ + 2x²</option>
+                      </>
+                    )}
+                  </select>
                 </div>
 
                 {/* Nhập hệ số */}
@@ -1098,37 +1096,15 @@ export default function TableVariationTool() {
           {/* CỘT PHẢI: KHUNG VẼ CANVAS TỰ ĐỘNG & THANH CÔNG CỤ (7 CỘT) */}
           <div className="lg:col-span-7 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[460px] space-y-4">
             
-            {/* THANH ĐIỀU KHIỂN PHÔNG & NÉT TRÊN CANVAS */}
-            <div className="w-full pb-3 border-b border-slate-200 dark:border-slate-700">
-              <MathFontSelector
-                font={fontChoice}
-                onFontChange={setFontChoice}
-                stroke={strokeChoice}
-                onStrokeChange={setStrokeChoice}
-                isBold={isBoldLabels}
-                onBoldChange={setIsBoldLabels}
-                size="sm"
-                extraRow1Right={
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleCopyAutoImage}
-                      className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
-                      title="Sao chép ảnh BBT độ nét 300 DPI dán trực tiếp vào Microsoft Word"
-                    >
-                      <Copy size={14} />
-                      <span>Chép vào Word (300 DPI)</span>
-                    </button>
-                    <button
-                      onClick={handleDownloadAutoPng}
-                      className="px-3 py-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
-                      title="Tải ảnh PNG về máy"
-                    >
-                      <Download size={14} />
-                      <span>Tải PNG</span>
-                    </button>
-                  </div>
-                }
-              />
+            {/* TIÊU ĐỀ KHUNG VẼ (ĐIỀU KHIỂN XUẤT ẢNH & ĐỊNH DẠNG TẠI THANH RIBBON WORD Ở TRÊN) */}
+            <div className="w-full flex items-center justify-between pb-1 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <span className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
+                <Sparkles size={15} />
+                <span>Bản vẽ Bảng biến thiên tự động (Độ nét cao 300 DPI)</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
+                Chép Word, đổi phông & nét trực tiếp trên thanh Ribbon Word ở trên
+              </span>
             </div>
 
             {/* VÙNG HIỂN THỊ CANVAS */}
@@ -1189,13 +1165,13 @@ export default function TableVariationTool() {
             {/* CỘT TRÁI (5 CỘT): DANH SÁCH CÁC ĐIỂM MỐC */}
             <div className="lg:col-span-5 space-y-4">
               <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">
                     Thiết lập từng cột mốc tọa độ:
                   </span>
                   <button
                     onClick={handleAddPoint}
-                    className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs"
+                    className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-xs whitespace-nowrap shrink-0"
                   >
                     <Plus size={13} />
                     <span>Thêm mốc x</span>
@@ -1203,7 +1179,7 @@ export default function TableVariationTool() {
                 </div>
 
                 {/* DANH SÁCH CÁC ĐIỂM MỐC */}
-                <div className="space-y-2.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                <div className="space-y-2.5 max-h-[460px] overflow-y-auto custom-scrollbar pr-1">
                   {points.map((pt, idx) => {
                     const isFirst = idx === 0;
                     const isLast = idx === points.length - 1;
@@ -1211,20 +1187,21 @@ export default function TableVariationTool() {
                     return (
                       <div 
                         key={pt.id} 
-                        className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2"
+                        className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs space-y-2.5"
                       >
+                        {/* HÀNG 1: MỐC THỨ TỰ & HOÀNH ĐỘ X */}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 text-[11px] font-bold flex items-center justify-center">
+                            <span className="w-5 h-5 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 text-[11px] font-bold flex items-center justify-center shrink-0">
                               {idx + 1}
                             </span>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               <span className="text-xs font-bold text-slate-500">x:</span>
                               <input
                                 type="text"
                                 value={pt.xVal}
                                 onChange={(e) => handleUpdatePoint(pt.id, { xVal: e.target.value })}
-                                className="w-16 px-2 py-0.5 text-center font-bold text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
+                                className="w-20 px-2 py-0.5 text-center font-bold text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-teal-900 dark:text-teal-100"
                                 placeholder="x"
                               />
                             </div>
@@ -1233,7 +1210,7 @@ export default function TableVariationTool() {
                           {!isFirst && !isLast && (
                             <button
                               onClick={() => handleDeletePoint(pt.id)}
-                              className="text-slate-400 hover:text-red-500 cursor-pointer p-1"
+                              className="text-slate-400 hover:text-red-500 cursor-pointer p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                               title="Xóa mốc này"
                             >
                               <Trash2 size={14} />
@@ -1241,17 +1218,17 @@ export default function TableVariationTool() {
                           )}
                         </div>
 
-                        {/* DÒNG Y': TRẠNG THÁI TẠI ĐIỂM & DẤU KHOẢNG BÊN PHẢI */}
+                        {/* HÀNG 2: TRẠNG THÁI TẠI ĐIỂM & DẤU KHOẢNG BÊN PHẢI (THEO HÀNG NGANG) */}
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div>
-                            <span className="text-[11px] text-slate-500 block mb-0.5">Tại mốc y':</span>
+                            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Tại mốc y':</span>
                             <select
                               value={pt.derivType}
                               onChange={(e) => handleUpdatePoint(pt.id, { derivType: e.target.value as any })}
-                              className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-semibold"
+                              className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
                             >
-                              <option value="0">0 (Nghiệm đạo hàm)</option>
-                              <option value="double_bar">|| (Vạch đôi không xác định)</option>
+                              <option value="0">0 (Nghiệm)</option>
+                              <option value="double_bar">|| (Vạch đôi K.X.Đ)</option>
                               <option value="single_bar">| (Vạch đơn)</option>
                               <option value="blank">Để trống</option>
                             </select>
@@ -1259,11 +1236,11 @@ export default function TableVariationTool() {
 
                           {!isLast ? (
                             <div>
-                              <span className="text-[11px] text-slate-500 block mb-0.5">Dấu khoảng sau:</span>
+                              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">Dấu khoảng sau:</span>
                               <select
                                 value={pt.intervalSign}
                                 onChange={(e) => handleUpdatePoint(pt.id, { intervalSign: e.target.value as any })}
-                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold text-teal-700 dark:text-teal-300"
+                                className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 cursor-pointer"
                               >
                                 <option value="+">+ (Dương)</option>
                                 <option value="-">- (Âm)</option>
@@ -1271,56 +1248,93 @@ export default function TableVariationTool() {
                               </select>
                             </div>
                           ) : (
-                            <div className="text-[11px] text-slate-400 flex items-center pt-3">
+                            <div className="text-[11px] text-slate-400 flex items-center pt-5">
                               (Điểm mút cuối)
                             </div>
                           )}
                         </div>
 
-                        {/* DÒNG Y: GIÁ TRỊ & ĐỘ CAO MŨI TÊN */}
+                        {/* HÀNG 3: GIÁ TRỊ Y VÀ VỊ TRÍ MŨI TÊN (THEO HÀNG NGANG) */}
                         {bbtMode === 'variation' && (
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-[11px] text-slate-500 block mb-0.5">
-                                {pt.derivType === 'double_bar' ? 'Giá trị y (Trái vạch ||):' : 'Giá trị y:'}
-                              </span>
-                              <input
-                                type="text"
-                                value={pt.yVal}
-                                onChange={(e) => handleUpdatePoint(pt.id, { yVal: e.target.value })}
-                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                placeholder="y"
-                              />
-                              <select
-                                value={pt.yPos}
-                                onChange={(e) => handleUpdatePoint(pt.id, { yPos: e.target.value as any })}
-                                className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
-                              >
-                                <option value="top">Ở trên cao (Cực đại / +inf)</option>
-                                <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
-                                <option value="middle">Ở giữa</option>
-                              </select>
-                            </div>
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                            {pt.derivType !== 'double_bar' ? (
+                              <div className="grid grid-cols-2 gap-2 items-center">
+                                <div>
+                                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                                    Giá trị y:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={pt.yVal}
+                                    onChange={(e) => handleUpdatePoint(pt.id, { yVal: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-center"
+                                    placeholder="y"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                                    Vị trí mũi tên:
+                                  </span>
+                                  <select
+                                    value={pt.yPos}
+                                    onChange={(e) => handleUpdatePoint(pt.id, { yPos: e.target.value as any })}
+                                    className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                                  >
+                                    <option value="top">Ở trên cao (Cực đại)</option>
+                                    <option value="bottom">Ở dưới thấp (Cực tiểu)</option>
+                                    <option value="middle">Ở giữa</option>
+                                  </select>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                                    y (Trái vạch ||):
+                                  </span>
+                                  <div className="flex gap-1.5 items-center">
+                                    <input
+                                      type="text"
+                                      value={pt.yVal}
+                                      onChange={(e) => handleUpdatePoint(pt.id, { yVal: e.target.value })}
+                                      className="w-14 px-1.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-center shrink-0"
+                                      placeholder="-inf"
+                                    />
+                                    <select
+                                      value={pt.yPos}
+                                      onChange={(e) => handleUpdatePoint(pt.id, { yPos: e.target.value as any })}
+                                      className="flex-1 min-w-0 px-1 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] cursor-pointer"
+                                    >
+                                      <option value="top">Trên</option>
+                                      <option value="bottom">Dưới</option>
+                                      <option value="middle">Giữa</option>
+                                    </select>
+                                  </div>
+                                </div>
 
-                            {pt.derivType === 'double_bar' && (
-                              <div>
-                                <span className="text-[11px] text-slate-500 block mb-0.5">Giá trị y (Phải vạch ||):</span>
-                                <input
-                                  type="text"
-                                  value={pt.yRightVal || ''}
-                                  onChange={(e) => handleUpdatePoint(pt.id, { yRightVal: e.target.value })}
-                                  className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs font-bold"
-                                  placeholder="+inf"
-                                />
-                                <select
-                                  value={pt.yRightPos || 'top'}
-                                  onChange={(e) => handleUpdatePoint(pt.id, { yRightPos: e.target.value as any })}
-                                  className="w-full mt-1 px-1.5 py-0.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px]"
-                                >
-                                  <option value="top">Ở trên cao (Cực đại / +inf)</option>
-                                  <option value="bottom">Ở dưới thấp (Cực tiểu / -inf)</option>
-                                  <option value="middle">Ở giữa</option>
-                                </select>
+                                <div>
+                                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
+                                    y (Phải vạch ||):
+                                  </span>
+                                  <div className="flex gap-1.5 items-center">
+                                    <input
+                                      type="text"
+                                      value={pt.yRightVal || ''}
+                                      onChange={(e) => handleUpdatePoint(pt.id, { yRightVal: e.target.value })}
+                                      className="w-14 px-1.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-center shrink-0"
+                                      placeholder="+inf"
+                                    />
+                                    <select
+                                      value={pt.yRightPos || 'top'}
+                                      onChange={(e) => handleUpdatePoint(pt.id, { yRightPos: e.target.value as any })}
+                                      className="flex-1 min-w-0 px-1 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] cursor-pointer"
+                                    >
+                                      <option value="top">Trên</option>
+                                      <option value="bottom">Dưới</option>
+                                      <option value="middle">Giữa</option>
+                                    </select>
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1334,71 +1348,15 @@ export default function TableVariationTool() {
 
             {/* CỘT PHẢI (7 CỘT): KHUNG VẼ BẢNG BIẾN THIÊN & NÚT XUẤT */}
             <div className="lg:col-span-7 space-y-4">
-              {/* THANH CÔNG CỤ TÙY CHỌN & XUẤT ẢNH */}
-              <div className="bg-slate-50 dark:bg-slate-800/40 p-3.5 px-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-                <MathFontSelector
-                  font={fontChoice}
-                  onFontChange={setFontChoice}
-                  stroke={strokeChoice}
-                  onStrokeChange={setStrokeChoice}
-                  isBold={isBoldLabels}
-                  onBoldChange={setIsBoldLabels}
-                  size="sm"
-                  extraRow1Right={
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleCopyImage}
-                        className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
-                        title="Sao chép ảnh độ nét 300 DPI dán trực tiếp vào Word (Ctrl + V)"
-                      >
-                        <Copy size={14} />
-                        <span>Chép vào Word (300 DPI)</span>
-                      </button>
-                      <button
-                        onClick={handleDownloadPng}
-                        className="px-3 py-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
-                        title="Tải ảnh PNG về máy"
-                      >
-                        <Download size={14} />
-                        <span>Tải PNG</span>
-                      </button>
-                      <button
-                        onClick={handleDownloadSvg}
-                        className="p-1.5 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold cursor-pointer transition"
-                        title="Tải file vector SVG"
-                      >
-                        <Code size={14} />
-                      </button>
-                    </div>
-                  }
-                />
-
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs flex-wrap">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cỡ chữ:</span>
-                    <select
-                      value={fontSizeMode}
-                      onChange={(e) => setFontSizeMode(e.target.value as any)}
-                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-teal-700 dark:text-teal-300 cursor-pointer shadow-xs"
-                    >
-                      <option value="large">To rõ SGK (Khuyên dùng)</option>
-                      <option value="extra">Rất to (Đặc biệt rõ)</option>
-                      <option value="standard">Tiêu chuẩn</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Màu:</span>
-                    <select
-                      value={colorStyle}
-                      onChange={(e) => setColorStyle(e.target.value as any)}
-                      className="px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
-                    >
-                      <option value="monochrome">Đen trắng SGK</option>
-                      <option value="colored">Màu sắc trực quan</option>
-                    </select>
-                  </div>
-                </div>
+              {/* TIÊU ĐỀ KHUNG VẼ (ĐIỀU KHIỂN XUẤT ẢNH & ĐỊNH DẠNG TẠI THANH RIBBON WORD Ở TRÊN) */}
+              <div className="w-full flex items-center justify-between pb-1 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <span className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
+                  <Table size={15} />
+                  <span>Bản vẽ Bảng biến thiên tùy biến (Độ nét cao 300 DPI)</span>
+                </span>
+                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
+                  Chép Word, đổi phông & nét trực tiếp trên thanh Ribbon Word ở trên
+                </span>
               </div>
 
               {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}
