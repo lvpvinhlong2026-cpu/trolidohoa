@@ -4,7 +4,7 @@ import {
   Trash2, Undo2, Redo2, Copy, Download, RefreshCw, 
   Layers, CheckCircle2, AlertCircle, Sparkles, Grid, Eye, EyeOff,
   FileDown, FileUp, Edit3, X, Check, Type, ArrowRight, ArrowLeftRight,
-  Box, FolderKanban, BarChart2
+  Box, FolderKanban, BarChart2, Crop
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import Gsp3DViewerModal from './Gsp3DViewerModal';
@@ -2141,6 +2141,28 @@ export default function GspSketchpad({
     e.target.value = '';
   };
 
+  // Lắng nghe sự kiện từ Ribbon Bar (Chép Word, Tải PNG, Cắt khung chữ nhật)
+  useEffect(() => {
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (!ce.detail) return;
+      const { type } = ce.detail;
+      if (type === 'copy_word') {
+        handleCopyImage();
+      } else if (type === 'download_png') {
+        handleDownloadPng();
+      } else if (type === 'open_crop') {
+        const offscreen = renderToOffscreenCanvas(3);
+        const dataUrl = offscreen.toDataURL('image/png');
+        window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+          detail: { dataUrl, title: 'Hình học GSP' }
+        }));
+      }
+    };
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+  }, [points, segments, circles, ellipses, rightAngles, texts]);
+
   // ==========================================
   // HÀM VẼ TOÀN BỘ BẢN VẼ GSP LÊN CANVAS
   // ==========================================
@@ -3407,10 +3429,26 @@ export default function GspSketchpad({
               <button
                 onClick={handleCopyImage}
                 className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                title="Sao chép ảnh độ nét cao 300 DPI trực tiếp vào Clipboard để dán (Ctrl+V) vào Word"
+                title="Sao chép toàn bộ ảnh độ nét cao 300 DPI trực tiếp vào Clipboard để dán (Ctrl+V) vào Word"
               >
                 <Copy size={14} />
                 <span>Copy ảnh (Dán Word)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const offscreen = renderToOffscreenCanvas(3);
+                  const dataUrl = offscreen.toDataURL('image/png');
+                  window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+                    detail: { dataUrl, title: 'Hình học GSP' }
+                  }));
+                }}
+                className="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
+              >
+                <Crop size={14} className="text-amber-600 dark:text-amber-400" />
+                <span>Cắt nhanh (Dán Word)</span>
               </button>
 
               <button

@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   TrendingUp, Table, Copy, Download, CheckCircle2, RefreshCw, 
   Sparkles, Layers, Sliders, Eye, HelpCircle, Check, Compass,
-  Type, Ruler, Hash, Move, Crosshair, RotateCcw, Plus, Trash2, Palette, Bold, X
+  Type, Ruler, Hash, Move, Crosshair, RotateCcw, Plus, Trash2, Palette, Bold, X,
+  Crop
 } from 'lucide-react';
 import { 
   analyzeFunction, 
@@ -530,6 +531,15 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
       } else if (type === 'copy_word') {
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleCopyImage(graphDataUrl, 'Đồ thị Oxy');
+        }
+      } else if (type === 'open_crop') {
+        if (graphDataUrl) {
+          window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+            detail: {
+              dataUrl: graphDataUrl,
+              title: activeSubTab === 'graph' ? 'Đồ thị Oxy' : activeSubTab === 'inequality' ? 'Miền nghiệm BPT' : 'Trục số thực R'
+            }
+          }));
         }
       } else if (type === 'download_png') {
         if (activeSubTab === 'graph' && graphDataUrl) {
@@ -1772,11 +1782,27 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
                 const label = 'Đồ thị Oxy';
                 handleCopyImage(currentUrl, label);
               }}
-              className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition"
-              title="Sao chép ảnh vào Clipboard (PNG) để dán trực tiếp Ctrl+V vào Word"
+              className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+              title="Sao chép toàn bộ ảnh vào Clipboard (PNG) để dán trực tiếp Ctrl+V vào Word"
             >
               <Copy size={15} />
               Copy ảnh (Ctrl+V vào Word)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (graphDataUrl) {
+                  window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+                    detail: { dataUrl: graphDataUrl, title: 'Đồ thị Oxy' }
+                  }));
+                }
+              }}
+              className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+              title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
+            >
+              <Crop size={15} className="text-amber-600 dark:text-amber-400" />
+              <span>Cắt nhanh (Dán Word)</span>
             </button>
 
             <button
@@ -1785,7 +1811,7 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
                 const fname = 'Do_thi_Oxy_300dpi.png';
                 handleDownloadImage(currentUrl, fname);
               }}
-              className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+              className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
               title="Tải ảnh PNG độ phân giải 300 DPI"
             >
               <Download size={15} />

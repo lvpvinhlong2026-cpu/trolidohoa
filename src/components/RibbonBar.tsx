@@ -24,7 +24,8 @@ import {
   RotateCcw,
   Play,
   Pause,
-  Grid
+  Grid,
+  Crop
 } from 'lucide-react';
 import { TabId } from '../App';
 import { AccentColor, ACCENT_THEMES } from '../types/personalization';
@@ -136,34 +137,45 @@ export default function RibbonBar({
               
               {/* Nhóm 1: CLIPBOARD / XUẤT ẢNH WORD */}
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
-                    title="Sao chép ảnh độ phân giải cao 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    title="Sao chép toàn bộ ảnh độ phân giải cao 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
+                    <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'open_crop' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
+                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
+                  >
+                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'download_png' })}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
                     >
-                      <Download size={13} className="text-teal-600" />
-                      <span>Tải PNG</span>
+                      <Download size={12} className="text-teal-600" />
+                      <span>PNG</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'download_svg' })}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
                     >
-                      <Download size={13} className="text-blue-600" />
-                      <span>Tải SVG</span>
+                      <Download size={12} className="text-blue-600" />
+                      <span>SVG</span>
                     </button>
                   </div>
                 </div>
@@ -329,34 +341,45 @@ export default function RibbonBar({
               
               {/* Nhóm 1: CLIPBOARD / XUẤT BẢN WORD */}
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
-                    title="Sao chép bảng biến thiên 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    title="Sao chép toàn bộ bảng biến thiên 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
+                    <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'open_crop' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
+                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
+                  >
+                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'download_png' })}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
                     >
-                      <Download size={13} className="text-teal-600" />
-                      <span>Tải PNG</span>
+                      <Download size={12} className="text-teal-600" />
+                      <span>PNG</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'download_svg' })}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
                     >
-                      <Download size={13} className="text-blue-600" />
-                      <span>Tải SVG</span>
+                      <Download size={12} className="text-blue-600" />
+                      <span>SVG</span>
                     </button>
                   </div>
                 </div>
@@ -568,23 +591,37 @@ export default function RibbonBar({
           {currentTab === 'geometry' && (
             <div className="flex items-stretch gap-2 shrink-0">
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
+                    <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'open_crop' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
+                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
+                  >
+                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'download_png' })}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
+                    title="Tải ảnh PNG"
                   >
                     <Download size={13} className="text-teal-600" />
-                    <span>Tải PNG</span>
+                    <span className="text-[11px]">PNG</span>
                   </button>
                 </div>
                 <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
@@ -648,23 +685,37 @@ export default function RibbonBar({
           {currentTab === 'statistics' && (
             <div className="flex items-stretch gap-2 shrink-0">
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
+                    <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'open_crop' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
+                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
+                  >
+                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'download_png' })}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
+                    title="Tải ảnh PNG"
                   >
                     <Download size={13} className="text-teal-600" />
-                    <span>Tải PNG</span>
+                    <span className="text-[11px]">PNG</span>
                   </button>
                 </div>
                 <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
@@ -717,23 +768,37 @@ export default function RibbonBar({
           {currentTab === 'probability_tree' && (
             <div className="flex items-stretch gap-2 shrink-0">
               <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
+                    <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction({ type: 'open_crop' })}
+                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
+                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
+                  >
+                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
+                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'download_png' })}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
+                    title="Tải ảnh PNG"
                   >
                     <Download size={13} className="text-teal-600" />
-                    <span>Tải PNG</span>
+                    <span className="text-[11px]">PNG</span>
                   </button>
                 </div>
                 <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">

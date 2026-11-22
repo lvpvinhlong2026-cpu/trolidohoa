@@ -27,7 +27,8 @@ import {
   Grid,
   GitFork,
   LayoutGrid,
-  Check
+  Check,
+  Crop
 } from 'lucide-react';
 
 import { 
@@ -39,6 +40,7 @@ import CommandPalette from './components/CommandPalette';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
 import RibbonBar from './components/RibbonBar';
+import FastSnipOverlay from './components/FastSnipOverlay';
 
 // =====================================================================
 // CHỈ GIỮ LẠI CÁC PHÂN HỆ CỐT LÕI ĐỒ HỌA TOÁN HỌC (300 DPI)
@@ -255,6 +257,11 @@ export default function App() {
   // 9. Modals State
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
+  const [cropModalState, setCropModalState] = useState<{
+    isOpen: boolean;
+    initialImageUrl?: string;
+    title?: string;
+  }>({ isOpen: false });
 
   const theme = ACCENT_THEMES[accentColor] || ACCENT_THEMES.teal;
 
@@ -317,7 +324,21 @@ export default function App() {
     };
   }, []);
 
-  // Lắng nghe phím tắt toàn cục (Ctrl + F1 hoặc Alt + B thu gọn Ribbon kiểu MS Word)
+  // Lắng nghe sự kiện mở công cụ cắt ảnh khung chữ nhật
+  useEffect(() => {
+    const handleOpenCropModal = (e: Event) => {
+      const ce = e as CustomEvent;
+      setCropModalState({
+        isOpen: true,
+        initialImageUrl: ce.detail?.dataUrl,
+        title: ce.detail?.title || 'Hình vẽ Toán học',
+      });
+    };
+    window.addEventListener('lvp_open_crop_modal', handleOpenCropModal);
+    return () => window.removeEventListener('lvp_open_crop_modal', handleOpenCropModal);
+  }, []);
+
+  // Lắng nghe phím tắt toàn cục (Ctrl + F1 hoặc Alt + B thu gọn Ribbon kiểu MS Word, Alt + C cắt ảnh)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (((e.ctrlKey || e.metaKey) && e.key === 'F1') || (e.altKey && e.key.toLowerCase() === 'b')) {
@@ -329,6 +350,9 @@ export default function App() {
       } else if (e.altKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         setIsCompactMode(prev => !prev);
+      } else if (e.altKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleRibbonAction({ type: 'open_crop' });
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -341,6 +365,19 @@ export default function App() {
     if (action.type === 'copy_word') {
       setToastMessage('Đã sao chép ảnh 300 DPI! Thầy/Cô mở Word và nhấn phím Ctrl + V để dán ngay.');
       setTimeout(() => setToastMessage(null), 4500);
+    } else if (action.type === 'open_crop') {
+      // Cho các component con cơ hội phản hồi và gửi dataUrl chi tiết
+      setTimeout(() => {
+        setCropModalState(prev => {
+          if (prev.isOpen) return prev;
+          const activeCanvas = document.querySelector('main canvas') as HTMLCanvasElement | null;
+          return {
+            isOpen: true,
+            initialImageUrl: activeCanvas ? activeCanvas.toDataURL('image/png') : undefined,
+            title: 'Hình vẽ Toán học',
+          };
+        });
+      }, 50);
     } else if (action.type === 'switch_subtab') {
       setGraphSubTab(action.subtab);
     } else if (action.type === 'switch_bbt_mode') {
@@ -435,6 +472,16 @@ export default function App() {
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Nút Cắt nhanh dán Word (Alt + C) */}
+            <button
+              onClick={() => handleRibbonAction({ type: 'open_crop' })}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition shadow-2xs cursor-pointer"
+              title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
+            >
+              <Crop size={14} className="text-amber-600 dark:text-amber-400" />
+              <span className="hidden sm:inline">Cắt nhanh Word</span>
+            </button>
+
             {/* Quick Command Palette Search (Ctrl + K) */}
             <button
               onClick={() => setShowCommandPalette(true)}
@@ -611,6 +658,18 @@ export default function App() {
         onTogglePin={handleTogglePin}
         startupTab={startupTabSetting}
         onSelectStartupTab={handleSelectStartupTab}
+      />
+
+      {/* Lớp phủ Cắt Nhanh Khung Chữ Nhật ➔ Tự Động Lưu Vào Word (300 DPI) */}
+      <FastSnipOverlay
+        isOpen={cropModalState.isOpen}
+        onClose={() => setCropModalState(prev => ({ ...prev, isOpen: false }))}
+        imageUrl={cropModalState.initialImageUrl}
+        title={cropModalState.title}
+        onNotify={msg => {
+          setToastMessage(msg);
+          setTimeout(() => setToastMessage(null), 5000);
+        }}
       />
 
       {/* Floating Toast Thông báo Sao chép Word 300 DPI */}

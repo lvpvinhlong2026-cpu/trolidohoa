@@ -169,3 +169,190 @@ export function cropCanvasToContent(sourceCanvas: HTMLCanvasElement, padding = 3
     return sourceCanvas;
   }
 }
+
+/**
+ * Tự động phát hiện hộp bao (bounding box) quanh nội dung vẽ của ảnh hoặc canvas.
+ * Trả về toạ độ x, y, width, height tính theo kích thước gốc (native).
+ */
+export function detectContentBoundingBox(
+  source: HTMLCanvasElement | HTMLImageElement,
+  padding = 24
+): { x: number; y: number; width: number; height: number } | null {
+  try {
+    let canvas: HTMLCanvasElement;
+    let w: number;
+    let h: number;
+
+    if (source instanceof HTMLCanvasElement) {
+      canvas = source;
+      w = canvas.width;
+      h = canvas.height;
+    } else {
+      w = source.naturalWidth || source.width;
+      h = source.naturalHeight || source.height;
+      canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(source, 0, 0);
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    let minX = w;
+    let minY = h;
+    let maxX = 0;
+    let maxY = 0;
+    let found = false;
+
+    // Quét với bước nhảy 3px để siêu nhanh
+    for (let y = 0; y < h; y += 3) {
+      for (let x = 0; x < w; x += 3) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const a = data[idx + 3];
+
+        if (a > 15 && (r < 246 || g < 246 || b < 246)) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          found = true;
+        }
+      }
+    }
+
+    if (!found || maxX <= minX || maxY <= minY) {
+      return { x: 0, y: 0, width: w, height: h };
+    }
+
+    const cropX = Math.max(0, minX - padding);
+    const cropY = Math.max(0, minY - padding);
+    const cropW = Math.min(w - cropX, maxX - minX + 2 * padding);
+    const cropH = Math.min(h - cropY, maxY - minY + 2 * padding);
+
+    return { x: cropX, y: cropY, width: cropW, height: cropH };
+  } catch (e) {
+    console.warn('detectContentBoundingBox failed:', e);
+    return null;
+  }
+}
+
+export interface CropExportOptions {
+  fillWhiteBg?: boolean;
+  borderStyle?: 'none' | 'solid_black' | 'solid_gray' | 'dashed';
+  borderWidth?: number;
+  dpi?: number;
+}
+
+/**
+ * Cắt một vùng hình chữ nhật từ Canvas hoặc ImageElement sang một Canvas mới.
+ */
+export function cropRegionToCanvas(
+  source: HTMLCanvasElement | HTMLImageElement,
+  rect: { x: number; y: number; width: number; height: number },
+  options: CropExportOptions = {}
+): HTMLCanvasElement {
+  const {
+    fillWhiteBg = true,
+    borderStyle = 'none',
+    borderWidth = 1,
+  } = options;
+
+  const cropped = document.createElement('canvas');
+  const cropW = Math.max(1, Math.round(rect.width));
+  const cropH = Math.max(1, Math.round(rect.height));
+  cropped.width = cropW;
+  cropped.height = cropH;
+
+  const ctx = cropped.getContext('2d');
+  if (!ctx) return cropped;
+
+  if (fillWhiteBg) {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, cropW, cropH);
+  }
+
+  ctx.drawImage(
+    source,
+    Math.round(rect.x),
+    Math.round(rect.y),
+    cropW,
+    cropH,
+    0,
+    0,
+    cropW,
+    cropH
+  );
+
+  if (borderStyle !== 'none') {
+    ctx.save();
+    ctx.lineWidth = borderWidth;
+    if (borderStyle === 'solid_black') {
+      ctx.strokeStyle = '#1e293b';
+    } else if (borderStyle === 'solid_gray') {
+      ctx.strokeStyle = '#94a3b8';
+    } else if (borderStyle === 'dashed') {
+      ctx.strokeStyle = '#64748b';
+      ctx.setLineDash([6, 4]);
+    }
+    // Vẽ viền lùi vào 0.5px để không bị cắt xén
+    ctx.strokeRect(0.5, 0.5, cropW - 1, cropH - 1);
+    ctx.restore();
+  }
+
+  return cropped;
+}
+
+/**
+ * Cắt 1 phần hình ảnh khung chữ nhật và chép trực tiếp vào Clipboard với 300 DPI & HTML Tag chuẩn Word.
+ */
+export async function copyCroppedRegionToClipboard(
+  source: HTMLCanvasElement | HTMLImageElement,
+  rect: { x: number; y: number; width: number; height: number },
+  options: CropExportOptions = {}
+): Promise<boolean> {
+  try {
+    const croppedCanvas = cropRegionToCanvas(source, rect, options);
+    const dpi = options.dpi || 300;
+
+    const blob = await new Promise<Blob | null>(resolve => croppedCanvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Không tạo được PNG blob');
+
+    const blobWithDpi = await addDpiToBlob(blob, dpi);
+    const dataUrl = croppedCanvas.toDataURL('image/png');
+
+    // Tỉ lệ scale vào Word: 300 DPI / 96 DPI = ~3.125 hoặc 2.5
+    // Đảm bảo hình vẽ có kích thước vừa vặn như in ấn thực tế
+    const wordWidth = Math.round(croppedCanvas.width / 2.5);
+    const wordHeight = Math.round(croppedCanvas.height / 2.5);
+    const htmlSnippet = `<img src="${dataUrl}" alt="Hinh toan hoc cat tu Tro ly Do hoa" width="${wordWidth}" height="${wordHeight}" style="display:inline-block; max-width:100%; height:auto;" />`;
+    const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blobWithDpi,
+          'text/html': htmlBlob,
+        })
+      ]);
+    } catch {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blobWithDpi })
+      ]);
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Lỗi khi chép vùng ảnh cắt vào Clipboard:', err);
+    return false;
+  }
+}
+

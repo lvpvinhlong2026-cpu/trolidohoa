@@ -15,7 +15,8 @@ import {
   Bookmark,
   AlertCircle,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Crop
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/dpiUtils';
 import { 
@@ -740,6 +741,23 @@ export default function TableVariationTool() {
         } else {
           handleCopyImage();
         }
+      } else if (type === 'open_crop') {
+        let dataUrl: string | null = null;
+        if (masterMode === 'auto') {
+          dataUrl = autoCanvasRef.current?.toDataURL('image/png') || null;
+        } else {
+          const canvas = document.createElement('canvas');
+          drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
+          dataUrl = canvas.toDataURL('image/png');
+        }
+        if (dataUrl) {
+          window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+            detail: {
+              dataUrl,
+              title: masterMode === 'auto' ? 'Bảng biến thiên tự động' : 'Bảng biến thiên tùy biến',
+            }
+          }));
+        }
       } else if (type === 'download_png') {
         if (masterMode === 'auto') {
           handleDownloadAutoPng();
@@ -1102,9 +1120,22 @@ export default function TableVariationTool() {
                 <Sparkles size={15} />
                 <span>Bản vẽ Bảng biến thiên tự động (Độ nét cao 300 DPI)</span>
               </span>
-              <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                Chép Word, đổi phông & nét trực tiếp trên thanh Ribbon Word ở trên
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const dataUrl = autoCanvasRef.current?.toDataURL('image/png');
+                  if (dataUrl) {
+                    window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+                      detail: { dataUrl, title: 'Bảng biến thiên tự động' }
+                    }));
+                  }
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition cursor-pointer shadow-2xs"
+                title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
+              >
+                <Crop size={13} className="text-amber-600 dark:text-amber-400" />
+                <span>Cắt nhanh (Dán Word)</span>
+              </button>
             </div>
 
             {/* VÙNG HIỂN THỊ CANVAS */}
@@ -1354,9 +1385,24 @@ export default function TableVariationTool() {
                   <Table size={15} />
                   <span>Bản vẽ Bảng biến thiên tùy biến (Độ nét cao 300 DPI)</span>
                 </span>
-                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                  Chép Word, đổi phông & nét trực tiếp trên thanh Ribbon Word ở trên
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const canvas = document.createElement('canvas');
+                    drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    if (dataUrl) {
+                      window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
+                        detail: { dataUrl, title: 'Bảng biến thiên tùy biến' }
+                      }));
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition cursor-pointer shadow-2xs"
+                  title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động lưu vào Word (Alt + C)"
+                >
+                  <Crop size={13} className="text-amber-600 dark:text-amber-400" />
+                  <span>Cắt nhanh (Dán Word)</span>
+                </button>
               </div>
 
               {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}
