@@ -56,14 +56,28 @@ export interface RibbonBarProps {
 
 // 8 Phân hệ chuẩn đồ họa Toán học sắp xếp như các tab Home, Insert... của Word
 const RIBBON_TABS: { id: TabId; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
-  { id: 'bbt_graph', label: 'Đồ thị & Trục số', icon: TrendingUp },
+  { id: 'bbt_graph', label: 'Đồ thị', icon: TrendingUp },
   { id: 'bbt', label: 'Bảng biến thiên', icon: Table },
-  { id: 'geometry', label: 'Hình học 2D & 3D', icon: Compass },
-  { id: 'statistics', label: 'Biểu đồ Thống kê', icon: BarChart2 },
-  { id: 'probability_tree', label: 'Cây Xác suất', icon: GitFork },
+  { id: 'geometry', label: 'Hình học', icon: Compass },
+  { id: 'statistics', label: 'Thống kê', icon: BarChart2 },
+  { id: 'probability_tree', label: 'Cây xác suất', icon: GitFork },
   { id: 'geogebra', label: 'GeoGebra 3D', icon: Layers },
   { id: 'simulation', label: 'Mô phỏng', icon: MonitorPlay },
   { id: 'guide', label: 'Hướng dẫn', icon: HelpCircle },
+];
+
+const GSP_SAMPLE_OPTIONS: SelectOption[] = [
+  { value: 'pyramid_regular_quad', label: 'Chóp S.ABCD (SO ⊥ đáy)' },
+  { value: 'pyramid_regular_tri', label: 'Chóp S.ABC (SG ⊥ đáy)' },
+  { value: 'chop_sa_vuong_day', label: 'Chóp S.ABCD (SA ⊥ đáy)' },
+  { value: 'lang_tru_tam_giac', label: "Lăng trụ tam giác ABC.A'B'C'" },
+  { value: 'box_abcd', label: "Hình hộp chữ nhật ABCD.A'B'C'D'" },
+  { value: 'tam_giac_vuong_cao', label: 'Tam giác vuông đường cao AH' },
+  { value: 'triangle_equi', label: 'Tam giác đều ABC' },
+  { value: 'parallelogram', label: 'Hình bình hành ABCD' },
+  { value: 'cone', label: 'Hình nón tròn xoay' },
+  { value: 'cylinder', label: 'Hình trụ tròn xoay' },
+  { value: 'hinh_cau', label: 'Hình cầu Oxyz' },
 ];
 
 const GRAPH_PRESET_OPTIONS: SelectOption[] = [
@@ -198,12 +212,11 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
-                    title="Sao chép toàn bộ ảnh độ phân giải cao 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
+                    title="Sao chép toàn bộ ảnh nét cao 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={18} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép Word</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
@@ -387,12 +400,11 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
                     title="Sao chép toàn bộ bảng biến thiên 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={18} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép Word</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
@@ -620,31 +632,30 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
                     title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={18} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép Word</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'download_png' })}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-[4px] text-xs font-medium bg-white hover:bg-[#EDEBE9] dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 cursor-pointer"
                       title="Tải ảnh PNG độ phân giải 300 DPI"
                     >
-                      <Download size={12} className="text-teal-600" />
+                      <Download size={12} className="text-[#0F6CBD]" />
                       <span>PNG</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onRibbonAction({ type: 'gsp_select_tool', tool: 'clear' })}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer"
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-[4px] text-xs font-medium bg-white hover:bg-rose-50 text-rose-600 border border-[#E1DFDD] dark:border-slate-700 cursor-pointer"
                       title="Xóa sạch bản vẽ để vẽ hình mới"
                     >
-                      <RotateCcw size={12} className="text-rose-600" />
+                      <RotateCcw size={12} className="text-rose-500" />
                       <span>Làm mới</span>
                     </button>
                   </div>
@@ -656,17 +667,17 @@ export default function RibbonBar({
 
               {/* Nhóm 2: CÔNG CỤ DỰNG HÌNH GSP (TƯƠNG TÁC CHUỘT) */}
               <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-                <div className="flex items-center gap-1.5 flex-1">
+                <div className="flex items-center gap-1 flex-1">
                   {[
-                    { id: 'select', label: 'Chọn & Dời', icon: MousePointer, tip: 'Chọn & di chuyển đỉnh, nhãn chữ' },
-                    { id: 'point', label: 'Vẽ điểm', icon: CircleDot, tip: 'Chấm điểm tự do (A, B, C...)' },
-                    { id: 'point_on_segment', label: 'Điểm trên cạnh', icon: Dot, tip: 'Lấy điểm nằm trên cạnh (phụ thuộc)' },
+                    { id: 'select', label: 'Chọn', icon: MousePointer, tip: 'Chọn & di chuyển đỉnh, nhãn chữ' },
+                    { id: 'point', label: 'Điểm', icon: CircleDot, tip: 'Chấm điểm tự do (A, B, C...)' },
+                    { id: 'point_on_segment', label: 'Điểm cạnh', icon: Dot, tip: 'Lấy điểm nằm trên cạnh' },
                     { id: 'segment', label: 'Đoạn thẳng', icon: Minus, tip: 'Nối đoạn thẳng giữa 2 điểm' },
                     { id: 'circle', label: 'Đường tròn', icon: Circle, tip: 'Vẽ đường tròn tâm và bán kính' },
-                    { id: 'ellipse', label: 'Đáy Elip', icon: Circle, tip: 'Vẽ hình elip làm đáy hình không gian' },
+                    { id: 'ellipse', label: 'Elip', icon: Circle, tip: 'Vẽ hình elip làm đáy hình không gian' },
                     { id: 'right_angle', label: 'Góc vuông', icon: CornerDownRight, tip: 'Đánh dấu ký hiệu góc vuông' },
-                    { id: 'text', label: 'Chữ / Nhãn', icon: Type, tip: 'Thêm chữ ký hiệu hoặc công thức' },
-                    { id: 'eraser', label: 'Tẩy xóa', icon: Eraser, tip: 'Nhấp đối tượng để xóa nhanh' },
+                    { id: 'text', label: 'Nhãn', icon: Type, tip: 'Thêm chữ ký hiệu hoặc công thức' },
+                    { id: 'eraser', label: 'Tẩy', icon: Eraser, tip: 'Nhấp đối tượng để xóa nhanh' },
                   ].map(item => {
                     const ItemIcon = item.icon;
                     const isActive = gspActiveTool === item.id;
@@ -675,54 +686,41 @@ export default function RibbonBar({
                         key={item.id}
                         type="button"
                         onClick={() => onRibbonAction({ type: 'gsp_select_tool', tool: item.id })}
-                        className={`flex flex-col items-center justify-center px-2 py-1 rounded-xl text-xs font-bold transition cursor-pointer h-[66px] min-w-[62px] border ${
+                        className={`flex flex-col items-center justify-center px-2 py-1 rounded-[4px] text-xs transition cursor-pointer h-[66px] min-w-[54px] border ${
                           isActive
-                            ? `${theme.softBg} ${theme.primaryText} border-teal-500 shadow-2xs ring-2 ring-teal-400/50`
-                            : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold shadow-2xs'
+                            : 'bg-white hover:bg-[#EDEBE9] text-[#242424] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border-transparent'
                         }`}
                         title={item.tip}
                       >
-                        <ItemIcon size={16} className={`mb-0.5 ${isActive ? theme.primaryText : 'text-slate-600 dark:text-slate-400'}`} />
-                        <span className="text-[10px] leading-tight text-center whitespace-nowrap">{item.label}</span>
+                        <ItemIcon size={18} className={`mb-1 ${isActive ? 'text-[#0F6CBD]' : 'text-[#424242] dark:text-slate-400'}`} />
+                        <span className="text-[11px] leading-tight text-center whitespace-nowrap">{item.label}</span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
-                  CÔNG CỤ DỰNG HÌNH GSP
+                  CÔNG CỤ DỰNG HÌNH
                 </div>
               </div>
 
-              {/* Nhóm 3: KHO MẪU HÌNH SGK (BẤM NẠP NGAY) */}
-              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-                <div className="flex items-center gap-1.5 flex-1">
-                  {[
-                    { id: 'pyramid_regular_quad', label: 'Chóp S.ABCD', desc: 'Chóp tứ giác đều (SO ⊥ đáy)' },
-                    { id: 'pyramid_regular_tri', label: 'Chóp S.ABC', desc: 'Chóp tam giác đều (SG ⊥ đáy)' },
-                    { id: 'chop_sa_vuong_day', label: 'Chóp SA ⊥ đáy', desc: 'Góc vuông tại đỉnh A' },
-                    { id: 'lang_tru_tam_giac', label: 'Lăng trụ tam giác', desc: "Lăng trụ ABC.A'B'C'" },
-                    { id: 'box_abcd', label: 'Hình hộp chữ nhật', desc: "Hình hộp ABCD.A'B'C'D'" },
-                    { id: 'tam_giac_vuong_cao', label: 'Tam giác (AH)', desc: 'Tam giác vuông đường cao AH' },
-                    { id: 'triangle_equi', label: 'Tam giác đều', desc: 'Tam giác đều ABC' },
-                    { id: 'parallelogram', label: 'Hình bình hành', desc: 'Bình hành ABCD đáy không gian' },
-                    { id: 'cone', label: 'Hình nón', desc: 'Đỉnh S & đáy tròn' },
-                    { id: 'cylinder', label: 'Hình trụ', desc: 'Hai đáy tròn song song' },
-                    { id: 'hinh_cau', label: 'Hình cầu', desc: 'Tâm O & đường vĩ tuyến' },
-                  ].map(sample => (
-                    <button
-                      key={sample.id}
-                      type="button"
-                      onClick={() => onRibbonAction({ type: 'gsp_load_sample', sample: sample.id })}
-                      className="flex flex-col items-start justify-center px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:border-teal-300 text-slate-700 dark:text-slate-300 transition cursor-pointer h-[66px] min-w-[105px]"
-                      title={`Bấm để nạp mẫu: ${sample.desc}`}
-                    >
-                      <span className="text-[11px] font-bold text-teal-800 dark:text-teal-300 truncate w-full">{sample.label}</span>
-                      <span className="text-[9px] text-slate-400 truncate w-full mt-0.5">{sample.desc}</span>
-                    </button>
-                  ))}
+              {/* Nhóm 3: MẪU HÌNH SGK (DROPDOWN TINH GỌN CHUẨN FLUENT) */}
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[190px]">
+                <div className="flex flex-col justify-center gap-1.5 flex-1">
+                  <span className="text-[11px] font-medium text-[#605E5C] dark:text-slate-400">Nạp nhanh mẫu SGK:</span>
+                  <CustomDropdownSelect
+                    value=""
+                    placeholder="-- Chọn mẫu hình học --"
+                    ariaLabel="Chọn mẫu hình học SGK chuẩn ARIA"
+                    options={GSP_SAMPLE_OPTIONS}
+                    onChange={(val) => {
+                      if (val) onRibbonAction({ type: 'gsp_load_sample', sample: val });
+                    }}
+                    buttonClassName="h-[32px] text-xs"
+                  />
                 </div>
                 <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
-                  KHO MẪU HÌNH SGK (BẤM NẠP NGAY)
+                  MẪU HÌNH SGK
                 </div>
               </div>
 
@@ -800,12 +798,11 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
                     title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={18} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép Word</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép Word</span>
                   </button>
 
                   <button
@@ -871,12 +868,11 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[72px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
                     title="Sao chép toàn bộ hình vẽ 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={18} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép Word</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép Word</span>
                   </button>
 
                   <button
@@ -925,11 +921,11 @@ export default function RibbonBar({
                   <button
                     type="button"
                     onClick={() => onRibbonAction({ type: 'copy_word' })}
-                    className="flex flex-col items-center justify-center px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition shadow-xs cursor-pointer border border-emerald-700 h-[66px] min-w-[78px]"
+                    className="flex flex-col items-center justify-center px-3 py-1 rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-semibold transition shadow-xs cursor-pointer h-[66px] min-w-[68px]"
+                    title="Sao chép toàn bộ hình 3D 300 DPI dán trực tiếp vào Microsoft Word (Ctrl + V)"
                   >
-                    <Copy size={20} className="mb-0.5" />
-                    <span className="text-[11px] leading-tight text-center">Chép 3D</span>
-                    <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
+                    <Copy size={18} className="mb-1" />
+                    <span className="text-xs font-bold leading-tight text-center">Chép 3D</span>
                   </button>
                 </div>
                 <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
