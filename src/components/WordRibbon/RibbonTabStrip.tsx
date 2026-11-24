@@ -11,7 +11,6 @@ import {
   Sparkles
 } from 'lucide-react';
 import { RibbonTabId } from '../../types/mathArtboard';
-import FileMenuDropdown from './FileMenuDropdown';
 
 export interface RibbonTabStripProps {
   activeTab: RibbonTabId;
@@ -58,17 +57,6 @@ export default function RibbonTabStrip({
     >
       {/* Khối Tabs bên trái */}
       <div className="flex items-center gap-0.5 h-full overflow-x-auto scrollbar-none">
-        {/* NÚT TỆP (FILE TAB) */}
-        <FileMenuDropdown
-          onNew={onNewFile}
-          onOpen={onOpenFile}
-          onSave={onSaveFile}
-          onExportPng={onExportPng}
-          onExportSvg={onExportSvg}
-          onPrint={onPrint}
-          onOpenSettings={onOpenSettings}
-        />
-
         {/* CÁC TAB CHÍNH */}
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;

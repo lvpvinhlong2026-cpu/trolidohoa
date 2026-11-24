@@ -373,7 +373,7 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
       window.removeEventListener('lvp_ineq_copy', onIneqCopy);
       window.removeEventListener('lvp_ineq_download', onIneqDownload);
     };
-  }, [config, zoom, fontScale, graphFont]);
+  }, [config, fontScale, graphFont]);
 
   // Thêm BPT mới
   const handleAddIneq = (str?: string) => {

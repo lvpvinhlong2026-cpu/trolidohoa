@@ -16,10 +16,12 @@ export type RibbonTabId =
 export type GraphicCategory =
   | 'graph_2d'
   | 'bbt'
+  | 'plane_trig'
   | 'number_line'
   | 'trig_circle'
   | 'plane_geo'
   | 'space_3d'
+  | 'stats_prob'
   | 'venn'
   | 'tree_prob'
   | 'box_plot'

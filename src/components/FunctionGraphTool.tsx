@@ -37,10 +37,19 @@ interface Props {
   apiKey?: string;
   model?: string;
   onNavigateToBBT?: () => void;
+  subTab?: 'graph' | 'inequality' | 'number_line';
+  onSubTabChange?: (subTab: 'graph' | 'inequality' | 'number_line') => void;
 }
 
-export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState<'graph' | 'inequality' | 'number_line'>('graph');
+export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT, subTab, onSubTabChange }: Props) {
+  const [activeSubTab, setActiveSubTab] = useState<'graph' | 'inequality' | 'number_line'>(subTab || 'graph');
+
+  // Đồng bộ hai chiều với Ribbon Bar khi subTab prop thay đổi
+  useEffect(() => {
+    if (subTab && subTab !== activeSubTab) {
+      setActiveSubTab(subTab);
+    }
+  }, [subTab]);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [fontScale, setFontScale] = useState<number>(1.0);
   const [graphFont, setGraphFont] = useState<MathFontChoice>('times');
@@ -564,6 +573,7 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
       if (type === 'switch_subtab' && subtab) {
         if (['graph', 'inequality', 'number_line'].includes(subtab)) {
           setActiveSubTab(subtab);
+          onSubTabChange?.(subtab);
         }
       } else if (type === 'select_fn_type' && fnType) {
         const mappedType: GraphConfig['type'] = fnType === 'rational_1_1' ? 'rational' : fnType;
@@ -580,6 +590,8 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
         setGraphConfig(prev => ({ ...prev, isBoldLabels: ce.detail.bold }));
       } else if (type === 'set_stroke' && ce.detail.stroke) {
         setGraphConfig(prev => ({ ...prev, curveWidth: ce.detail.stroke }));
+      } else if (type === 'toggle_grid') {
+        setGraphConfig(prev => ({ ...prev, showGrid: !prev.showGrid }));
       } else if (type === 'copy_word') {
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleCopyImage(graphDataUrl, 'Đồ thị Oxy');

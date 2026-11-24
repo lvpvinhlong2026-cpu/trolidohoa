@@ -153,7 +153,7 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
       window.removeEventListener('lvp_nl_copy', onNlCopy);
       window.removeEventListener('lvp_nl_download', onNlDownload);
     };
-  }, [interval, zoom, fontScale, graphFont, isBold]);
+  }, [interval, fontScale, graphFont, isBold]);
 
   // Nhập chuỗi tập hợp
   const handleApplyCustomInput = (str?: string) => {

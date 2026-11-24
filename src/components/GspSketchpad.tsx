@@ -4,7 +4,7 @@ import {
   Trash2, Undo2, Redo2, Copy, Download, RefreshCw, 
   Layers, CheckCircle2, AlertCircle, Sparkles, Grid, Eye, EyeOff,
   FileDown, FileUp, Edit3, X, Check, Type, ArrowRight, ArrowLeftRight,
-  Box, FolderKanban, BarChart2, Crop
+  Box, FolderKanban, BarChart2, Crop, Sliders
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import { cropCanvasToContent } from '../utils/dpiUtils';

@@ -43,7 +43,6 @@ import {
   ArtboardDocument, 
   INITIAL_ARTBOARD_DOC 
 } from './types/mathArtboard';
-import { CustomDropdownMenu, DropdownMenuItem } from './components/CustomDropdown';
 import RibbonTabStrip from './components/WordRibbon/RibbonTabStrip';
 import RibbonCommandPanel from './components/WordRibbon/RibbonCommandPanel';
 import WordStatusBar from './components/StatusBar/WordStatusBar';
@@ -65,9 +64,11 @@ const StatisticsChartTool = lazy(() => import('./components/StatisticsChartTool'
 const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 
+export type TabId = 'home' | 'bbt_graph' | 'bbt' | 'geometry' | 'statistics' | 'probability_tree' | 'geogebra' | 'simulation' | 'guide' | 'gsp' | 'quick3d';
+
 export default function App() {
-  // 1. Trạng thái Ribbon Tab (Trang chủ, Đồ thị 2D, Bảng biến thiên, Hình phẳng & Lượng giác, Không gian 3D, Thống kê & Xác suất)
-  const [activeTab, setActiveTab] = useState<RibbonTabId>('home');
+  // 1. Trạng thái Ribbon Tab (Đồ thị 2D, Bảng biến thiên, Hình phẳng & Lượng giác, Không gian 3D, Thống kê & Xác suất)
+  const [activeTab, setActiveTab] = useState<RibbonTabId>('graph_2d');
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('lvp_ribbon_collapsed_4') === 'true';
   });
@@ -138,7 +139,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Lưu lịch sử tab đã mở để nạp mượt mà
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['home', activeTab]));
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['graph_2d']));
 
   // Đồng bộ theme
   useEffect(() => {
@@ -260,7 +261,7 @@ export default function App() {
     handleRibbonAction({ type: 'copy_word' });
 
     const activeCanvas = document.querySelector('canvas') as HTMLCanvasElement | null;
-    const activeSvg = document.getElementById('math-artboard-svg') as SVGSVGElement | null;
+    const activeSvg = document.getElementById('math-artboard-svg') as unknown as SVGSVGElement | null;
     const target = activeCanvas || activeSvg;
 
     if (target) {
@@ -345,58 +346,6 @@ export default function App() {
     showToast('AI đã hoàn tất dựng hình tự động từ đề bài!');
   };
 
-  // Menu sổ dọc Phân hệ (chuẩn ARIA)
-  const toolMenuItems: DropdownMenuItem[] = [
-    {
-      id: 'tab_home',
-      label: 'Trang chủ (Tổng quan)',
-      subLabel: 'Màn hình bắt đầu & công cụ nhanh',
-      icon: Palette,
-      selected: activeTab === 'home',
-      onClick: () => setActiveTab('home'),
-    },
-    {
-      id: 'tab_graph',
-      label: 'Đồ thị 2D & Tích phân',
-      subLabel: 'Khảo sát hàm số, Oxy, miền nghiệm BPT, trục số',
-      icon: TrendingUp,
-      selected: activeTab === 'graph_2d',
-      onClick: () => setActiveTab('graph_2d'),
-    },
-    {
-      id: 'tab_bbt',
-      label: 'Bảng biến thiên & Xét dấu',
-      subLabel: 'BBT tự động & BBT tùy biến chuẩn SGK',
-      icon: Table,
-      selected: activeTab === 'bbt',
-      onClick: () => setActiveTab('bbt'),
-    },
-    {
-      id: 'tab_plane',
-      label: 'Hình phẳng & Lượng giác',
-      subLabel: 'GSP Sketchpad Web & Đường tròn lượng giác',
-      icon: Compass,
-      selected: activeTab === 'plane_trig',
-      onClick: () => setActiveTab('plane_trig'),
-    },
-    {
-      id: 'tab_space',
-      label: 'Không gian 3D & Oxyz',
-      subLabel: 'GeoGebra 3D AI Studio & Khối 3D xoay 360°',
-      icon: Layers,
-      selected: activeTab === 'space_3d',
-      onClick: () => setActiveTab('space_3d'),
-    },
-    {
-      id: 'tab_stats',
-      label: 'Thống kê & Xác suất',
-      subLabel: 'Biểu đồ hộp (Box-plot), Histogram, Cây Bayes',
-      icon: BarChart2,
-      selected: activeTab === 'stats_prob',
-      onClick: () => setActiveTab('stats_prob'),
-    },
-  ];
-
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#E8E8E8] text-[#242424]'}`}>
       
@@ -414,9 +363,6 @@ export default function App() {
               <h1 className="text-xs sm:text-sm font-bold tracking-tight text-[#242424] dark:text-white uppercase truncate leading-none">
                 TRỢ LÝ ĐỒ HỌA TOÁN HỌC
               </h1>
-              <span className="hidden sm:inline-block text-[10px] font-semibold text-[#0F6CBD] bg-[#EFF6FC] dark:bg-sky-950/60 dark:text-sky-300 px-1.5 py-0.2 rounded border border-[#C7E0F4] dark:border-sky-800">
-                Office 365 Fluent UI
-              </span>
             </div>
             <span className="hidden xl:inline-block text-[10px] text-[#605E5C] dark:text-slate-400 font-normal truncate leading-tight">
               GV Lê Vĩnh Phúc (Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long)
@@ -426,31 +372,6 @@ export default function App() {
 
         {/* Bên phải: Các nút dạng Pill bo tròn thanh lịch */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Menu sổ dọc Phân hệ chuẩn ARIA */}
-          <CustomDropdownMenu
-            ariaLabel="Menu chuyển đổi nhanh phân hệ đồ họa Toán học chuẩn ARIA"
-            label="Phân hệ"
-            icon={Menu}
-            items={toolMenuItems}
-            placement="bottom-right"
-            menuWidth="w-72 sm:w-80"
-            buttonClassName="h-[26px] bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#242424] dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 rounded-full shadow-2xs px-3 text-xs"
-          />
-
-          {/* Quick Search Ctrl + K */}
-          <button
-            type="button"
-            onClick={() => setShowCommandPalette(true)}
-            className="h-[26px] flex items-center gap-1.5 px-3 rounded-full text-xs font-medium bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer border border-[#E1DFDD] dark:border-slate-700 shadow-2xs"
-            title="Tìm nhanh công cụ đồ họa Toán học (Ctrl + K)"
-          >
-            <Search size={13} className="text-[#0F6CBD]" />
-            <span className="hidden sm:inline">Tìm kiếm</span>
-            <kbd className="hidden sm:inline-block text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 text-slate-500">
-              Ctrl K
-            </kbd>
-          </button>
-
           {/* Cài đặt & Khóa API */}
           <button
             type="button"
@@ -560,127 +481,15 @@ export default function App() {
           <div className="max-w-[1550px] mx-auto bg-white dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-800 rounded-[4px] shadow-[0_4px_24px_rgba(0,0,0,0.10),0_1px_3px_rgba(0,0,0,0.06)] p-3 sm:p-5 min-h-[calc(100vh-175px)]">
             <Suspense fallback={<TabLoadingSkeleton title="Đang nạp phân hệ toán học..." accentColor={accentColor} />}>
 
-              {/* 3.1 TAB TRANG CHỦ (HOME) - TỔNG QUAN TINH GIẢN & ĐIỀU HƯỚNG NHANH */}
-              {activeTab === 'home' && (
-                <div className="space-y-6 py-4 px-2 max-w-5xl mx-auto animate-fade-in">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800/60 dark:to-slate-800/30 border border-blue-200/80 dark:border-slate-700 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="space-y-2 text-center md:text-left">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/50 text-[#0F6CBD] dark:text-blue-300 text-xs font-bold">
-                        <Sparkles size={13} />
-                        <span>Chương trình GDPT 2018 • Kết nối tri thức với cuộc sống</span>
-                      </div>
-                      <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">
-                        Hệ Thống Trợ Lý Đồ Họa Toán Học THPT
-                      </h2>
-                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
-                        Chuyên biệt hỗ trợ giáo viên tạo nhanh hình vẽ vector, đồ thị Oxy, bảng biến thiên, không gian Oxyz và biểu đồ thống kê <strong>chuẩn 300 DPI, chừa lề 24px</strong> để dán trực tiếp vào đề thi Word (Ctrl + V).
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setShowAiModal(true)}
-                        className="px-5 py-2.5 bg-[#0F6CBD] hover:bg-[#115EA3] active:bg-[#0C5494] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
-                      >
-                        <Sparkles size={15} />
-                        <span>Dán đề (AI) tự dựng hình</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('graph_2d')}
-                        className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#242424] dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs"
-                      >
-                        <span>Bắt đầu vẽ đồ thị 2D</span>
-                        <ArrowRight size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 5 Thẻ phân hệ chính (Truy cập 1-Click) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      {
-                        tab: 'graph_2d' as RibbonTabId,
-                        title: 'Đồ thị 2D & Tích phân',
-                        desc: 'Khảo sát hàm số, trục Oxy, tiếp tuyến, tiệm cận, miền nghiệm BPT, diện tích tích phân.',
-                        icon: TrendingUp,
-                        color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900',
-                      },
-                      {
-                        tab: 'bbt' as RibbonTabId,
-                        title: 'Bảng biến thiên & Xét dấu',
-                        desc: 'BBT tự động từ hàm số và tùy biến tự do. Hỗ trợ tam thức bậc 2, bậc 3, phân thức 1/1, 2/1.',
-                        icon: Table,
-                        color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-900',
-                      },
-                      {
-                        tab: 'plane_trig' as RibbonTabId,
-                        title: 'Hình phẳng & Lượng giác',
-                        desc: 'GSP Sketchpad Web, đường tròn lượng giác đầy đủ, trục số khoảng/đoạn và kho mẫu phẳng.',
-                        icon: Compass,
-                        color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900',
-                      },
-                      {
-                        tab: 'space_3d' as RibbonTabId,
-                        title: 'Không gian 3D & Oxyz',
-                        desc: 'GeoGebra 3D AI Studio, khối chóp, lăng trụ, nón, trụ, cầu và mô hình xoay 360 độ tương tác.',
-                        icon: Layers,
-                        color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900',
-                      },
-                      {
-                        tab: 'stats_prob' as RibbonTabId,
-                        title: 'Thống kê & Xác suất',
-                        desc: 'Biểu đồ hộp (Box-plot), Histogram ghép nhóm, Sơ đồ cây Bayes và biểu đồ Ven chuẩn GDPT 2018.',
-                        icon: BarChart2,
-                        color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900',
-                      },
-                      {
-                        tab: 'home' as RibbonTabId,
-                        title: 'Hướng dẫn sử dụng',
-                        desc: 'Tài liệu hướng dẫn chi tiết cách dựng hình và mẹo xuất ảnh đẹp chuẩn đề thi THPT.',
-                        icon: HelpCircle,
-                        color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900',
-                        onClick: () => setShowCommandPalette(true),
-                      },
-                    ].map((card, idx) => {
-                      const CardIcon = card.icon;
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => card.onClick ? card.onClick() : setActiveTab(card.tab)}
-                          className="p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-800/90 hover:shadow-md hover:border-[#0F6CBD]/40 transition-all cursor-pointer group flex flex-col justify-between"
-                        >
-                          <div className="space-y-2.5">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${card.color} group-hover:scale-105 transition-transform`}>
-                              <CardIcon size={20} />
-                            </div>
-                            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 group-hover:text-[#0F6CBD] transition-colors">
-                              {card.title}
-                            </h3>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                              {card.desc}
-                            </p>
-                          </div>
-                          <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs font-semibold text-[#0F6CBD]">
-                            <span>Mở phân hệ</span>
-                            <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* 3.2 TAB ĐỒ THỊ 2D & TÍCH PHÂN */}
+              {/* 3.1 TAB ĐỒ THỊ 2D & TÍCH PHÂN */}
               {visitedTabs.has('graph_2d') && (
                 <div className={activeTab === 'graph_2d' ? 'block animate-fade-in' : 'hidden'}>
                   <FunctionGraphTool 
                     apiKey={apiKey} 
                     model={preferredModel} 
                     onNavigateToBBT={() => setActiveTab('bbt')}
+                    subTab={graphSubTab}
+                    onSubTabChange={setGraphSubTab}
                   />
                 </div>
               )}
@@ -699,40 +508,9 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3.5 TAB KHÔNG GIAN 3D & OXYZ (GEOGEBRA 3D AI STUDIO & MÔ PHỎNG) */}
+              {/* 3.4 TAB KHÔNG GIAN 3D & OXYZ (GEOGEBRA 3D AI STUDIO & MÔ PHỎNG) */}
               {visitedTabs.has('space_3d') && (
-                <div className={activeTab === 'space_3d' ? 'block animate-fade-in space-y-3' : 'hidden'}>
-                  {/* Thanh chuyển đổi phân hệ Không gian 3D tinh gọn */}
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E1DFDD] dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setSpace3dSubTool('geogebra')}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border ${
-                          space3dSubTool === 'geogebra'
-                            ? 'bg-[#0F6CBD] text-white border-[#0F6CBD] shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-[#424242] dark:text-slate-200 border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9]'
-                        }`}
-                      >
-                        <Layers size={14} />
-                        <span>GeoGebra 3D AI Studio</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSpace3dSubTool('simulation')}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border ${
-                          space3dSubTool === 'simulation'
-                            ? 'bg-[#0F6CBD] text-white border-[#0F6CBD] shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-[#424242] dark:text-slate-200 border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9]'
-                        }`}
-                      >
-                        <MonitorPlay size={14} />
-                        <span>Mô phỏng Khái niệm tương tác</span>
-                      </button>
-                    </div>
-                  </div>
-
+                <div className={activeTab === 'space_3d' ? 'block animate-fade-in' : 'hidden'}>
                   {space3dSubTool === 'geogebra' ? (
                     <Geogebra3DTool apiKey={apiKey} model={preferredModel} />
                   ) : (
@@ -741,40 +519,9 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3.6 TAB THỐNG KÊ & XÁC SUẤT */}
+              {/* 3.5 TAB THỐNG KÊ & XÁC SUẤT */}
               {visitedTabs.has('stats_prob') && (
-                <div className={activeTab === 'stats_prob' ? 'block animate-fade-in space-y-3' : 'hidden'}>
-                  {/* Thanh chuyển đổi Thống kê & Xác suất tinh gọn */}
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E1DFDD] dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setStatsSubTool('statistics')}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border ${
-                          statsSubTool === 'statistics'
-                            ? 'bg-[#0F6CBD] text-white border-[#0F6CBD] shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-[#424242] dark:text-slate-200 border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9]'
-                        }`}
-                      >
-                        <BarChart2 size={14} />
-                        <span>Biểu đồ Hộp & Thống kê THPT</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setStatsSubTool('tree')}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border ${
-                          statsSubTool === 'tree'
-                            ? 'bg-[#0F6CBD] text-white border-[#0F6CBD] shadow-xs'
-                            : 'bg-white dark:bg-slate-800 text-[#424242] dark:text-slate-200 border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9]'
-                        }`}
-                      >
-                        <GitFork size={14} />
-                        <span>Sơ đồ Cây Xác suất & Bayes</span>
-                      </button>
-                    </div>
-                  </div>
-
+                <div className={activeTab === 'stats_prob' ? 'block animate-fade-in' : 'hidden'}>
                   {statsSubTool === 'statistics' ? (
                     <StatisticsChartTool />
                   ) : (
