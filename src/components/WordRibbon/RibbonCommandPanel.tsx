@@ -72,7 +72,6 @@ export interface RibbonCommandPanelProps {
   onCopyWord: () => void;
   onDownloadPng: () => void;
   onDownloadSvg: () => void;
-  onOpenAiModal?: () => void;
   onSelectTemplate: (category: string, presetKey: string) => void;
   onRibbonAction?: (action: { type: string; [key: string]: any }) => void;
   graphSubTab?: 'graph' | 'inequality' | 'number_line';
@@ -135,7 +134,6 @@ export default function RibbonCommandPanel({
   onCopyWord,
   onDownloadPng,
   onDownloadSvg,
-  onOpenAiModal,
   onSelectTemplate,
   onRibbonAction,
   graphSubTab = 'graph',
@@ -616,7 +614,6 @@ export default function RibbonCommandPanel({
                 { id: 'circle', label: 'Đường tròn', icon: Circle },
                 { id: 'ellipse', label: 'Elip', icon: Circle },
                 { id: 'right_angle', label: 'Góc vuông', icon: CornerDownRight },
-                { id: 'trig_angle', label: 'Góc lg', icon: RotateCw },
                 { id: 'text', label: 'Nhãn', icon: Type },
                 { id: 'eraser', label: 'Tẩy', icon: Eraser },
               ].map(t => {
@@ -643,7 +640,7 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 2 – Kho mẫu hình học & Lượng giác */}
+          {/* Nhóm 2 – Kho mẫu hình học */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-1.5 flex-1">
               <AccessibleDropdown
@@ -659,11 +656,6 @@ export default function RibbonCommandPanel({
                   { id: 'tri_deu', label: 'Tam giác đều', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'tam_giac_deu' }) },
                   { id: 'hbh', label: 'Hình bình hành ABCD', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_binh_hanh' }) },
                   { id: 'hthang', label: 'Hình thang vuông', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_thang_vuong' }) },
-                  { id: 'trig', label: 'Đường tròn lượng giác đầy đủ', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'duong_tron_luong_giac' }) },
-                  { id: 'div_trig', label: '', divider: true, onClick: () => {} },
-                  { id: 'trig_pos', label: 'Góc lượng giác chiều dương (+60° / π/3)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_duong' }) },
-                  { id: 'trig_neg', label: 'Góc lượng giác chiều âm (-120°)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_am' }) },
-                  { id: 'trig_spi', label: 'Góc lượng giác nhiều vòng (+420° xoắn ốc)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_xoan_oc' }) },
                   { id: 'div1', label: '', divider: true, onClick: () => {} },
                   { id: 'cone', label: 'Hình nón (đáy elip đứt-liền)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cone' }) },
                   { id: 'cylinder', label: 'Hình trụ (2 đáy elip)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cylinder' }) },
@@ -729,6 +721,149 @@ export default function RibbonCommandPanel({
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
               Kho mẫu & Hiển thị
+            </div>
+          </div>
+
+          {/* Nhóm 3 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 4B: GÓC LƯỢNG GIÁC (TOÁN 11 SGK GDPT 2018)
+          ========================================================================= */}
+      {activeTab === 'trig_angle' && (
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1: Kho mẫu góc SGK 11 */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-1.5 flex-1">
+              <AccessibleDropdown
+                label="Mẫu góc SGK 11"
+                icon={Compass}
+                variant="large"
+                menuWidth="w-72"
+                ariaLabel="Kho mẫu góc lượng giác SGK 11"
+                items={[
+                  { id: 't_30', label: 'Góc dương +30° (π/6)', subLabel: 'sin = 1/2, cos = √3/2', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 30 }) },
+                  { id: 't_45', label: 'Góc dương +45° (π/4)', subLabel: 'sin = √2/2, cos = √2/2', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 45 }) },
+                  { id: 't_60', label: 'Góc dương +60° (π/3)', subLabel: 'sin = √3/2, cos = 1/2', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 60 }) },
+                  { id: 't_90', label: 'Góc vuông +90° (π/2)', subLabel: 'sin = 1, cos = 0', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 90 }) },
+                  { id: 't_120', label: 'Góc tù +120° (2π/3)', subLabel: 'sin = √3/2, cos = -1/2', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 120 }) },
+                  { id: 't_150', label: 'Góc tù +150° (5π/6)', subLabel: 'sin = 1/2, cos = -√3/2', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 150 }) },
+                  { id: 't_180', label: 'Góc bẹt +180° (π)', subLabel: 'sin = 0, cos = -1', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 180 }) },
+                  { id: 'div_neg', label: '', divider: true, onClick: () => {} },
+                  { id: 't_neg30', label: 'Góc âm -30° (-π/6)', subLabel: 'Chiều kim đồng hồ', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: -30 }) },
+                  { id: 't_neg60', label: 'Góc âm -60° (-π/3)', subLabel: 'Chiều kim đồng hồ', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: -60 }) },
+                  { id: 't_neg120', label: 'Góc âm -120° (-2π/3)', subLabel: 'Chiều kim đồng hồ', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: -120 }) },
+                  { id: 'div_spiral', label: '', divider: true, onClick: () => {} },
+                  { id: 't_420', label: 'Góc xoắn ốc +420° (360° + 60°)', subLabel: 'Bài 1 SGK Toán 11', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 420 }) },
+                  { id: 't_750', label: 'Góc xoắn ốc +750° (2×360° + 30°)', subLabel: 'Bài 1 SGK Toán 11', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: 750 }) },
+                  { id: 't_neg750', label: 'Góc xoắn ốc -750° (-2×360° - 30°)', subLabel: 'Bài 1 SGK Toán 11', onClick: () => onRibbonAction?.({ type: 'trig_set_angle', angle: -750 }) },
+                ]}
+              />
+
+              <div className="flex flex-col gap-1 justify-center">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_set_mode', mode: 'unit_circle' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Đường tròn lượng giác Oxy"
+                  >
+                    <Compass size={13} className="text-[#0F6CBD]" />
+                    <span>Đường tròn Oxy</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_set_mode', mode: 'general_ray' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Góc lượng giác tia (Ou, Ov)"
+                  >
+                    <ArrowRight size={13} className="text-rose-600" />
+                    <span>Tia (Ou, Ov)</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_step_angle', delta: 15 })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Tăng góc 15 độ (+15°)"
+                  >
+                    <Plus size={12} />
+                    <span>+15°</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_step_angle', delta: -15 })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Giảm góc 15 độ (-15°)"
+                  >
+                    <Minus size={12} />
+                    <span>-15°</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_step_angle', delta: 360 })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Thêm 1 vòng xoắn ốc (+360°)"
+                  >
+                    <span>+1 vòng</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Mẫu góc & Xoay góc
+            </div>
+          </div>
+
+          {/* Nhóm 2 – Các trục & Hình chiếu */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-1 flex-1">
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'trig_toggle_projections' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
+                title="Bật/Tắt hình chiếu vuông góc lên Ox (cos) và Oy (sin)"
+              >
+                <Sliders size={18} className="mb-1 text-emerald-600" />
+                <span className="text-[10px] leading-tight">Chiếu sin/cos</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'trig_toggle_tan' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
+                title="Bật/Tắt trục tiếp tuyến Tang t'At"
+              >
+                <span className="text-xs font-bold text-amber-600 mb-1">t'At</span>
+                <span className="text-[10px] leading-tight">Trục Tang</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'trig_toggle_cot' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
+                title="Bật/Tắt trục tiếp tuyến Cotang s'Bs"
+              >
+                <span className="text-xs font-bold text-purple-600 mb-1">s'Bs</span>
+                <span className="text-[10px] leading-tight">Trục Cotang</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'trig_toggle_grid' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
+                title="Bật/Tắt lưới tọa độ"
+              >
+                <Grid size={18} className="mb-1 text-slate-500" />
+                <span className="text-[10px] leading-tight">Lưới tọa độ</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Trục & Hình chiếu
             </div>
           </div>
 

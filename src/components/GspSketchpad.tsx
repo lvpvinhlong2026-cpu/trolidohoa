@@ -680,14 +680,20 @@ export default function GspSketchpad({
     return null;
   };
 
-  // Dựng đoạn thẳng qua 1 điểm song song với 1 cạnh
-  const constructParallel = (pointId: string, segmentId: string) => {
-    const pt = points.find(p => p.id === pointId);
+  // Dựng đoạn thẳng qua 1 điểm song song và bằng độ dài đoạn thẳng gốc (không tìm giao điểm)
+  const constructParallel = (pointId: string, segmentId: string, currentPointsList?: GspPoint[]) => {
+    const pts = currentPointsList || points;
+    const pt = pts.find(p => p.id === pointId);
     const seg = segments.find(s => s.id === segmentId);
     if (!pt || !seg) return;
 
-    const p1 = points.find(p => p.id === seg.p1Id);
-    const p2 = points.find(p => p.id === seg.p2Id);
+    if (pt.id === seg.p1Id || pt.id === seg.p2Id) {
+      showNotice('Điểm đã chọn là đầu mút của chính đoạn thẳng đó! Hãy chọn điểm khác ngoài đoạn thẳng.');
+      return;
+    }
+
+    const p1 = pts.find(p => p.id === seg.p1Id);
+    const p2 = pts.find(p => p.id === seg.p2Id);
     if (!p1 || !p2) return;
 
     const dx = p2.x - p1.x;
@@ -697,106 +703,41 @@ export default function GspSketchpad({
 
     saveSnapshot();
 
-    // Tìm các giao điểm của đường thẳng song song với các cạnh khác trong hình (trừ cạnh gốc)
-    interface IntersectHit {
-      t: number;
-      x: number;
-      y: number;
-      targetSeg: GspSegment;
-    }
-    const hits: IntersectHit[] = [];
+    // Điểm đầu mút thứ 2 sao cho vector PQ = vector p1p2 (đoạn PQ song song và BẰNG ĐỘ DÀI đoạn p1p2)
+    const qx = Math.round(pt.x + dx);
+    const qy = Math.round(pt.y + dy);
 
-    const ux = dx / len;
-    const uy = dy / len;
+    // Kiểm tra xem có điểm nào đã trùng tại vị trí qx, qy chưa
+    const workingPts = [...pts];
+    let pQ = workingPts.find(p => Math.hypot(p.x - qx, p.y - qy) < 8);
+    const newPointsToAdd: GspPoint[] = [];
 
-    for (const s of segments) {
-      if (s.id === seg.id) continue;
-      const sa = points.find(p => p.id === s.p1Id);
-      const sb = points.find(p => p.id === s.p2Id);
-      if (!sa || !sb) continue;
-
-      const sdx = sb.x - sa.x;
-      const sdy = sb.y - sa.y;
-      const denom = ux * sdy - uy * sdx;
-      if (Math.abs(denom) < 1e-5) continue;
-
-      const t = ((sa.x - pt.x) * sdy - (sa.y - pt.y) * sdx) / denom;
-      const u = ((sa.x - pt.x) * uy - (sa.y - pt.y) * ux) / denom;
-
-      if (u >= -0.01 && u <= 1.01) {
-        const hx = Math.round(pt.x + t * ux);
-        const hy = Math.round(pt.y + t * uy);
-        hits.push({ t, x: hx, y: hy, targetSeg: s });
-      }
+    if (!pQ) {
+      pQ = createPoint(qx, qy, getNextLabel(workingPts));
+      newPointsToAdd.push(pQ);
     }
 
-    hits.sort((a, b) => a.t - b.t);
-
-    let endPointA: GspPoint | null = null;
-    let endPointB: GspPoint | null = null;
-
-    const hitNeg = hits.filter(h => h.t < -2);
-    const hitPos = hits.filter(h => h.t > 2);
-
-    if (hitNeg.length > 0 && hitPos.length > 0) {
-      const h1 = hitNeg[hitNeg.length - 1];
-      const h2 = hitPos[0];
-
-      let pA = points.find(p => Math.hypot(p.x - h1.x, p.y - h1.y) < 6);
-      if (!pA) {
-        pA = createPoint(h1.x, h1.y, getNextLabel(points));
-        setPoints(prev => [...prev, pA!]);
-      }
-      let pB = points.find(p => Math.hypot(p.x - h2.x, p.y - h2.y) < 6);
-      if (!pB) {
-        pB = createPoint(h2.x, h2.y, getNextLabel([...points, pA]));
-        setPoints(prev => [...prev, pB!]);
-      }
-      endPointA = pA;
-      endPointB = pB;
-    } else if (hitPos.length > 0) {
-      const h2 = hitPos[0];
-      let pB = points.find(p => Math.hypot(p.x - h2.x, p.y - h2.y) < 6);
-      if (!pB) {
-        pB = createPoint(h2.x, h2.y, getNextLabel(points));
-        setPoints(prev => [...prev, pB!]);
-      }
-      endPointA = pt;
-      endPointB = pB;
-    } else if (hitNeg.length > 0) {
-      const h1 = hitNeg[hitNeg.length - 1];
-      let pA = points.find(p => Math.hypot(p.x - h1.x, p.y - h1.y) < 6);
-      if (!pA) {
-        pA = createPoint(h1.x, h1.y, getNextLabel(points));
-        setPoints(prev => [...prev, pA!]);
-      }
-      endPointA = pA;
-      endPointB = pt;
-    } else {
-      const qx = Math.round(pt.x + dx);
-      const qy = Math.round(pt.y + dy);
-      let pQ = points.find(p => Math.hypot(p.x - qx, p.y - qy) < 6);
-      if (!pQ) {
-        pQ = createPoint(qx, qy, getNextLabel(points));
-        setPoints(prev => [...prev, pQ]);
-      }
-      endPointA = pt;
-      endPointB = pQ;
+    if (newPointsToAdd.length > 0) {
+      setPoints(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const filteredNew = newPointsToAdd.filter(np => !existingIds.has(np.id));
+        return [...prev, ...filteredNew];
+      });
     }
 
-    if (endPointA && endPointB && endPointA.id !== endPointB.id) {
+    if (pt && pQ && pt.id !== pQ.id) {
       const newSegId = 'seg_' + Date.now();
       const newSeg: GspSegment = {
         id: newSegId,
-        p1Id: endPointA.id,
-        p2Id: endPointB.id,
+        p1Id: pt.id,
+        p2Id: pQ.id,
         style: lineStyle,
         color: activeColor,
         width: 1.6
       };
       setSegments(prev => [...prev, newSeg]);
       setSelectedSegmentId(newSegId);
-      showNotice(`Đã dựng đoạn song song ${endPointA.label}${endPointB.label} // ${p1.label}${p2.label}`);
+      showNotice(`Đã dựng đoạn thẳng [${pt.label}${pQ.label}] song song và bằng đoạn [${p1.label}${p2.label}]`);
     }
   };
 
@@ -1407,32 +1348,71 @@ export default function GspSketchpad({
         }
       }
     } else if (activeTool === 'parallel') {
-      if (nearbyPt) {
-        if (parallelSegmentId) {
+      const segClickRadius = 14;
+      const clickedSeg = (!nearbyPt && !nearbyTxt) ? findNearbySegment(x, y, segClickRadius) : null;
+
+      if (parallelSegmentId) {
+        // Đã chọn đoạn thẳng trước đó
+        if (nearbyPt) {
           constructParallel(nearbyPt.id, parallelSegmentId);
           setParallelPointId(null);
           setParallelSegmentId(null);
+        } else if (clickedSeg && clickedSeg.id !== parallelSegmentId) {
+          // Bấm vào cạnh khác: tạo điểm M trên cạnh đó và kẻ song song ngay
+          const ptMap = new Map<string, GspPoint>(points.map(p => [p.id, p]));
+          const sa = ptMap.get(clickedSeg.p1Id);
+          const sb = ptMap.get(clickedSeg.p2Id);
+          if (sa && sb) {
+            const segDx = sb.x - sa.x;
+            const segDy = sb.y - sa.y;
+            const segLenSq = segDx * segDx + segDy * segDy;
+            const rawT = segLenSq > 1e-4 ? ((x - sa.x) * segDx + (y - sa.y) * segDy) / segLenSq : 0.5;
+            const t = Math.max(0.05, Math.min(0.95, rawT));
+            const mx = Math.round(sa.x + t * segDx);
+            const my = Math.round(sa.y + t * segDy);
+            const newPt = createPoint(mx, my, getNextLabel(points));
+            const updatedPoints = [...points, newPt];
+            setPoints(updatedPoints);
+            constructParallel(newPt.id, parallelSegmentId, updatedPoints);
+            setParallelPointId(null);
+            setParallelSegmentId(null);
+          }
         } else {
-          setParallelPointId(nearbyPt.id);
-          showNotice(`Đã chọn điểm [${nearbyPt.label}]. Hãy nhấp chọn một cạnh để kẻ đường song song.`);
-        }
-      } else if (nearbySeg) {
-        if (parallelPointId) {
-          constructParallel(parallelPointId, nearbySeg.id);
+          // Bấm vị trí trống: tạo điểm tại (x, y) và kẻ song song ngay
+          const newPt = createPoint(x, y, getNextLabel(points));
+          const updatedPoints = [...points, newPt];
+          setPoints(updatedPoints);
+          constructParallel(newPt.id, parallelSegmentId, updatedPoints);
           setParallelPointId(null);
           setParallelSegmentId(null);
+        }
+      } else if (parallelPointId) {
+        // Đã chọn điểm trước đó
+        if (clickedSeg) {
+          constructParallel(parallelPointId, clickedSeg.id);
+          setParallelPointId(null);
+          setParallelSegmentId(null);
+        } else if (nearbyPt && nearbyPt.id !== parallelPointId) {
+          setParallelPointId(nearbyPt.id);
+          showNotice(`Đã đổi sang điểm [${nearbyPt.label}]. Hãy nhấp chọn một cạnh để kẻ song song.`);
         } else {
-          setParallelSegmentId(nearbySeg.id);
-          showNotice('Đã chọn cạnh. Hãy nhấp chọn một điểm để kẻ đường song song qua điểm đó.');
+          showNotice('Hãy nhấp chuột vào một đoạn thẳng/cạnh để kẻ đường song song.');
         }
       } else {
-        const newPt = createPoint(x, y, getNextLabel(points));
-        setPoints(prev => [...prev, newPt]);
-        if (parallelSegmentId) {
-          constructParallel(newPt.id, parallelSegmentId);
-          setParallelPointId(null);
-          setParallelSegmentId(null);
+        // Chưa chọn điểm hay đoạn nào
+        if (nearbyPt) {
+          setParallelPointId(nearbyPt.id);
+          showNotice(`Đã chọn điểm [${nearbyPt.label}]. Hãy nhấp chọn một cạnh để kẻ đường song song.`);
+        } else if (clickedSeg) {
+          setParallelSegmentId(clickedSeg.id);
+          const ptMap = new Map<string, GspPoint>(points.map(p => [p.id, p]));
+          const sa = ptMap.get(clickedSeg.p1Id);
+          const sb = ptMap.get(clickedSeg.p2Id);
+          const segName = (sa && sb) ? `${sa.label}${sb.label}` : 'cạnh';
+          showNotice(`Đã chọn cạnh [${segName}]. Hãy nhấp chọn điểm hoặc nhấp lên cạnh khác để kẻ song song.`);
         } else {
+          const newPt = createPoint(x, y, getNextLabel(points));
+          setPoints(prev => [...prev, newPt]);
           setParallelPointId(newPt.id);
           showNotice(`Đã tạo điểm [${newPt.label}]. Hãy nhấp chọn một đoạn thẳng để kẻ song song.`);
         }
@@ -3767,24 +3747,6 @@ export default function GspSketchpad({
 
               <button
                 onClick={() => {
-                  setActiveTool('trig_angle');
-                  setDrawingStartPointId(null);
-                  setTrigAngleStepPoints([]);
-                  showNotice('Đã chọn góc lượng giác. Nhấp 3 điểm: Đỉnh O ➔ Tia đầu Ou ➔ Tia cuối Ov.');
-                }}
-                className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  activeTool === 'trig_angle'
-                    ? 'bg-teal-600 text-white shadow-xs'
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
-                title="Vẽ góc lượng giác định hướng (Toán 11 SGK)"
-              >
-                <RotateCw size={15} />
-                <span>Góc LG</span>
-              </button>
-
-              <button
-                onClick={() => {
                   const next = pointDisplayMode === 'all' ? 'labels_only' : pointDisplayMode === 'labels_only' ? 'hidden' : 'all';
                   setPointDisplayMode(next);
                   showNotice(
@@ -3860,28 +3822,6 @@ export default function GspSketchpad({
               <div className="text-[10px] text-purple-800/80 dark:text-purple-300/80 bg-purple-100/60 dark:bg-purple-900/30 p-2 rounded-lg leading-relaxed">
                 {intersectFirstSegmentId ? '✅ Đã chọn đoạn thứ nhất. Hãy nhấp chọn đoạn thẳng thứ hai.' :
                  'Nhấp lần lượt vào 2 đoạn thẳng. Hệ thống sẽ tính toán và tự động gắn điểm giao nhau kèm tên đỉnh.'}
-              </div>
-            </div>
-          )}
-
-          {/* HƯỚNG DẪN CÔNG CỤ GÓC LƯỢNG GIÁC */}
-          {activeTool === 'trig_angle' && (
-            <div className="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 space-y-2 animate-fade-in text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold text-sky-800 dark:text-sky-200 flex items-center gap-1.5">
-                  <RotateCw size={14} /> Góc lượng giác SGK 11:
-                </span>
-                <button
-                  onClick={() => { setActiveTool('select'); setTrigAngleStepPoints([]); }}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
-                >
-                  ✕ Đóng
-                </button>
-              </div>
-              <div className="text-[10px] text-sky-800/80 dark:text-sky-300/80 bg-sky-100/60 dark:bg-sky-900/30 p-2 rounded-lg leading-relaxed">
-                {trigAngleStepPoints.length === 0 ? 'Bước 1: Nhấp chọn ĐỈNH góc (O).' :
-                 trigAngleStepPoints.length === 1 ? 'Bước 2: Nhấp chọn điểm trên TIA ĐẦU (Ou).' :
-                 'Bước 3: Nhấp chọn điểm trên TIA CUỐI (Ov).'}
               </div>
             </div>
           )}

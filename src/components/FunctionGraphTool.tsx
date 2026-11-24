@@ -34,14 +34,12 @@ import NumberLineTool from './NumberLineTool';
 import { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
-  apiKey?: string;
-  model?: string;
   onNavigateToBBT?: () => void;
   subTab?: 'graph' | 'inequality' | 'number_line';
   onSubTabChange?: (subTab: 'graph' | 'inequality' | 'number_line') => void;
 }
 
-export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT, subTab, onSubTabChange }: Props) {
+export default function FunctionGraphTool({ onNavigateToBBT, subTab, onSubTabChange }: Props) {
   const [activeSubTab, setActiveSubTab] = useState<'graph' | 'inequality' | 'number_line'>(subTab || 'graph');
 
   // Đồng bộ hai chiều với Ribbon Bar khi subTab prop thay đổi

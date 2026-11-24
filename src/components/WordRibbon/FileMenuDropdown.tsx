@@ -75,7 +75,7 @@ export default function FileMenuDropdown({
     { id: 'export_svg', label: 'Xuất vector SVG', icon: Code, shortcut: 'Vector', onClick: onExportSvg },
     { id: 'print', label: 'In nhanh', icon: Printer, shortcut: 'Ctrl + P', onClick: onPrint },
     { divider: true },
-    { id: 'settings', label: 'Cài đặt & Khóa API Gemini', icon: Settings, onClick: onOpenSettings },
+    { id: 'settings', label: 'Cài đặt & Cá nhân hóa', icon: Settings, onClick: onOpenSettings },
   ];
 
   return (

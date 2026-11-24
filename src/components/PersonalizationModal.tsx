@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
 import { 
   Check, 
-  Eye, 
-  EyeOff, 
-  Sparkles, 
-  Zap, 
-  Brain, 
-  ShieldCheck, 
   Settings, 
   User, 
   Palette, 
   Star, 
   X, 
-  Sliders, 
-  Building2, 
-  BookOpen, 
   GraduationCap, 
-  CheckCircle2, 
-  Layers,
   Monitor
 } from 'lucide-react';
 import { 
@@ -33,9 +22,6 @@ import { CustomDropdownSelect, SelectOption } from './CustomDropdown';
 interface PersonalizationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  apiKey: string;
-  preferredModel: string;
-  onSaveApiKey: (key: string, model: string) => void;
   profile: TeacherProfile;
   onSaveProfile: (profile: TeacherProfile) => void;
   accentColor: AccentColor;
@@ -51,9 +37,6 @@ interface PersonalizationModalProps {
 export default function PersonalizationModal({
   isOpen,
   onClose,
-  apiKey,
-  preferredModel,
-  onSaveApiKey,
   profile,
   onSaveProfile,
   accentColor,
@@ -65,12 +48,7 @@ export default function PersonalizationModal({
   startupTab,
   onSelectStartupTab,
 }: PersonalizationModalProps) {
-  const [activeTab, setActiveTab] = useState<'ai' | 'profile' | 'theme' | 'favorites'>('ai');
-
-  // AI settings local state
-  const [keyInput, setKeyInput] = useState(apiKey);
-  const [modelInput, setModelInput] = useState(preferredModel || 'auto');
-  const [showKey, setShowKey] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'theme' | 'favorites'>('profile');
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   // Profile local state
@@ -82,57 +60,10 @@ export default function PersonalizationModal({
 
   const theme = ACCENT_THEMES[accentColor] || ACCENT_THEMES.teal;
 
-  const models = [
-    { 
-      id: 'auto', 
-      name: 'Tự động thông minh (Khuyên dùng trong Hệ sinh thái LVP)', 
-      desc: 'Tự động chọn mô hình tối ưu nhất (Gemini 3 Flash/Pro). Khi Google AI quá tải, tự động chuyển sang Gemini 2.5/2.0 Flash không làm gián đoạn bài giảng.', 
-      badge: 'Khuyên dùng',
-      icon: Sparkles,
-      iconColor: 'text-teal-500'
-    },
-    { 
-      id: 'gemini-3-flash-preview', 
-      name: 'Gemini 3 Flash (Thế hệ 3 Mới nhất - Siêu tốc & Thông minh)', 
-      desc: 'Tốc độ phản hồi tức thì, tối ưu xử lý hình học Oxyz, đồ thị Oxy và phân tích văn bản sư phạm.', 
-      badge: 'Thế hệ 3',
-      icon: Zap,
-      iconColor: 'text-amber-500'
-    },
-    { 
-      id: 'gemini-3-pro-preview', 
-      name: 'Gemini 3 Pro (Trí tuệ Nhân tạo Đỉnh cao - Suy luận chuyên sâu)', 
-      desc: 'Khả năng giải toán chuyên sâu, dựng hình GeoGebra 3D phức tạp và soạn kế hoạch bài dạy 5512 xuất sắc.', 
-      badge: 'Chuyên sâu',
-      icon: Brain,
-      iconColor: 'text-purple-500'
-    },
-    { 
-      id: 'gemini-2.5-flash', 
-      name: 'Gemini 2.5 Flash (Cực kỳ Ổn định 24/7)', 
-      desc: 'Hoạt động liên tục, hạn ngạch rộng lớn, không bao giờ bị nghẽn mạng khi chuyển đổi file Word hay PDF.', 
-      badge: 'Ổn định',
-      icon: ShieldCheck,
-      iconColor: 'text-emerald-500'
-    },
-    { 
-      id: 'gemini-2.0-flash', 
-      name: 'Gemini 2.0 Flash (Bền bỉ)', 
-      desc: 'Mô hình thế hệ 2 tốc độ cao, phương án dự phòng tin cậy.', 
-      badge: '',
-      icon: ShieldCheck,
-      iconColor: 'text-blue-500'
-    }
-  ];
-
   const handleSaveAll = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // 1. Save AI Key
-    const trimmedKey = keyInput.trim();
-    onSaveApiKey(trimmedKey, modelInput);
-
-    // 2. Save Profile
+    // Lưu thông tin Hồ sơ giáo viên
     onSaveProfile({
       name: nameInput.trim() || 'GV Lê Vĩnh Phúc',
       school: schoolInput.trim() || 'Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long',
@@ -186,19 +117,6 @@ export default function PersonalizationModal({
         <div className="flex border-b border-slate-100 dark:border-slate-800 px-4 sm:px-5 bg-slate-50/50 dark:bg-slate-900/50 overflow-x-auto scrollbar-none gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('ai')}
-            className={`py-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition whitespace-nowrap ${
-              activeTab === 'ai'
-                ? `${theme.primaryBorder} ${theme.primaryText}`
-                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-            }`}
-          >
-            <Sparkles size={14} />
-            <span>Cấu hình AI (Gemini)</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('profile')}
             className={`py-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition whitespace-nowrap ${
               activeTab === 'profile'
@@ -240,93 +158,7 @@ export default function PersonalizationModal({
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           
-          {/* TAB 1: CẤU HÌNH AI */}
-          {activeTab === 'ai' && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Khóa API Gemini (Dùng chung cho toàn bộ Hệ sinh thái LVP)
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={keyInput}
-                    onChange={e => setKeyInput(e.target.value)}
-                    placeholder="Dán API Key AIzaSy... từ Google AI Studio"
-                    className={`w-full pl-3.5 pr-10 py-2.5 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-mono text-xs ${theme.ring} focus:ring-2 outline-none transition`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                  >
-                    {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-0.5">
-                  <span>Khóa được lưu cục bộ trên máy của Thầy/Cô, hoàn toàn bảo mật.</span>
-                  <a
-                    href="https://aistudio.google.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${theme.primaryText} font-semibold hover:underline`}
-                  >
-                    Lấy API Key miễn phí →
-                  </a>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Chọn dòng mô hình AI mặc định
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  {models.map(m => {
-                    const Icon = m.icon;
-                    const isSelected = modelInput === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setModelInput(m.id)}
-                        className={`p-3 text-left border rounded-2xl flex items-start gap-3 transition-all cursor-pointer ${
-                          isSelected
-                            ? `${theme.softBg} ${theme.primaryBorder} ring-1 ${theme.primaryBorder}`
-                            : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 bg-white dark:bg-slate-900'
-                        }`}
-                      >
-                        <div className="mt-0.5 shrink-0">
-                          <Icon size={16} className={m.iconColor} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-xs font-bold ${isSelected ? theme.primaryText : 'text-slate-800 dark:text-slate-100'}`}>
-                              {m.name}
-                            </span>
-                            {m.badge && (
-                              <span className={`text-[9px] px-2 py-0.2 rounded-full font-extrabold uppercase ${
-                                isSelected
-                                  ? `${theme.badgeBg} ${theme.badgeText}`
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                              }`}>
-                                {m.badge}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 leading-relaxed">
-                            {m.desc}
-                          </p>
-                        </div>
-                        {isSelected && <Check size={16} className={`${theme.primaryText} shrink-0 mt-0.5`} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: HỒ SƠ THẦY/CÔ */}
+          {/* TAB 1: HỒ SƠ THẦY/CÔ */}
           {activeTab === 'profile' && (
             <div className="space-y-4">
               <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-2xl flex items-start gap-2.5 text-xs text-blue-800 dark:text-blue-300">

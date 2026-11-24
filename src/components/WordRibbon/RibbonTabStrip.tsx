@@ -30,7 +30,8 @@ export interface RibbonTabStripProps {
 const TABS: { id: RibbonTabId; label: string }[] = [
   { id: 'graph_2d', label: 'Đồ thị 2D' },
   { id: 'bbt', label: 'Bảng biến thiên' },
-  { id: 'plane_trig', label: 'Hình phẳng & Lượng giác' },
+  { id: 'plane_trig', label: 'Hình học phẳng' },
+  { id: 'trig_angle', label: 'Góc lượng giác' },
   { id: 'stats_prob', label: 'Thống kê & Xác suất' },
 ];
 

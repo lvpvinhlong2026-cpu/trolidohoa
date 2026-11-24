@@ -57,11 +57,12 @@ import { copyAutoCroppedImageToClipboard } from './utils/wordAutoCropExport';
 const FunctionGraphTool = lazy(() => import('./components/FunctionGraphTool'));
 const TableVariationTool = lazy(() => import('./components/TableVariationTool'));
 const CombinedGeometryTab = lazy(() => import('./components/CombinedGeometryTab'));
+const TrigAngleTool = lazy(() => import('./components/TrigAngleTool'));
 const StatisticsChartTool = lazy(() => import('./components/StatisticsChartTool'));
 const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 
-export type TabId = 'home' | 'bbt_graph' | 'bbt' | 'geometry' | 'statistics' | 'probability_tree' | 'geogebra' | 'simulation' | 'guide' | 'gsp' | 'quick3d';
+export type TabId = 'home' | 'bbt_graph' | 'bbt' | 'geometry' | 'trig_angle' | 'statistics' | 'probability_tree' | 'geogebra' | 'simulation' | 'guide' | 'gsp' | 'quick3d';
 
 export default function App() {
   // 1. Trạng thái Ribbon Tab (Đồ thị 2D, Bảng biến thiên, Hình phẳng & Lượng giác, Không gian 3D, Thống kê & Xác suất)
@@ -99,13 +100,7 @@ export default function App() {
   const [cursorCoords, setCursorCoords] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState<number>(100);
 
-  // 6. Gemini API & Thông tin giáo viên
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem('gemini_api_key') || localStorage.getItem('edtech_gemini_api_key') || '';
-  });
-  const [preferredModel, setPreferredModel] = useState<string>(() => {
-    return localStorage.getItem('gemini_preferred_model') || 'gemini-2.5-flash';
-  });
+  // 6. Thông tin giáo viên & giao diện
   const [profile, setProfile] = useState<TeacherProfile>(() => {
     try {
       const saved = localStorage.getItem('lvp_teacher_profile');
@@ -129,7 +124,6 @@ export default function App() {
   });
 
   // 8. Modals
-  const [showAiModal, setShowAiModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -328,21 +322,6 @@ export default function App() {
     input.click();
   };
 
-  // Áp dụng kết quả từ Dán đề (AI)
-  const handleApplyAiResult = (category: string, config: any) => {
-    if (category === 'graph_2d') {
-      setActiveTab('graph_2d');
-      if (config.graph2D?.type) setGraphFnType(config.graph2D.type);
-    } else if (category === 'bbt') {
-      setActiveTab('bbt');
-    } else if (category === 'plane_trig') {
-      setActiveTab('plane_trig');
-    } else if (category === 'stats_prob') {
-      setActiveTab('stats_prob');
-    }
-    showToast('AI đã hoàn tất dựng hình tự động từ đề bài!');
-  };
-
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#E8E8E8] text-[#242424]'}`}>
       
@@ -369,18 +348,15 @@ export default function App() {
 
         {/* Bên phải: Các nút dạng Pill bo tròn thanh lịch */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Cài đặt & Khóa API */}
+          {/* Cài đặt */}
           <button
             type="button"
             onClick={() => setShowSettingsModal(true)}
             className="h-[26px] px-2.5 rounded-full text-xs font-medium bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer relative"
-            title="Cài đặt hệ thống & Khóa API Gemini"
+            title="Cài đặt & Cá nhân hóa"
           >
             <Settings size={13} className="text-[#0F6CBD]" />
             <span className="hidden md:inline">Cài đặt</span>
-            {!apiKey.trim() && (
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 absolute -top-0.5 -right-0.5 animate-pulse" />
-            )}
           </button>
 
           {/* Toàn màn hình */}
@@ -436,7 +412,6 @@ export default function App() {
             onCopyWord={handleCopyWord}
             onDownloadPng={handleDownloadPng}
             onDownloadSvg={handleDownloadSvg}
-            onOpenAiModal={() => setShowAiModal(true)}
             onSelectTemplate={(cat, presetKey) => {
               if (cat === 'graph_2d') {
                 setActiveTab('graph_2d');
@@ -447,6 +422,8 @@ export default function App() {
               } else if (cat === 'plane_trig') {
                 setActiveTab('plane_trig');
                 handleRibbonAction({ type: 'gsp_load_sample', sample: presetKey });
+              } else if (cat === 'trig_angle') {
+                setActiveTab('trig_angle');
               } else if (cat === 'stats_prob') {
                 setActiveTab('stats_prob');
                 handleRibbonAction({ type: 'select_stat_chart', chart: presetKey });
@@ -477,8 +454,6 @@ export default function App() {
               {visitedTabs.has('graph_2d') && (
                 <div className={activeTab === 'graph_2d' ? 'block animate-fade-in' : 'hidden'}>
                   <FunctionGraphTool 
-                    apiKey={apiKey} 
-                    model={preferredModel} 
                     onNavigateToBBT={() => setActiveTab('bbt')}
                     subTab={graphSubTab}
                     onSubTabChange={setGraphSubTab}
@@ -493,10 +468,17 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3.4 TAB HÌNH PHẲNG & LƯỢNG GIÁC (GSP SKETCHPAD WEB) */}
+              {/* 3.4 TAB HÌNH HỌC PHẲNG (GSP SKETCHPAD WEB) */}
               {visitedTabs.has('plane_trig') && (
                 <div className={activeTab === 'plane_trig' ? 'block animate-fade-in' : 'hidden'}>
                   <CombinedGeometryTab />
+                </div>
+              )}
+
+              {/* 3.5 TAB GÓC LƯỢNG GIÁC (SGK TOÁN 11 GDPT 2018) */}
+              {visitedTabs.has('trig_angle') && (
+                <div className={activeTab === 'trig_angle' ? 'block animate-fade-in' : 'hidden'}>
+                  <TrigAngleTool />
                 </div>
               )}
 
@@ -554,6 +536,7 @@ export default function App() {
           if (toolId === 'bbt_graph') setActiveTab('graph_2d');
           else if (toolId === 'bbt') setActiveTab('bbt');
           else if (toolId === 'geometry') setActiveTab('plane_trig');
+          else if (toolId === 'trig_angle') setActiveTab('trig_angle');
           else if (toolId === 'statistics') {
             setActiveTab('stats_prob');
             setStatsSubTool('statistics');
@@ -567,23 +550,15 @@ export default function App() {
         accentColor={accentColor}
       />
 
-      {/* Cài đặt & Khóa API */}
+      {/* Cài đặt & Cá nhân hóa */}
       <PersonalizationModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        apiKey={apiKey}
-        preferredModel={preferredModel}
-        onSaveApiKey={(key, model) => {
-          localStorage.setItem('gemini_api_key', key);
-          localStorage.setItem('gemini_preferred_model', model);
-          setApiKey(key);
-          setPreferredModel(model);
-          showToast('Đã lưu cài đặt API Key thành công!');
-        }}
         profile={profile}
         onSaveProfile={(newProf) => {
           localStorage.setItem('lvp_teacher_profile', JSON.stringify(newProf));
           setProfile(newProf);
+          showToast('Đã lưu cấu hình thành công!');
         }}
         accentColor={accentColor}
         onSelectAccentColor={(c) => {

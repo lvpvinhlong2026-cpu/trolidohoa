@@ -11,7 +11,8 @@ import {
   Compass, 
   MonitorPlay, 
   HelpCircle,
-  GitFork 
+  GitFork,
+  RotateCw 
 } from 'lucide-react';
 import { TabId } from '../App';
 import { AccentColor, ACCENT_THEMES } from '../types/personalization';
@@ -57,12 +58,21 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
   },
   {
     id: 'geometry',
-    label: 'Hình phẳng & Lượng giác (GSP Sketchpad)',
+    label: 'Hình học phẳng (GSP Sketchpad)',
     category: 'Đồ Họa Toán Học (300 DPI)',
-    sub: 'GSP Sketchpad + Kho mẫu hình học & Góc lượng giác SGK',
+    sub: 'Dựng hình GSP, đoạn song song, giao điểm, tam giác, hình bình hành, nón, trụ',
     badge: 'GSP 5',
-    keywords: ['hình học', 'gsp', 'sketchpad', 'tam giác', 'đường tròn', 'góc lượng giác', 'toán 11'],
+    keywords: ['hình học', 'gsp', 'sketchpad', 'tam giác', 'song song', 'giao điểm', 'đường tròn'],
     icon: Compass,
+  },
+  {
+    id: 'trig_angle',
+    label: 'Góc lượng giác & Đường tròn Oxy (SGK 11)',
+    category: 'Đồ Họa Toán Học (300 DPI)',
+    sub: 'Góc dương, góc âm, xoắn ốc nhiều vòng Archimedes, hình chiếu sin/cos, trục tang/cotang',
+    badge: 'Toán 11',
+    keywords: ['góc lượng giác', 'đường tròn lượng giác', 'lượng giác', 'toán 11', 'sin', 'cos', 'tan', 'cot', 'cung', 'xoắn ốc', 'archimedes', 'radian', 'độ'],
+    icon: RotateCw,
   },
   {
     id: 'probability_tree',
