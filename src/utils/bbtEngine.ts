@@ -1075,8 +1075,14 @@ export function drawMathText(
 }
 
 export function getTextHalfWidth(ctx: CanvasRenderingContext2D, val?: string, fontFam = '"Times New Roman", "STIX Two Text", "Cambria Math", serif'): number {
-  if (!val) return 20;
-  const trimmed = val.trim();
+  if (!val) return 16;
+  let trimmed = val.trim();
+  trimmed = trimmed
+    .replace(/\\infty/g, '∞')
+    .replace(/-\s*\\infty/g, '−∞')
+    .replace(/\+\s*\\infty/g, '+∞')
+    .replace(/^-/g, '−')
+    .replace(/-/g, '−');
   const fracMatch = trimmed.match(/^([-+−\u2212]?)\s*([^/]+)\/([^/]+)$/);
   if (fracMatch) {
     const isNeg = fracMatch[1] === '-' || fracMatch[1] === '−' || fracMatch[1] === '\u2212';
@@ -1087,13 +1093,13 @@ export function getTextHalfWidth(ctx: CanvasRenderingContext2D, val?: string, fo
     const barWidth = Math.max(ctx.measureText(num).width, ctx.measureText(den).width) + 8;
     ctx.restore();
     const totalW = (isNeg ? 18 : 0) + barWidth;
-    return Math.max(20, Math.round(totalW / 2 + 7));
+    return Math.max(18, Math.round(totalW / 2));
   }
   ctx.save();
   ctx.font = `bold 22px ${fontFam}`;
   const w = ctx.measureText(trimmed).width;
   ctx.restore();
-  return Math.max(18, Math.round(w / 2 + 6));
+  return Math.max(14, Math.round(w / 2));
 }
 
 /**
@@ -1186,18 +1192,35 @@ export function renderBBTToCanvas(
 
   const contentWidth = tableW - headerColWidth;
   
-  // Tính tọa độ x cho từng điểm mốc (Cân xứng hoàn hảo chuẩn SGK)
+  // Tính tọa độ x cho từng điểm mốc (Cân xứng hoàn hảo chuẩn SGK Việt Nam)
   const xPositions: number[] = [];
   if (numPoints <= 1) {
     xPositions.push(colDividerX + contentWidth / 2);
+  } else if (numPoints === 2) {
+    const edgePad = 48;
+    xPositions.push(colDividerX + edgePad, tableX + tableW - edgePad);
   } else {
     const edgePad = Math.max(38, Math.min(50, 180 / numPoints));
     const firstX = colDividerX + edgePad;
     const lastX = tableX + tableW - edgePad;
-    const stepX = (lastX - firstX) / (numPoints - 1);
+    const totalAvail = lastX - firstX;
 
-    for (let i = 0; i < numPoints; i++) {
-      xPositions.push(firstX + i * stepX);
+    const intervalWeights: number[] = [];
+    for (let i = 0; i < numPoints - 1; i++) {
+      const p1 = data.points[i];
+      const p2 = data.points[i + 1];
+      const hasDb = p1.isDoubleBar || p1.yPrimeSymbol === '||' || p2.isDoubleBar || p2.yPrimeSymbol === '||';
+      intervalWeights.push(hasDb ? 1.25 : 1.0);
+    }
+
+    const totalWeight = intervalWeights.reduce((s, w) => s + w, 0);
+    const stepUnit = totalAvail / totalWeight;
+
+    xPositions.push(firstX);
+    let currX = firstX;
+    for (let i = 0; i < intervalWeights.length; i++) {
+      currX += intervalWeights[i] * stepUnit;
+      xPositions.push(currX);
     }
   }
 
@@ -1298,7 +1321,7 @@ export function renderBBTToCanvas(
     });
   }
 
-  // Vẽ các mũi tên nối các điểm (nét dày 2.0px, đầu mũi tên to rõ)
+  // Vẽ các mũi tên nối các điểm (nét dày 2.0px, đầu mũi tên to rõ, cân xứng chuẩn SGK)
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2.0;
 
@@ -1306,55 +1329,36 @@ export function renderBBTToCanvas(
     const p1 = yRenderList[i];
     const p2 = yRenderList[i + 1];
 
+    let startX: number;
+    let startY: number;
+    let endX: number;
+    let endY: number;
+
     if (p1.isDoubleBar) {
-      const aX1 = p1.x + 32;
-      const aY1 = p1.rightLimit === '+∞' ? yTopY : p1.rightLimit === '-∞' ? yBottomY : yMidY;
-      const hw2 = getTextHalfWidth(ctx, p2.val, fontFamily);
-      const R2 = hw2 + 8;
-      const aX2 = p2.x;
-      const aY2 = p2.y;
-      const dx = aX2 - aX1;
-      const dy = aY2 - aY1;
-      if (dx > R2 + 10) {
-        const m = dy / dx;
-        const startX = aX1;
-        const startY = aY1;
-        const endX = aX2 - R2;
-        const endY = aY2 - m * R2;
-        drawArrow(ctx, startX, startY, endX, endY);
-      }
-    } else if (p2.isDoubleBar) {
-      const hw1 = getTextHalfWidth(ctx, p1.val, fontFamily);
-      const R1 = hw1 + 8;
-      const aX1 = p1.x;
-      const aY1 = p1.y;
-      const aX2 = p2.x - 32;
-      const aY2 = p2.leftLimit === '+∞' ? yTopY : p2.leftLimit === '-∞' ? yBottomY : yMidY;
-      const dx = aX2 - aX1;
-      const dy = aY2 - aY1;
-      if (dx > R1 + 10) {
-        const m = dy / dx;
-        const startX = aX1 + R1;
-        const startY = aY1 + m * R1;
-        const endX = aX2;
-        const endY = aY2;
-        drawArrow(ctx, startX, startY, endX, endY);
-      }
+      const rLim = p1.rightLimit || '+∞';
+      const hw = getTextHalfWidth(ctx, rLim, fontFamily);
+      startX = p1.x + 11 + hw * 2 + 8;
+      startY = rLim.includes('+') ? yTopY : rLim.includes('-') ? yBottomY : yMidY;
     } else {
       const hw1 = getTextHalfWidth(ctx, p1.val, fontFamily);
+      startX = p1.x + hw1 + 8;
+      startY = p1.y;
+    }
+
+    if (p2.isDoubleBar) {
+      const lLim = p2.leftLimit || '-∞';
+      const hw = getTextHalfWidth(ctx, lLim, fontFamily);
+      endX = p2.x - 11 - hw * 2 - 8;
+      endY = lLim.includes('-') ? yBottomY : lLim.includes('+') ? yTopY : yMidY;
+    } else {
       const hw2 = getTextHalfWidth(ctx, p2.val, fontFamily);
-      const R1 = hw1 + 8;
-      const R2 = hw2 + 8;
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      if (dx > R1 + R2 + 10) {
-        const m = dy / dx;
-        const startX = p1.x + R1;
-        const startY = p1.y + m * R1;
-        const endX = p2.x - R2;
-        const endY = p2.y - m * R2;
-        drawArrow(ctx, startX, startY, endX, endY);
-      }
+      endX = p2.x - hw2 - 8;
+      endY = p2.y;
+    }
+
+    const dx = endX - startX;
+    if (dx > 12) {
+      drawArrow(ctx, startX, startY, endX, endY);
     }
   }
 
@@ -1363,25 +1367,27 @@ export function renderBBTToCanvas(
     const pt = yRenderList[i];
     if (pt.isDoubleBar) {
       if (pt.leftLimit) {
-        const leftY = pt.leftLimit === '+∞' ? yTopY : yBottomY;
+        const leftY = pt.leftLimit.includes('+') ? yTopY : yBottomY;
         const limFontSz = Math.round(25 * fontScale);
-        drawMathText(ctx, pt.leftLimit, pt.x - 10, leftY, {
+        drawMathText(ctx, pt.leftLimit, pt.x - 11, leftY, {
           fontSize: limFontSz,
           isItalic: true,
           isBold,
           align: 'right',
-          fontFamily
+          fontFamily,
+          useRectHalo: true
         });
       }
       if (pt.rightLimit) {
-        const rightY = pt.rightLimit === '+∞' ? yTopY : yBottomY;
+        const rightY = pt.rightLimit.includes('+') ? yTopY : yBottomY;
         const limFontSz = Math.round(25 * fontScale);
-        drawMathText(ctx, pt.rightLimit, pt.x + 10, rightY, {
+        drawMathText(ctx, pt.rightLimit, pt.x + 11, rightY, {
           fontSize: limFontSz,
           isItalic: true,
           isBold,
           align: 'left',
-          fontFamily
+          fontFamily,
+          useRectHalo: true
         });
       }
     } else if (pt.val) {
@@ -1402,7 +1408,7 @@ export function renderBBTToCanvas(
 }
 
 function drawArrow(ctx: CanvasRenderingContext2D, fromX: number, fromY: number, toX: number, toY: number): void {
-  const headLength = 12;
+  const headLength = 11;
   const angle = Math.atan2(toY - fromY, toX - fromX);
 
   ctx.beginPath();

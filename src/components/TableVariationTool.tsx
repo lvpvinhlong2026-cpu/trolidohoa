@@ -29,7 +29,7 @@ import {
   formatNum,
   IntervalMinMaxInfo
 } from '../utils/bbtEngine';
-import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
+import { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export type BBTType = 'variation' | 'sign_chart';
 export type MasterBBTMode = 'auto' | 'variation' | 'sign_chart';
@@ -195,12 +195,37 @@ function drawBBTToCanvas(
     ctx.fillText('y', labelX, yRow3 + hRowY / 2);
   }
 
-  // 6. Tính tọa độ x cho từng điểm
-  const colStep = dataAreaW / Math.max(1, numPts - 1);
+  // 6. Tính tọa độ x cho từng điểm (Áp dụng trọng số khoảng có tiệm cận đứng chuẩn SGK)
+  const edgePad = Math.max(30, Math.min(45, 160 / numPts));
+  const firstColX = dataAreaX + edgePad;
+  const lastColX = dataAreaX + dataAreaW - edgePad;
+  const totalColAvail = lastColX - firstColX;
+
+  const colPositions: number[] = [];
+  if (numPts <= 1) {
+    colPositions.push(dataAreaX + dataAreaW / 2);
+  } else if (numPts === 2) {
+    colPositions.push(firstColX, lastColX);
+  } else {
+    const weights: number[] = [];
+    for (let i = 0; i < numPts - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const hasDb = p1.derivType === 'double_bar' || p2.derivType === 'double_bar';
+      weights.push(hasDb ? 1.25 : 1.0);
+    }
+    const totalW = weights.reduce((s, w) => s + w, 0);
+    const stepUnit = totalColAvail / totalW;
+    colPositions.push(firstColX);
+    let curr = firstColX;
+    for (let i = 0; i < weights.length; i++) {
+      curr += weights[i] * stepUnit;
+      colPositions.push(curr);
+    }
+  }
+
   const getColX = (index: number) => {
-    if (index === 0) return dataAreaX + 35;
-    if (index === numPts - 1) return dataAreaX + dataAreaW - 35;
-    return dataAreaX + index * colStep;
+    return colPositions[index] ?? (firstColX + index * (totalColAvail / Math.max(1, numPts - 1)));
   };
 
   const xFontSz = Math.round(16 * fontMultiplier);
@@ -283,7 +308,7 @@ function drawBBTToCanvas(
       return Math.max(12, Math.round(m / 2));
     };
 
-    // Vẽ mũi tên biến thiên
+    // Vẽ mũi tên biến thiên (cân xứng, không đè nhãn chuẩn SGK)
     ctx.lineWidth = 2.2 * strokeMultiplier;
     ctx.strokeStyle = strokeColor;
     ctx.fillStyle = strokeColor;
@@ -298,37 +323,45 @@ function drawBBTToCanvas(
       const isDb1 = p1.derivType === 'double_bar';
       const isDb2 = p2.derivType === 'double_bar';
 
-      const aX1 = isDb1 ? x1 + 28 : x1;
-      const aY1 = getYCoord(isDb1 ? (p1.yRightPos || 'top') : p1.yPos);
-      const val1 = isDb1 ? p1.yRightVal : p1.yVal;
+      let startX: number;
+      let startY: number;
+      let endX: number;
+      let endY: number;
 
-      const aX2 = isDb2 ? x2 - 28 : x2;
-      const aY2 = getYCoord(p2.yPos);
-      const val2 = p2.yVal;
+      if (isDb1) {
+        const val1 = p1.yRightVal || '+\\infty';
+        const w1 = getValHalfW(val1);
+        startX = x1 + 11 + w1 * 2 + 8;
+        startY = getYCoord(p1.yRightPos || (val1.includes('+') ? 'top' : 'bottom'));
+      } else {
+        const val1 = p1.yVal;
+        const w1 = getValHalfW(val1);
+        startX = x1 + w1 + 8;
+        startY = getYCoord(p1.yPos);
+      }
 
-      const w1 = getValHalfW(val1);
-      const w2 = getValHalfW(val2);
-      const R1 = w1 + 8;
-      const R2 = w2 + 8;
+      if (isDb2) {
+        const val2 = p2.yVal || '-\\infty';
+        const w2 = getValHalfW(val2);
+        endX = x2 - 11 - w2 * 2 - 8;
+        endY = getYCoord(p2.yPos || (val2.includes('-') ? 'bottom' : 'top'));
+      } else {
+        const val2 = p2.yVal;
+        const w2 = getValHalfW(val2);
+        endX = x2 - w2 - 8;
+        endY = getYCoord(p2.yPos);
+      }
 
-      const dx = aX2 - aX1;
-      const dy = aY2 - aY1;
-
-      if (dx > R1 + R2 + 10) {
-        const m = dy / dx;
-        const startX = aX1 + R1;
-        const startY = aY1 + m * R1;
-        const endX = aX2 - R2;
-        const endY = aY2 - m * R2;
-
+      const dx = endX - startX;
+      if (dx > 12) {
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
 
         const angle = Math.atan2(endY - startY, endX - startX);
-        const arrowLength = 10 * strokeMultiplier;
-        const arrowWidth = Math.PI / 6;
+        const arrowLength = 11 * strokeMultiplier;
+        const arrowWidth = Math.PI / 7;
 
         ctx.beginPath();
         ctx.moveTo(endX, endY);
@@ -357,7 +390,7 @@ function drawBBTToCanvas(
         if (!text) return;
         const textStr = formatDisplayMath(text);
         const metrics = ctx.measureText(textStr);
-        const bgW = metrics.width + 4;
+        const bgW = metrics.width + 6;
         const bgH = yFontSz + 4;
 
         ctx.fillStyle = '#FFFFFF';
@@ -370,8 +403,10 @@ function drawBBTToCanvas(
       if (pt.derivType !== 'double_bar') {
         renderValWithHalo(pt.yVal, px, getYCoord(pt.yPos));
       } else {
-        renderValWithHalo(pt.yVal, px - 28, getYCoord(pt.yPos));
-        renderValWithHalo(pt.yRightVal || '', px + 28, getYCoord(pt.yRightPos || 'top'));
+        const wLeft = getValHalfW(pt.yVal);
+        const wRight = getValHalfW(pt.yRightVal);
+        renderValWithHalo(pt.yVal, px - 11 - wLeft, getYCoord(pt.yPos));
+        renderValWithHalo(pt.yRightVal || '', px + 11 + wRight, getYCoord(pt.yRightPos || 'top'));
       }
     }
   }
@@ -1394,11 +1429,36 @@ export default function TableVariationTool() {
                 const yBottom = yRow3 + hRowY;
                 const svgH = yBottom + 25;
 
-                const colStep = dataAreaW / Math.max(1, numPts - 1);
+                const edgePad = Math.max(30, Math.min(45, 160 / numPts));
+                const firstColX = dataAreaX + edgePad;
+                const lastColX = dataAreaX + dataAreaW - edgePad;
+                const totalColAvail = lastColX - firstColX;
+
+                const colPositions: number[] = [];
+                if (numPts <= 1) {
+                  colPositions.push(dataAreaX + dataAreaW / 2);
+                } else if (numPts === 2) {
+                  colPositions.push(firstColX, lastColX);
+                } else {
+                  const weights: number[] = [];
+                  for (let i = 0; i < numPts - 1; i++) {
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    const hasDb = p1.derivType === 'double_bar' || p2.derivType === 'double_bar';
+                    weights.push(hasDb ? 1.25 : 1.0);
+                  }
+                  const totalW = weights.reduce((s, w) => s + w, 0);
+                  const stepUnit = totalColAvail / totalW;
+                  colPositions.push(firstColX);
+                  let curr = firstColX;
+                  for (let i = 0; i < weights.length; i++) {
+                    curr += weights[i] * stepUnit;
+                    colPositions.push(curr);
+                  }
+                }
+
                 const getColX = (index: number) => {
-                  if (index === 0) return dataAreaX + 35;
-                  if (index === numPts - 1) return dataAreaX + dataAreaW - 35;
-                  return dataAreaX + index * colStep;
+                  return colPositions[index] ?? (firstColX + index * (totalColAvail / Math.max(1, numPts - 1)));
                 };
 
                 const padY = 22;
@@ -1611,41 +1671,49 @@ export default function TableVariationTool() {
                             const isDb1 = p1.derivType === 'double_bar';
                             const isDb2 = p2.derivType === 'double_bar';
 
-                            const aX1 = isDb1 ? x1 + 28 : x1;
-                            const aY1 = getYCoord(isDb1 ? (p1.yRightPos || 'top') : p1.yPos);
-                            const val1 = isDb1 ? p1.yRightVal : p1.yVal;
-
-                            const aX2 = isDb2 ? x2 - 28 : x2;
-                            const aY2 = getYCoord(p2.yPos);
-                            const val2 = p2.yVal;
-
                             const getSvgValHalfW = (text?: string) => {
                               if (!text) return 10;
                               const str = formatDisplayMath(text).trim();
-                              if (str.includes('∞')) return Math.round(22 * (fontMultiplier > 1.2 ? 1.15 : 1));
-                              if (str.includes('/')) return Math.round(20 * (fontMultiplier > 1.2 ? 1.15 : 1));
-                              return Math.max(12, Math.round((str.length * 7 + 8) * (fontMultiplier > 1.2 ? 1.1 : 1)));
+                              if (str.includes('∞')) return Math.round(18 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              if (str.includes('/')) return Math.round(18 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              return Math.max(10, Math.round((str.length * 6 + 6) * (fontMultiplier > 1.2 ? 1.1 : 1)));
                             };
 
-                            const w1 = getSvgValHalfW(val1);
-                            const w2 = getSvgValHalfW(val2);
-                            const R1 = w1 + 8;
-                            const R2 = w2 + 8;
+                            let startX: number;
+                            let startY: number;
+                            let endX: number;
+                            let endY: number;
 
-                            const dx = aX2 - aX1;
-                            const dy = aY2 - aY1;
+                            if (isDb1) {
+                              const val1 = p1.yRightVal || '+\\infty';
+                              const w1 = getSvgValHalfW(val1);
+                              startX = x1 + 11 + w1 * 2 + 8;
+                              startY = getYCoord(p1.yRightPos || (val1.includes('+') ? 'top' : 'bottom'));
+                            } else {
+                              const val1 = p1.yVal;
+                              const w1 = getSvgValHalfW(val1);
+                              startX = x1 + w1 + 8;
+                              startY = getYCoord(p1.yPos);
+                            }
 
-                            if (dx <= R1 + R2 + 10) return null;
+                            if (isDb2) {
+                              const val2 = p2.yVal || '-\\infty';
+                              const w2 = getSvgValHalfW(val2);
+                              endX = x2 - 11 - w2 * 2 - 8;
+                              endY = getYCoord(p2.yPos || (val2.includes('-') ? 'bottom' : 'top'));
+                            } else {
+                              const val2 = p2.yVal;
+                              const w2 = getSvgValHalfW(val2);
+                              endX = x2 - w2 - 8;
+                              endY = getYCoord(p2.yPos);
+                            }
 
-                            const m = dy / dx;
-                            const startX = aX1 + R1;
-                            const startY = aY1 + m * R1;
-                            const endX = aX2 - R2;
-                            const endY = aY2 - m * R2;
+                            const dx = endX - startX;
+                            if (dx <= 12) return null;
 
                             const angle = Math.atan2(endY - startY, endX - startX);
-                            const arrowLength = 10 * (strokeChoice === 'thin' ? 0.8 : strokeChoice === 'bold' ? 1.3 : 1.0);
-                            const arrowWidth = Math.PI / 6;
+                            const arrowLength = 11 * (strokeChoice === 'thin' ? 0.8 : strokeChoice === 'bold' ? 1.3 : 1.0);
+                            const arrowWidth = Math.PI / 7;
 
                             const pArrow1X = endX - arrowLength * Math.cos(angle - arrowWidth);
                             const pArrow1Y = endY - arrowLength * Math.sin(angle - arrowWidth);
@@ -1677,6 +1745,14 @@ export default function TableVariationTool() {
                             const px = getColX(i);
                             const yFontSz = Math.round(16 * fontMultiplier);
 
+                            const getSvgValHalfW = (text?: string) => {
+                              if (!text) return 10;
+                              const str = formatDisplayMath(text).trim();
+                              if (str.includes('∞')) return Math.round(18 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              if (str.includes('/')) return Math.round(18 * (fontMultiplier > 1.2 ? 1.15 : 1));
+                              return Math.max(10, Math.round((str.length * 6 + 6) * (fontMultiplier > 1.2 ? 1.1 : 1)));
+                            };
+
                             if (pt.derivType !== 'double_bar') {
                               return (
                                 <g key={`yval-${pt.id}`}>
@@ -1698,10 +1774,12 @@ export default function TableVariationTool() {
                                 </g>
                               );
                             } else {
+                              const wLeft = getSvgValHalfW(pt.yVal);
+                              const wRight = getSvgValHalfW(pt.yRightVal);
                               return (
                                 <g key={`yval-db-${pt.id}`}>
                                   <text
-                                    x={px - 28}
+                                    x={px - 11 - wLeft}
                                     y={getYCoord(pt.yPos)}
                                     dominantBaseline="central"
                                     textAnchor="middle"
@@ -1716,7 +1794,7 @@ export default function TableVariationTool() {
                                     {formatDisplayMath(pt.yVal)}
                                   </text>
                                   <text
-                                    x={px + 28}
+                                    x={px + 11 + wRight}
                                     y={getYCoord(pt.yRightPos || 'top')}
                                     dominantBaseline="central"
                                     textAnchor="middle"

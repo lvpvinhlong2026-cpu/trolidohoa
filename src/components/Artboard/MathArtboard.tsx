@@ -537,7 +537,6 @@ export default function MathArtboard({
           {doc.category === 'graph_2d' && renderGraph2D()}
           {doc.category === 'bbt' && renderBBT()}
           {doc.category === 'plane_trig' && renderPlaneTrig()}
-          {doc.category === 'space_3d' && renderSpace3D()}
           {doc.category === 'stats_prob' && renderStatsProb()}
         </svg>
 

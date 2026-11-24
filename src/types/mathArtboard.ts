@@ -9,7 +9,6 @@ export type RibbonTabId =
   | 'graph_2d'
   | 'bbt'
   | 'plane_trig'
-  | 'space_3d'
   | 'stats_prob'
   | 'format'; // Contextual Tab
 
@@ -20,7 +19,6 @@ export type GraphicCategory =
   | 'number_line'
   | 'trig_circle'
   | 'plane_geo'
-  | 'space_3d'
   | 'stats_prob'
   | 'venn'
   | 'tree_prob'

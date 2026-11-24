@@ -59,9 +59,6 @@ export default function InspectorPanel({
       if (doc.planeTrig.type === 'number_line') return 'x \\in [2; 6)';
       return '\\cos^2\\alpha + \\sin^2\\alpha = 1';
     }
-    if (doc.category === 'space_3d') {
-      return 'S.ABCD, \\; SA \\perp (ABCD)';
-    }
     if (doc.category === 'stats_prob') {
       return '\\Delta_Q = Q_3 - Q_1';
     }
@@ -267,27 +264,6 @@ export default function InspectorPanel({
                 <option value="triangle">Tam giác vuông & Ký hiệu góc vuông</option>
               </select>
             </div>
-          </div>
-        )}
-
-        {/* Cấu hình Không gian 3D */}
-        {doc.category === 'space_3d' && (
-          <div className="space-y-3">
-            <div className="text-xs font-bold text-[#242424] dark:text-slate-200 border-b border-[#E1DFDD] pb-1">
-              Khối 3D & Nét đứt tự động
-            </div>
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <input
-                type="checkbox"
-                checked={doc.space3D.autoHiddenLines}
-                onChange={(e) => onUpdateDoc(prev => ({
-                  ...prev,
-                  space3D: { ...prev.space3D, autoHiddenLines: e.target.checked }
-                }))}
-                className="rounded accent-[#0F6CBD]"
-              />
-              <span>Tự động phân biệt Nét liền / Nét đứt</span>
-            </label>
           </div>
         )}
 

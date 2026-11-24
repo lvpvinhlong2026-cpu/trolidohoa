@@ -16,7 +16,7 @@ import {
   InequalityLabelHitbox
 } from '../utils/inequalityEngine';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
-import MathFontSelector, { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
+import { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
   fontScale?: number;
@@ -361,6 +361,12 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
         handleCopy();
       } else if (ce.detail.type === 'download_png') {
         handleDownload();
+      } else if (ce.detail.type === 'set_font' && ce.detail.font) {
+        setGraphFont(ce.detail.font);
+      } else if (ce.detail.type === 'set_stroke' && ce.detail.stroke) {
+        setConfig(prev => ({ ...prev, curveWidth: ce.detail.stroke }));
+      } else if (ce.detail.type === 'toggle_bold') {
+        setConfig(prev => ({ ...prev, isBoldLabels: !prev.isBoldLabels }));
       }
     };
     const onIneqCopy = () => handleCopy();
@@ -716,72 +722,9 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
         {/* CỘT PHẢI: KHUNG VẼ CANVAS TRỰC TIẾP (7 CỘT) */}
         {/* ========================================================= */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs flex flex-col items-center justify-center min-h-[460px]">
-          {/* CỤM ĐIỀU KHIỂN CÔNG CỤ: PHÔNG, NÉT, CỠ CHỮ, THU PHÓNG, BƯỚC CHIA, LƯỚI */}
-          <div className="w-full flex flex-col gap-2 pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
-            {/* Cụm Phông chữ, Nét vẽ, Độ đậm chữ & Cỡ chữ (Layout 2 dòng chuẩn mẫu) */}
-            <MathFontSelector
-              font={graphFont}
-              onFontChange={val => {
-                setGraphFont(val);
-                if (val === 'latex') {
-                  setConfig(prev => ({
-                    ...prev,
-                    isBoldLabels: false,
-                    curveWidth: 2.0,
-                    axisWidth: 1.4
-                  }));
-                } else {
-                  setConfig(prev => ({
-                    ...prev,
-                    isBoldLabels: true,
-                    curveWidth: 2.4,
-                    axisWidth: 1.8
-                  }));
-                }
-              }}
-              stroke={(config.curveWidth ?? 2.4) <= 1.8 ? 'thin' : (config.curveWidth ?? 2.4) >= 3.2 ? 'bold' : 'standard'}
-              onStrokeChange={s => {
-                const w = s === 'thin' ? 1.6 : s === 'bold' ? 3.6 : 2.4;
-                setConfig(prev => ({ ...prev, curveWidth: w }));
-              }}
-              isBold={config.isBoldLabels !== false}
-              onBoldChange={b => setConfig(prev => ({ ...prev, isBoldLabels: b }))}
-              size="sm"
-              extraRow1Right={
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Cỡ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
-                  </span>
-                  <input
-                    type="range"
-                    min="0.75"
-                    max="1.6"
-                    step="0.05"
-                    value={fontScale}
-                    onChange={e => setFontScale(parseFloat(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
-                  />
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              }
-            />
-
-            {/* Dòng 2: Thu phóng Oxy & Lưới tọa độ */}
+          {/* CỤM ĐIỀU KHIỂN CÔNG CỤ: THU PHÓNG, CỠ CHỮ, BƯỚC CHIA, LƯỚI */}
+          <div className="w-full flex flex-col gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+            {/* Thanh điều khiển: Thu phóng Oxy, Cỡ chữ & Lưới tọa độ */}
             <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
               {/* Thu phóng phạm vi Oxy */}
               <div className="flex items-center gap-2">
@@ -812,6 +755,38 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
                     onClick={() => handleZoomStep(-1)}
                     className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 cursor-pointer"
                     title="Thu hẹp trục Oxy (+)"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Cỡ chữ nhãn */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] font-bold text-slate-500">
+                  Cỡ chữ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
+                </span>
+                <input
+                  type="range"
+                  min="0.75"
+                  max="1.6"
+                  step="0.05"
+                  value={fontScale}
+                  onChange={e => setFontScale(parseFloat(e.target.value))}
+                  className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                />
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
+                    className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
+                    className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
                   >
                     +
                   </button>
@@ -929,11 +904,6 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
               className={`max-w-full h-auto rounded-lg shadow-xs bg-white border border-slate-200 select-none touch-none ${getCanvasCursor()}`}
               title="Click & kéo trực tiếp chữ O, chữ x, y, số giao điểm trên trục hoặc tên đường thẳng để sắp xếp thoáng đẹp!"
             />
-          </div>
-
-          <div className="w-full mt-3 p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
-            <div>💡 <strong>Tương tác kéo thả:</strong> Thầy/cô có thể <strong>click & kéo chuột trực tiếp</strong> tên đường thẳng ($2x + y = 300$), các điểm số tọa độ giao điểm trên $Ox, Oy$, chữ $O$, chữ $x, y$ hoặc điểm kiểm tra $M$ để bố trí chữ thoáng đẹp, không bị đè lên nét vẽ. Bấm <em>"Đặt lại vị trí nhãn"</em> để trở về vị trí tự động ban đầu.</div>
-            <div>💡 <strong>Quy ước SGK:</strong> Đường thẳng biên là <strong>nét liền</strong> nếu có dấu bằng (≤, ≥) và <strong>nét đứt</strong> nếu là bất đẳng thức ngặt (&lt;, &gt;). Nửa mặt phẳng <strong>gạch sọc</strong> là phần bị loại bỏ. Phần không bị gạch (tô màu xanh nhạt) là <strong>miền nghiệm</strong> của hệ bất phương trình.</div>
           </div>
         </div>
       </div>

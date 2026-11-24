@@ -18,7 +18,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
-import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
+import { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface GroupedInterval {
   id: string;
@@ -405,6 +405,12 @@ export default function StatisticsChartTool() {
         handleCopyImage();
       } else if (type === 'download_png') {
         handleDownloadPng();
+      } else if (type === 'set_font' && ce.detail.font) {
+        setFontChoice(ce.detail.font);
+      } else if (type === 'set_stroke' && ce.detail.stroke) {
+        setStrokeChoice(ce.detail.stroke === 2.5 ? 'bold' : 'standard');
+      } else if (type === 'toggle_bold') {
+        setIsBold(prev => !prev);
       } else if (type === 'select_stat_chart') {
         const c = ce.detail.chart;
         if (c === 'box') {
@@ -573,18 +579,6 @@ export default function StatisticsChartTool() {
                 />
                 <span>Đánh dấu giá trị bất thường (Outliers)</span>
               </label>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <MathFontSelector
-                  font={fontChoice}
-                  onFontChange={setFontChoice}
-                  stroke={strokeChoice}
-                  onStrokeChange={setStrokeChoice}
-                  isBold={isBold}
-                  onBoldChange={setIsBold}
-                  size="sm"
-                />
-              </div>
             </div>
           </div>
 

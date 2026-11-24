@@ -141,6 +141,22 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
         handleCopy();
       } else if (ce.detail.type === 'download_png') {
         handleDownload();
+      } else if (ce.detail.type === 'nl_preset') {
+        if (ce.detail.mode === 'single') {
+          setMode('single');
+          if (ce.detail.input) {
+            setCustomInput(ce.detail.input);
+            const parsed = parseIntervalString(ce.detail.input);
+            if (parsed) setInterval(parsed);
+          }
+        } else if (ce.detail.mode === 'operation') {
+          setMode('operation');
+          if (ce.detail.opType) {
+            setOpType(ce.detail.opType);
+          }
+        }
+      } else if (ce.detail.type === 'nl_toggle_mode') {
+        setMode(prev => prev === 'single' ? 'operation' : 'single');
       }
     };
     const onNlCopy = () => handleCopy();
@@ -174,35 +190,84 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
         </div>
       )}
 
-      {/* CHUYỂN ĐỔI CHẾ ĐỘ VẼ TRỤC SỐ */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setMode('single')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              mode === 'single'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
-          >
-            📏 Trục số đơn (Tập tùy biến)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('operation')}
-            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-              mode === 'operation'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
-          >
-            🔀 Phép toán tập hợp (Giao, Hợp, Hiệu)
-          </button>
+      {/* CHUYỂN ĐỔI CHẾ ĐỘ VẼ TRỤC SỐ & PHÉP TOÁN TẬP HỢP */}
+      <div className="flex flex-col gap-2.5 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-teal-200 dark:border-slate-800 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setMode('single')}
+              className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                mode === 'single'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+              }`}
+            >
+              <Ruler size={14} />
+              <span>Khoảng, Đoạn & Nửa khoảng</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('operation')}
+              className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                mode === 'operation'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+              }`}
+            >
+              <Layers size={14} />
+              <span>Phép toán tập hợp (Giao, Hợp, Hiệu)</span>
+            </button>
+          </div>
+
+          <div className="text-[11px] text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/60 px-2.5 py-1 rounded-lg border border-teal-200 dark:border-teal-800 font-semibold">
+            Chuẩn SGK Toán 10: Tự động gạch chéo /////// phần loại bỏ
+          </div>
         </div>
 
-        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
-          Chuẩn SGK Toán 10: Gạch chéo /////// phần bị loại bỏ
+        {/* Thanh phím tắt 1-Click chọn nhanh Khoảng / Đoạn / Nửa khoảng / Giao / Hợp / Hiệu */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Mẫu nhanh:</span>
+          {[
+            { label: 'Khoảng (a; b)', mode: 'single', input: '(a; b)' },
+            { label: 'Đoạn [a; b]', mode: 'single', input: '[a; b]' },
+            { label: 'Nửa khoảng [a; b)', mode: 'single', input: '[a; b)' },
+            { label: 'Nửa khoảng (a; b]', mode: 'single', input: '(a; b]' },
+            { label: 'Nửa đ.thẳng [a; +∞)', mode: 'single', input: '[a; +inf)' },
+            { label: 'Nửa đ.thẳng (-∞; b]', mode: 'single', input: '(-inf; b]' },
+          ].map(p => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => {
+                setMode('single');
+                setCustomInput(p.input);
+                handleApplyCustomInput(p.input);
+              }}
+              className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-50 dark:bg-slate-800 hover:bg-teal-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+            >
+              {p.label}
+            </button>
+          ))}
+          <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          {[
+            { label: 'Giao A ∩ B', op: 'intersection' as const },
+            { label: 'Hợp A ∪ B', op: 'union' as const },
+            { label: 'Hiệu A \\ B', op: 'difference' as const },
+            { label: 'Hiệu B \\ A', op: 'difference_ba' as const },
+          ].map(op => (
+            <button
+              key={op.label}
+              type="button"
+              onClick={() => {
+                setMode('operation');
+                setOpType(op.op);
+              }}
+              className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800 transition cursor-pointer"
+            >
+              {op.label}
+            </button>
+          ))}
         </div>
       </div>
 

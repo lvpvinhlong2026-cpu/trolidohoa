@@ -46,7 +46,6 @@ import {
 import RibbonTabStrip from './components/WordRibbon/RibbonTabStrip';
 import RibbonCommandPanel from './components/WordRibbon/RibbonCommandPanel';
 import WordStatusBar from './components/StatusBar/WordStatusBar';
-import AiProblemParserModal from './components/AiModal/AiProblemParserModal';
 import CommandPalette from './components/CommandPalette';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
@@ -58,8 +57,6 @@ import { copyAutoCroppedImageToClipboard } from './utils/wordAutoCropExport';
 const FunctionGraphTool = lazy(() => import('./components/FunctionGraphTool'));
 const TableVariationTool = lazy(() => import('./components/TableVariationTool'));
 const CombinedGeometryTab = lazy(() => import('./components/CombinedGeometryTab'));
-const Geogebra3DTool = lazy(() => import('./components/Geogebra3DTool'));
-const SimulationGenerator = lazy(() => import('./components/SimulationGenerator'));
 const StatisticsChartTool = lazy(() => import('./components/StatisticsChartTool'));
 const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
@@ -74,7 +71,6 @@ export default function App() {
   });
 
   // 2. Trạng thái các tab con bên trong các phân hệ chuyên sâu
-  const [space3dSubTool, setSpace3dSubTool] = useState<'geogebra' | 'viewer3d' | 'simulation'>('geogebra');
   const [statsSubTool, setStatsSubTool] = useState<'statistics' | 'tree'>('statistics');
 
   // 3. Trạng thái tài liệu Artboard Document
@@ -225,6 +221,9 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('lvp_ribbon_action', { detail: action }));
     if (action.type === 'switch_subtab') {
       setGraphSubTab(action.subtab);
+    } else if (action.type === 'switch_to_number_line') {
+      setActiveTab('graph_2d');
+      setGraphSubTab('number_line');
     } else if (action.type === 'switch_bbt_mode') {
       setBbtMasterMode(action.mode);
     } else if (action.type === 'select_fn_type') {
@@ -336,8 +335,6 @@ export default function App() {
       if (config.graph2D?.type) setGraphFnType(config.graph2D.type);
     } else if (category === 'bbt') {
       setActiveTab('bbt');
-    } else if (category === 'space_3d') {
-      setActiveTab('space_3d');
     } else if (category === 'plane_trig') {
       setActiveTab('plane_trig');
     } else if (category === 'stats_prob') {
@@ -450,9 +447,6 @@ export default function App() {
               } else if (cat === 'plane_trig') {
                 setActiveTab('plane_trig');
                 handleRibbonAction({ type: 'gsp_load_sample', sample: presetKey });
-              } else if (cat === 'space_3d') {
-                setActiveTab('space_3d');
-                handleRibbonAction({ type: 'geogebra_select_object', obj: presetKey });
               } else if (cat === 'stats_prob') {
                 setActiveTab('stats_prob');
                 handleRibbonAction({ type: 'select_stat_chart', chart: presetKey });
@@ -464,9 +458,7 @@ export default function App() {
             bbtIsBold={bbtIsBold}
             bbtStroke={bbtStroke}
             gspActiveTool={gspActiveTool}
-            space3dTool={space3dSubTool}
             statsTool={statsSubTool}
-            onSetSpace3dTool={setSpace3dSubTool}
             onSetStatsTool={setStatsSubTool}
           />
         )}
@@ -508,18 +500,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* 3.4 TAB KHÔNG GIAN 3D & OXYZ (GEOGEBRA 3D AI STUDIO & MÔ PHỎNG) */}
-              {visitedTabs.has('space_3d') && (
-                <div className={activeTab === 'space_3d' ? 'block animate-fade-in' : 'hidden'}>
-                  {space3dSubTool === 'geogebra' ? (
-                    <Geogebra3DTool apiKey={apiKey} model={preferredModel} />
-                  ) : (
-                    <SimulationGenerator apiKey={apiKey} model={preferredModel} />
-                  )}
-                </div>
-              )}
-
-              {/* 3.5 TAB THỐNG KÊ & XÁC SUẤT */}
+              {/* 3.4 TAB THỐNG KÊ & XÁC SUẤT */}
               {visitedTabs.has('stats_prob') && (
                 <div className={activeTab === 'stats_prob' ? 'block animate-fade-in' : 'hidden'}>
                   {statsSubTool === 'statistics' ? (
@@ -564,14 +545,6 @@ export default function App() {
       {/* =====================================================================
           5. CÁC MODAL HỆ THỐNG
           ===================================================================== */}
-      {/* Modal Dán đề (AI) */}
-      <AiProblemParserModal
-        isOpen={showAiModal}
-        onClose={() => setShowAiModal(false)}
-        onApplyResult={handleApplyAiResult}
-        apiKey={apiKey}
-      />
-
       {/* Command Palette Ctrl + K */}
       <CommandPalette
         isOpen={showCommandPalette}
@@ -581,13 +554,7 @@ export default function App() {
           if (toolId === 'bbt_graph') setActiveTab('graph_2d');
           else if (toolId === 'bbt') setActiveTab('bbt');
           else if (toolId === 'geometry') setActiveTab('plane_trig');
-          else if (toolId === 'geogebra') {
-            setActiveTab('space_3d');
-            setSpace3dSubTool('geogebra');
-          } else if (toolId === 'simulation') {
-            setActiveTab('space_3d');
-            setSpace3dSubTool('simulation');
-          } else if (toolId === 'statistics') {
+          else if (toolId === 'statistics') {
             setActiveTab('stats_prob');
             setStatsSubTool('statistics');
           } else if (toolId === 'probability_tree') {

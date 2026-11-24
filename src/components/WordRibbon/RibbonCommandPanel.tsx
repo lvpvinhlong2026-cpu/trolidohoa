@@ -41,6 +41,8 @@ import {
   RotateCw,
   Plus,
   Minus,
+  Equal,
+  X,
   Crop,
   Eye,
   EyeOff,
@@ -70,7 +72,7 @@ export interface RibbonCommandPanelProps {
   onCopyWord: () => void;
   onDownloadPng: () => void;
   onDownloadSvg: () => void;
-  onOpenAiModal: () => void;
+  onOpenAiModal?: () => void;
   onSelectTemplate: (category: string, presetKey: string) => void;
   onRibbonAction?: (action: { type: string; [key: string]: any }) => void;
   graphSubTab?: 'graph' | 'inequality' | 'number_line';
@@ -78,9 +80,7 @@ export interface RibbonCommandPanelProps {
   bbtIsBold?: boolean;
   bbtStroke?: number;
   gspActiveTool?: string;
-  space3dTool?: 'geogebra' | 'viewer3d' | 'simulation';
   statsTool?: 'statistics' | 'tree';
-  onSetSpace3dTool?: (tool: 'geogebra' | 'viewer3d' | 'simulation') => void;
   onSetStatsTool?: (tool: 'statistics' | 'tree') => void;
 }
 
@@ -143,9 +143,7 @@ export default function RibbonCommandPanel({
   bbtIsBold = false,
   bbtStroke = 1.5,
   gspActiveTool = 'select',
-  space3dTool = 'geogebra',
   statsTool = 'statistics',
-  onSetSpace3dTool,
   onSetStatsTool,
 }: RibbonCommandPanelProps) {
 
@@ -177,22 +175,9 @@ export default function RibbonCommandPanel({
           ========================================================================= */}
       {activeTab === 'home' && (
         <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
-          {/* Nhóm 1 – Thao tác (Clipboard & AI) */}
+          {/* Nhóm 1 – Thao tác Clipboard */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-2 flex-1">
-              <button
-                type="button"
-                onClick={onOpenAiModal}
-                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 transition cursor-pointer text-center group"
-                title="Dán đề bài toán để AI tự động nhận diện và vẽ hình (GDPT 2018)"
-              >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex items-center justify-center mb-1 shadow-xs group-hover:scale-105 transition-transform">
-                  <Sparkles size={16} />
-                </div>
-                <span className="text-xs font-bold leading-tight text-[#0F6CBD]">Dán đề (AI)</span>
-                <span className="text-[10px] text-[#605E5C] dark:text-slate-400">Tự dựng hình</span>
-              </button>
-
               <div className="flex flex-col gap-1 justify-center">
                 <div className="flex items-center gap-1">
                   <button
@@ -429,8 +414,8 @@ export default function RibbonCommandPanel({
                 }`}
               >
                 <Minus size={20} className="mb-1 text-indigo-600" />
-                <span className="text-[11px] leading-tight">Trục số</span>
-                <span className="text-[9px] text-[#605E5C]">Khoảng & đoạn</span>
+                <span className="text-[11px] leading-tight">Trục số (L10)</span>
+                <span className="text-[9px] text-[#605E5C]">Khoảng, Đoạn, Giao/Hợp</span>
               </button>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
@@ -438,32 +423,7 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 2 – Tạo nhanh mẫu */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-            <div className="flex items-center gap-2 flex-1">
-              <AccessibleDropdown
-                label="Mẫu đồ thị chuẩn"
-                icon={TrendingUp}
-                variant="large"
-                menuWidth="w-72"
-                ariaLabel="Menu mẫu đồ thị SGK"
-                items={[
-                  { id: 'parabola', label: 'Parabol bậc 2 (Toán 10)', subLabel: 'y = ax² + bx + c', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'parabola' }) },
-                  { id: 'cubic', label: 'Hàm bậc 3: 2 Cực trị (Toán 12)', subLabel: 'y = ax³ + bx² + cx + d', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'cubic' }) },
-                  { id: 'quartic', label: 'Hàm bậc 4 trùng phương (Toán 12)', subLabel: 'y = ax⁴ + bx² + c', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'quartic' }) },
-                  { id: 'rat_1_1', label: 'Phân thức bậc 1/1 (Toán 12)', subLabel: 'y = (ax+b)/(cx+d)', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'rational_1_1' }) },
-                  { id: 'rat_2_1', label: 'Phân thức bậc 2/1 (Toán 12)', subLabel: 'Tiệm cận xiên & đứng', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'rational_2_1' }) },
-                  { id: 'trig', label: 'Lượng giác sin / cos (Toán 11)', subLabel: 'Chu kỳ, tiệm cận', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'trig_sin' }) },
-                  { id: 'exp_log', label: 'Mũ & Lôgarit (Toán 11)', subLabel: 'y = aˣ, y = logₐx', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'exp' }) },
-                ]}
-              />
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Tạo nhanh mẫu
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Định dạng đồ thị */}
+          {/* Nhóm 2 – Định dạng đồ thị */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
               <div className="flex items-center gap-1.5">
@@ -496,22 +456,33 @@ export default function RibbonCommandPanel({
                 >
                   <span>In đậm nhãn</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onRibbonAction?.({ type: 'toggle_grid' });
-                    onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showGrid: !p.graph2D.showGrid } }));
-                  }}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
-                  title="Bật/Tắt lưới tọa độ Oxy"
-                >
-                  <Grid size={12} className="text-[#0F6CBD]" />
-                  <span>Lưới Oxy</span>
-                </button>
+                {graphSubTab === 'number_line' ? (
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'nl_toggle_mode' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold transition cursor-pointer flex items-center gap-1"
+                    title="Đổi giữa Trục số đơn và Phép toán tập hợp (Giao, Hợp, Hiệu)"
+                  >
+                    <span>🔀 Giao / Hợp / Hiệu</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRibbonAction?.({ type: 'toggle_grid' });
+                      onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showGrid: !p.graph2D.showGrid } }));
+                    }}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Bật/Tắt lưới tọa độ Oxy"
+                  >
+                    <Grid size={12} className="text-[#0F6CBD]" />
+                    <span>Lưới Oxy</span>
+                  </button>
+                )}
               </div>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Định dạng đồ thị
+              {graphSubTab === 'number_line' ? 'Định dạng trục số' : 'Định dạng đồ thị'}
             </div>
           </div>
 
@@ -573,29 +544,7 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 2 – Tạo nhanh (Mẫu BBT) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-            <div className="flex items-center gap-2 flex-1">
-              <AccessibleDropdown
-                label="Mẫu BBT chuẩn"
-                icon={TableIcon}
-                variant="large"
-                menuWidth="w-72"
-                ariaLabel="Menu mẫu BBT"
-                items={[
-                  { id: 'quad_sign', label: 'Bảng xét dấu tam thức bậc hai', subLabel: 'ax² + bx + c (Toán 10)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'quadratic_roots' }) },
-                  { id: 'cubic_2ext', label: 'BBT hàm bậc ba (2 cực trị)', subLabel: 'y = x³ - 3x + 1 (Toán 12)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'cubic_2_extrema' }) },
-                  { id: 'rat_1_1', label: 'BBT phân thức bậc 1/1 (Nghịch biến)', subLabel: 'Tiệm cận đứng x=1, ngang y=2', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'fraction_1_1_dec' }) },
-                  { id: 'rat_2_1', label: 'BBT phân thức bậc 2/1 (2 cực trị)', subLabel: 'Tiệm cận xiên & đứng (L12)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'fraction_2_1' }) },
-                ]}
-              />
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Tạo nhanh mẫu
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Định dạng bảng */}
+          {/* Nhóm 2 – Định dạng bảng */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
               <div className="flex items-center gap-1.5">
@@ -661,10 +610,13 @@ export default function RibbonCommandPanel({
                 { id: 'point', label: 'Điểm', icon: CircleDot },
                 { id: 'point_on_segment', label: 'Điểm cạnh', icon: Dot },
                 { id: 'segment', label: 'Đoạn', icon: Minus },
+                { id: 'parallel', label: 'Song song', icon: Equal },
+                { id: 'intersection', label: 'Giao điểm', icon: X },
                 { id: 'vector', label: 'Vectơ', icon: ArrowRight },
                 { id: 'circle', label: 'Đường tròn', icon: Circle },
                 { id: 'ellipse', label: 'Elip', icon: Circle },
                 { id: 'right_angle', label: 'Góc vuông', icon: CornerDownRight },
+                { id: 'trig_angle', label: 'Góc lg', icon: RotateCw },
                 { id: 'text', label: 'Nhãn', icon: Type },
                 { id: 'eraser', label: 'Tẩy', icon: Eraser },
               ].map(t => {
@@ -701,11 +653,17 @@ export default function RibbonCommandPanel({
                 menuWidth="w-72"
                 ariaLabel="Kho mẫu hình học"
                 items={[
+                  { id: 'sample_number_line', label: 'Trục số & Tập hợp (Khoảng, Đoạn, Giao/Hợp)', subLabel: 'Toán 10 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'switch_to_number_line' }) },
+                  { id: 'div_nl', label: '', divider: true, onClick: () => {} },
                   { id: 'tri_vuong', label: 'Tam giác vuông (Đường cao AH)', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'tam_giac_vuong' }) },
                   { id: 'tri_deu', label: 'Tam giác đều', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'tam_giac_deu' }) },
                   { id: 'hbh', label: 'Hình bình hành ABCD', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_binh_hanh' }) },
                   { id: 'hthang', label: 'Hình thang vuông', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_thang_vuong' }) },
                   { id: 'trig', label: 'Đường tròn lượng giác đầy đủ', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'duong_tron_luong_giac' }) },
+                  { id: 'div_trig', label: '', divider: true, onClick: () => {} },
+                  { id: 'trig_pos', label: 'Góc lượng giác chiều dương (+60° / π/3)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_duong' }) },
+                  { id: 'trig_neg', label: 'Góc lượng giác chiều âm (-120°)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_am' }) },
+                  { id: 'trig_spi', label: 'Góc lượng giác nhiều vòng (+420° xoắn ốc)', subLabel: 'Toán 11 SGK', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'goc_luong_giac_xoan_oc' }) },
                   { id: 'div1', label: '', divider: true, onClick: () => {} },
                   { id: 'cone', label: 'Hình nón (đáy elip đứt-liền)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cone' }) },
                   { id: 'cylinder', label: 'Hình trụ (2 đáy elip)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cylinder' }) },
@@ -737,16 +695,36 @@ export default function RibbonCommandPanel({
                     <Eye size={13} />
                     <span>Điểm</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_toggle_hide' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Ẩn / Hiện đối tượng đang chọn (Ctrl+H)"
+                  >
+                    <EyeOff size={13} className="text-amber-600" />
+                    <span>Ẩn/Hiện</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'gsp_set_line_style', style: 'toggle' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
-                  title="Chuyển đổi nét liền và nét đứt (khuất)"
-                >
-                  <span className="font-mono font-bold text-[#0F6CBD]">┅/─</span>
-                  <span>Đổi nét ⇄</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_set_line_style', style: 'toggle' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Chuyển đổi nét liền và nét đứt (khuất)"
+                  >
+                    <span className="font-mono font-bold text-[#0F6CBD]">┅/─</span>
+                    <span>Đổi nét</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_show_all' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Hiện lại tất cả đối tượng bị ẩn (Ctrl+Shift+H)"
+                  >
+                    <Eye size={13} className="text-teal-600" />
+                    <span>Hiện hết</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
@@ -764,77 +742,7 @@ export default function RibbonCommandPanel({
       )}
 
       {/* =========================================================================
-          TAB 5: KHÔNG GIAN 3D & OXYZ (L11 – L12)
-          ========================================================================= */}
-      {activeTab === 'space_3d' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
-          {/* Nhóm 1 – Chọn công cụ 3D */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onSetSpace3dTool?.('geogebra')}
-                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
-                  space3dTool === 'geogebra' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
-                }`}
-              >
-                <Layers size={22} className="mb-1 text-[#0F6CBD]" />
-                <span className="text-[11px] leading-tight">GeoGebra 3D AI</span>
-                <span className="text-[9px] text-[#605E5C]">Dựng hình Oxyz</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSetSpace3dTool?.('simulation')}
-                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
-                  space3dTool === 'simulation' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
-                }`}
-              >
-                <MonitorPlay size={22} className="mb-1 text-teal-600" />
-                <span className="text-[11px] leading-tight">Mô phỏng 3D</span>
-                <span className="text-[9px] text-[#605E5C]">Xoay 360 độ</span>
-              </button>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Công cụ Không gian
-            </div>
-          </div>
-
-          {/* Nhóm 2 – Khối cơ bản Oxyz */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-            <div className="flex items-center gap-2 flex-1">
-              <AccessibleDropdown
-                label="Mẫu khối 3D"
-                icon={Box}
-                variant="large"
-                menuWidth="w-72"
-                ariaLabel="Menu khối hình 3D"
-                items={[
-                  { id: 'pyr_quad', label: 'Chóp tứ giác đều S.ABCD', subLabel: 'SO ⊥ đáy', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'chop_tu_giac' }) },
-                  { id: 'pyr_sa', label: 'Chóp S.ABCD có SA ⊥ đáy', subLabel: 'Góc vuông tại A', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'chop_sa_vuong_day' }) },
-                  { id: 'prism', label: 'Lăng trụ đứng ABC.A\'B\'C\'', subLabel: 'Đáy tam giác', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'lang_tru_dung' }) },
-                  { id: 'cube', label: 'Hình lập phương / Hình hộp', subLabel: 'ABCD.A\'B\'C\'D\'', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'lap_phuong' }) },
-                  { id: 'sphere', label: 'Mặt cầu tâm O bán kính R', subLabel: 'Oxyz', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'mat_cau' }) },
-                  { id: 'cone_cyl', label: 'Khối tròn xoay (Nón / Trụ)', subLabel: 'Đáy elip đứt liền', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'khoi_non' }) },
-                ]}
-              />
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Khối cơ bản
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Xuất sang Word */}
-          <ExportGroup
-            onCopyWord={onCopyWord}
-            onDownloadPng={onDownloadPng}
-            onDownloadSvg={onDownloadSvg}
-          />
-        </div>
-      )}
-
-      {/* =========================================================================
-          TAB 6: THỐNG KÊ & XÁC SUẤT (L10 – L11 – L12)
+          TAB 5: THỐNG KÊ & XÁC SUẤT (L10 – L11 – L12)
           ========================================================================= */}
       {activeTab === 'stats_prob' && (
         <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">

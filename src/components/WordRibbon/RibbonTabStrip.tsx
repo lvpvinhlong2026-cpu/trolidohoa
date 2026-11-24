@@ -31,7 +31,6 @@ const TABS: { id: RibbonTabId; label: string }[] = [
   { id: 'graph_2d', label: 'Đồ thị 2D' },
   { id: 'bbt', label: 'Bảng biến thiên' },
   { id: 'plane_trig', label: 'Hình phẳng & Lượng giác' },
-  { id: 'space_3d', label: 'Không gian 3D & Oxyz' },
   { id: 'stats_prob', label: 'Thống kê & Xác suất' },
 ];
 

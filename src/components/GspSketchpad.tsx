@@ -4,7 +4,7 @@ import {
   Trash2, Undo2, Redo2, Copy, Download, RefreshCw, 
   Layers, CheckCircle2, AlertCircle, Sparkles, Grid, Eye, EyeOff,
   FileDown, FileUp, Edit3, X, Check, Type, ArrowRight, ArrowLeftRight,
-  Box, FolderKanban, BarChart2, Crop, Sliders
+  Box, FolderKanban, BarChart2, Crop, Sliders, Equal, RotateCw
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import { cropCanvasToContent } from '../utils/dpiUtils';
@@ -46,6 +46,7 @@ export interface GspSegment {
   width?: number;
   isVector?: boolean;       // Là vectơ có mũi tên chỉ hướng
   vectorEnd?: 'p1' | 'p2';  // Đầu mũi tên (mặc định 'p2': p1 -> p2)
+  hidden?: boolean;         // Ẩn đoạn thẳng
 }
 
 export interface GspCircle {
@@ -55,6 +56,7 @@ export interface GspCircle {
   radius?: number;
   style: 'solid' | 'dashed';
   color: string;
+  hidden?: boolean;         // Ẩn đường tròn
 }
 
 export interface GspEllipse {
@@ -66,6 +68,7 @@ export interface GspEllipse {
   style: 'half_dashed' | 'solid' | 'dashed'; // 'half_dashed': nửa trên đứt, nửa dưới liền
   color: string;
   width?: number;
+  hidden?: boolean;         // Ẩn hình elip
 }
 
 export interface GspRightAngle {
@@ -76,6 +79,22 @@ export interface GspRightAngle {
   size?: number;
   color?: string;
   hasDot?: boolean;
+  hidden?: boolean;         // Ẩn ký hiệu góc vuông
+}
+
+export interface GspTrigAngle {
+  id: string;
+  vertexId?: string;      // Gốc O
+  vertexPointId?: string; // alias cho vertexId
+  startPointId: string;   // Điểm trên tia đầu Ou
+  endPointId: string;     // Điểm trên tia cuối Ov
+  radius?: number;        // Bán kính cung tròn (mặc định 36px)
+  direction?: 'positive' | 'negative'; // 'positive' (chiều dương +, ngược chiều KĐH) | 'negative' (chiều âm -, cùng chiều KĐH)
+  clockwise?: boolean;    // true: chiều âm (-), false: chiều dương (+)
+  label?: string;         // Nhãn, vd "α", "60°", "π/3", "-120°"
+  turns?: number;         // 0: góc quay < 360°, 1, 2...: xoắn ốc > 360°
+  color?: string;         // Màu sắc (mặc định #0F6CBD hoặc #000000)
+  hidden?: boolean;       // Ẩn hoàn toàn trên ảnh xuất Word
 }
 
 export interface GspText {
@@ -87,6 +106,7 @@ export interface GspText {
   isItalic?: boolean;
   isBold?: boolean;
   color?: string;
+  hidden?: boolean;         // Ẩn chữ chú thích
 }
 
 export interface GspState {
@@ -97,6 +117,7 @@ export interface GspState {
   rightAngles: GspRightAngle[];
   texts?: GspText[];
   charts?: GspChartItem[];
+  trigAngles?: GspTrigAngle[];
 }
 
 export interface GspSketchpadProps {
@@ -121,10 +142,13 @@ export default function GspSketchpad({
   const [circles, setCircles] = useState<GspCircle[]>([]);
   const [ellipses, setEllipses] = useState<GspEllipse[]>([]);
   const [rightAngles, setRightAngles] = useState<GspRightAngle[]>([]);
+  const [trigAngles, setTrigAngles] = useState<GspTrigAngle[]>([]);
   const [texts, setTexts] = useState<GspText[]>([]);
   const [charts, setCharts] = useState<GspChartItem[]>([]);
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [hoveredChartId, setHoveredChartId] = useState<string | null>(null);
+  const [selectedTrigAngleId, setSelectedTrigAngleId] = useState<string | null>(null);
+  const [hoveredTrigAngleId, setHoveredTrigAngleId] = useState<string | null>(null);
   const [chartRenderTrigger, setChartRenderTrigger] = useState<number>(0);
   const chartImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const [chartDragState, setChartDragState] = useState<{
@@ -148,7 +172,7 @@ export default function GspSketchpad({
   const [currentPresetType, setCurrentPresetType] = useState<string>('pyramid_regular_quad');
 
   // Công cụ đang chọn
-  const [activeTool, setActiveTool] = useState<'select' | 'point' | 'point_on_segment' | 'segment' | 'vector' | 'circle' | 'ellipse' | 'right_angle' | 'text' | 'eraser'>('select');
+  const [activeTool, setActiveTool] = useState<'select' | 'point' | 'point_on_segment' | 'segment' | 'parallel' | 'intersection' | 'vector' | 'circle' | 'ellipse' | 'right_angle' | 'trig_angle' | 'text' | 'eraser'>('select');
   const [lineStyle, setLineStyle] = useState<'solid' | 'dashed'>('solid');
   const [ellipseStyle, setEllipseStyle] = useState<'half_dashed' | 'solid' | 'dashed'>('half_dashed');
   const [pointDisplayMode, setPointDisplayMode] = useState<'all' | 'labels_only' | 'hidden'>('all');
@@ -156,6 +180,17 @@ export default function GspSketchpad({
   const [activeColor, setActiveColor] = useState<string>('#000000');
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(false);
+  const [showHiddenElements, setShowHiddenElements] = useState<boolean>(false);
+
+  // Dựng đoạn song song
+  const [parallelPointId, setParallelPointId] = useState<string | null>(null);
+  const [parallelSegmentId, setParallelSegmentId] = useState<string | null>(null);
+
+  // Xác định giao điểm
+  const [intersectFirstSegmentId, setIntersectFirstSegmentId] = useState<string | null>(null);
+
+  // Vẽ góc lượng giác [Gốc O, Tia đầu Ou, Tia cuối Ov]
+  const [trigAngleStepPoints, setTrigAngleStepPoints] = useState<string[]>([]);
 
   // Menu chuột phải (Context Menu) tương tác nhanh
   const [contextMenu, setContextMenu] = useState<{
@@ -164,7 +199,7 @@ export default function GspSketchpad({
     y: number;
     canvasX: number;
     canvasY: number;
-    targetType: 'point' | 'segment' | 'ellipse' | 'right_angle' | 'text' | 'canvas';
+    targetType: 'point' | 'segment' | 'ellipse' | 'right_angle' | 'trig_angle' | 'text' | 'canvas';
     targetId?: string;
   }>({
     isOpen: false,
@@ -250,13 +285,83 @@ export default function GspSketchpad({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setContextMenu(prev => prev.isOpen ? { ...prev, isOpen: false } : prev);
+        setParallelPointId(null);
+        setParallelSegmentId(null);
+        setIntersectFirstSegmentId(null);
+        setTrigAngleStepPoints([]);
+        setDrawingStartPointId(null);
       }
-      // Phím tắt Xóa Biểu đồ khi đang chọn
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedChartId) {
-        saveSnapshot();
-        setCharts(prev => prev.filter(c => c.id !== selectedChartId));
-        setSelectedChartId(null);
-        showNotice('Đã xóa biểu đồ khỏi hình vẽ.');
+      // Phím tắt Xóa đối tượng đang chọn
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedChartId) {
+          saveSnapshot();
+          setCharts(prev => prev.filter(c => c.id !== selectedChartId));
+          setSelectedChartId(null);
+          showNotice('Đã xóa biểu đồ khỏi hình vẽ.');
+        } else if (selectedPointId) {
+          saveSnapshot();
+          setPoints(pts => pts.filter(p => p.id !== selectedPointId));
+          setSegments(segs => segs.filter(s => s.p1Id !== selectedPointId && s.p2Id !== selectedPointId));
+          setCircles(circs => circs.filter(c => c.centerId !== selectedPointId && c.radiusPointId !== selectedPointId));
+          setEllipses(els => els.filter(el => el.centerId !== selectedPointId && el.rxPointId !== selectedPointId));
+          setRightAngles(ras => ras.filter(r => r.vertexId !== selectedPointId && r.p1Id !== selectedPointId && r.p2Id !== selectedPointId));
+          setTrigAngles(tas => tas.filter(ta => (ta.vertexId !== selectedPointId && ta.vertexPointId !== selectedPointId) && ta.startPointId !== selectedPointId && ta.endPointId !== selectedPointId));
+          setSelectedPointId(null);
+          showNotice('Đã xóa điểm.');
+        } else if (selectedSegmentId) {
+          saveSnapshot();
+          setSegments(segs => segs.filter(s => s.id !== selectedSegmentId));
+          setSelectedSegmentId(null);
+          showNotice('Đã xóa đoạn thẳng.');
+        } else if (selectedTrigAngleId) {
+          saveSnapshot();
+          setTrigAngles(tas => tas.filter(ta => ta.id !== selectedTrigAngleId));
+          setSelectedTrigAngleId(null);
+          showNotice('Đã xóa góc lượng giác.');
+        } else if (selectedTextId) {
+          saveSnapshot();
+          setTexts(txts => txts.filter(t => t.id !== selectedTextId));
+          setSelectedTextId(null);
+          showNotice('Đã xóa chữ chú thích.');
+        }
+      }
+      // Phím tắt Ẩn / Hiện: Ctrl + H hoặc Command + H
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Ctrl + Shift + H: Hiện tất cả đối tượng ẩn
+          saveSnapshot();
+          setPoints(pts => pts.map(p => ({ ...p, hidden: false, hideDot: false, hideLabel: false })));
+          setSegments(segs => segs.map(s => ({ ...s, hidden: false })));
+          setCircles(circs => circs.map(c => ({ ...c, hidden: false })));
+          setEllipses(els => els.map(el => ({ ...el, hidden: false })));
+          setRightAngles(ras => ras.map(r => ({ ...r, hidden: false })));
+          setTexts(txts => txts.map(t => ({ ...t, hidden: false })));
+          setTrigAngles(tas => tas.map(ta => ({ ...ta, hidden: false })));
+          showNotice('👁️ Đã hiện tất cả các đối tượng bị ẩn (Ctrl+Shift+H).');
+        } else {
+          // Ctrl + H: Đổi trạng thái Ẩn/Hiện của đối tượng đang chọn
+          if (selectedPointId) {
+            saveSnapshot();
+            setPoints(pts => pts.map(p => p.id === selectedPointId ? { ...p, hidden: !p.hidden } : p));
+            showNotice('Đã đổi trạng thái Ẩn/Hiện của điểm (Ctrl+H).');
+          } else if (selectedSegmentId) {
+            saveSnapshot();
+            setSegments(segs => segs.map(s => s.id === selectedSegmentId ? { ...s, hidden: !s.hidden } : s));
+            showNotice('Đã đổi trạng thái Ẩn/Hiện của đoạn thẳng (Ctrl+H).');
+          } else if (selectedTrigAngleId) {
+            saveSnapshot();
+            setTrigAngles(tas => tas.map(ta => ta.id === selectedTrigAngleId ? { ...ta, hidden: !ta.hidden } : ta));
+            showNotice('Đã đổi trạng thái Ẩn/Hiện của góc lượng giác (Ctrl+H).');
+          } else if (selectedTextId) {
+            saveSnapshot();
+            setTexts(txts => txts.map(t => t.id === selectedTextId ? { ...t, hidden: !t.hidden } : t));
+            showNotice('Đã đổi trạng thái Ẩn/Hiện của chữ chú thích (Ctrl+H).');
+          } else {
+            setShowHiddenElements(prev => !prev);
+            showNotice(showHiddenElements ? 'Đã tắt chế độ xem đối tượng ẩn' : 'Đã bật chế độ xem đối tượng ẩn (Ctrl+H)');
+          }
+        }
       }
       // Phím tắt Hoàn tác: Ctrl + Z hoặc Command + Z
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -279,7 +384,7 @@ export default function GspSketchpad({
       window.removeEventListener('mousedown', handleCloseMenu);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles, selectedPointId, selectedSegmentId, selectedTrigAngleId, selectedTextId, selectedChartId, showHiddenElements]);
 
   // Lưu lại snapshot cho Undo
   const saveSnapshot = useCallback(() => {
@@ -290,18 +395,19 @@ export default function GspSketchpad({
       ellipses: JSON.parse(JSON.stringify(ellipses)),
       rightAngles: JSON.parse(JSON.stringify(rightAngles)),
       texts: JSON.parse(JSON.stringify(texts)),
-      charts: JSON.parse(JSON.stringify(charts))
+      charts: JSON.parse(JSON.stringify(charts)),
+      trigAngles: JSON.parse(JSON.stringify(trigAngles))
     };
     setHistory(prev => [...prev.slice(-25), currentState]);
     setRedoStack([]);
-  }, [points, segments, circles, ellipses, rightAngles, texts, charts]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles]);
 
   const handleUndo = () => {
     if (history.length === 0) {
       showNotice('Không có thao tác nào trước đó để hoàn tác.');
       return;
     }
-    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts };
+    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles };
     const prev = history[history.length - 1];
     setRedoStack(r => [currentState, ...r]);
     setHistory(h => h.slice(0, -1));
@@ -313,8 +419,10 @@ export default function GspSketchpad({
     setRightAngles(prev.rightAngles || []);
     setTexts(prev.texts || []);
     setCharts(prev.charts || []);
+    setTrigAngles(prev.trigAngles || []);
     setSelectedPointId(null);
     setSelectedSegmentId(null);
+    setSelectedTrigAngleId(null);
     setSelectedTextId(null);
     setSelectedChartId(null);
     showNotice('↩️ Đã hoàn tác thao tác vừa rồi (Undo).');
@@ -326,7 +434,7 @@ export default function GspSketchpad({
       return;
     }
     const next = redoStack[0];
-    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts };
+    const currentState: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles };
     setHistory(h => [...h, currentState]);
     setRedoStack(r => r.slice(1));
 
@@ -337,11 +445,12 @@ export default function GspSketchpad({
     setRightAngles(next.rightAngles || []);
     setTexts(next.texts || []);
     setCharts(next.charts || []);
+    setTrigAngles(next.trigAngles || []);
     showNotice('↪️ Đã làm lại thao tác (Redo).');
   };
 
   const handleClearAll = () => {
-    if (points.length === 0 && texts.length === 0 && ellipses.length === 0 && charts.length === 0) return;
+    if (points.length === 0 && texts.length === 0 && ellipses.length === 0 && charts.length === 0 && trigAngles.length === 0) return;
     if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ bản vẽ và bắt đầu lại không?')) {
       saveSnapshot();
       setPoints([]);
@@ -351,11 +460,17 @@ export default function GspSketchpad({
       setRightAngles([]);
       setTexts([]);
       setCharts([]);
+      setTrigAngles([]);
       setSelectedPointId(null);
       setSelectedSegmentId(null);
+      setSelectedTrigAngleId(null);
       setSelectedTextId(null);
       setSelectedChartId(null);
       setDrawingStartPointId(null);
+      setParallelPointId(null);
+      setParallelSegmentId(null);
+      setIntersectFirstSegmentId(null);
+      setTrigAngleStepPoints([]);
       showNotice('Đã làm sạch bảng vẽ.');
     }
   };
@@ -536,6 +651,194 @@ export default function GspSketchpad({
     return pt;
   };
 
+  // Tìm góc lượng giác gần chuột nhất để tương tác hoặc đổi kiểu
+  const findNearbyTrigAngle = (x: number, y: number, maxDist = 18): GspTrigAngle | null => {
+    const ptMap = new Map<string, GspPoint>(points.map(p => [p.id, p]));
+    for (const ta of trigAngles) {
+      if (ta.hidden && !showHiddenElements) continue;
+      const v = ptMap.get(ta.vertexPointId || ta.vertexId || '');
+      const p1 = ptMap.get(ta.startPointId);
+      const p2 = ptMap.get(ta.endPointId);
+      if (!v || !p1 || !p2) continue;
+
+      const r = ta.radius || 40;
+      const d = Math.hypot(x - v.x, y - v.y);
+      if (Math.abs(d - r) <= maxDist) {
+        return ta;
+      }
+      // Kiểm tra gần nhãn
+      const a1 = Math.atan2(p1.y - v.y, p1.x - v.x);
+      const a2 = Math.atan2(p2.y - v.y, p2.x - v.x);
+      let midAngle = (a1 + a2) / 2;
+      const lblDist = r + 16;
+      const lx = v.x + lblDist * Math.cos(midAngle);
+      const ly = v.y + lblDist * Math.sin(midAngle);
+      if (Math.hypot(x - lx, y - ly) <= maxDist) {
+        return ta;
+      }
+    }
+    return null;
+  };
+
+  // Dựng đoạn thẳng qua 1 điểm song song với 1 cạnh
+  const constructParallel = (pointId: string, segmentId: string) => {
+    const pt = points.find(p => p.id === pointId);
+    const seg = segments.find(s => s.id === segmentId);
+    if (!pt || !seg) return;
+
+    const p1 = points.find(p => p.id === seg.p1Id);
+    const p2 = points.find(p => p.id === seg.p2Id);
+    if (!p1 || !p2) return;
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-4) return;
+
+    saveSnapshot();
+
+    // Tìm các giao điểm của đường thẳng song song với các cạnh khác trong hình (trừ cạnh gốc)
+    interface IntersectHit {
+      t: number;
+      x: number;
+      y: number;
+      targetSeg: GspSegment;
+    }
+    const hits: IntersectHit[] = [];
+
+    const ux = dx / len;
+    const uy = dy / len;
+
+    for (const s of segments) {
+      if (s.id === seg.id) continue;
+      const sa = points.find(p => p.id === s.p1Id);
+      const sb = points.find(p => p.id === s.p2Id);
+      if (!sa || !sb) continue;
+
+      const sdx = sb.x - sa.x;
+      const sdy = sb.y - sa.y;
+      const denom = ux * sdy - uy * sdx;
+      if (Math.abs(denom) < 1e-5) continue;
+
+      const t = ((sa.x - pt.x) * sdy - (sa.y - pt.y) * sdx) / denom;
+      const u = ((sa.x - pt.x) * uy - (sa.y - pt.y) * ux) / denom;
+
+      if (u >= -0.01 && u <= 1.01) {
+        const hx = Math.round(pt.x + t * ux);
+        const hy = Math.round(pt.y + t * uy);
+        hits.push({ t, x: hx, y: hy, targetSeg: s });
+      }
+    }
+
+    hits.sort((a, b) => a.t - b.t);
+
+    let endPointA: GspPoint | null = null;
+    let endPointB: GspPoint | null = null;
+
+    const hitNeg = hits.filter(h => h.t < -2);
+    const hitPos = hits.filter(h => h.t > 2);
+
+    if (hitNeg.length > 0 && hitPos.length > 0) {
+      const h1 = hitNeg[hitNeg.length - 1];
+      const h2 = hitPos[0];
+
+      let pA = points.find(p => Math.hypot(p.x - h1.x, p.y - h1.y) < 6);
+      if (!pA) {
+        pA = createPoint(h1.x, h1.y, getNextLabel(points));
+        setPoints(prev => [...prev, pA!]);
+      }
+      let pB = points.find(p => Math.hypot(p.x - h2.x, p.y - h2.y) < 6);
+      if (!pB) {
+        pB = createPoint(h2.x, h2.y, getNextLabel([...points, pA]));
+        setPoints(prev => [...prev, pB!]);
+      }
+      endPointA = pA;
+      endPointB = pB;
+    } else if (hitPos.length > 0) {
+      const h2 = hitPos[0];
+      let pB = points.find(p => Math.hypot(p.x - h2.x, p.y - h2.y) < 6);
+      if (!pB) {
+        pB = createPoint(h2.x, h2.y, getNextLabel(points));
+        setPoints(prev => [...prev, pB!]);
+      }
+      endPointA = pt;
+      endPointB = pB;
+    } else if (hitNeg.length > 0) {
+      const h1 = hitNeg[hitNeg.length - 1];
+      let pA = points.find(p => Math.hypot(p.x - h1.x, p.y - h1.y) < 6);
+      if (!pA) {
+        pA = createPoint(h1.x, h1.y, getNextLabel(points));
+        setPoints(prev => [...prev, pA!]);
+      }
+      endPointA = pA;
+      endPointB = pt;
+    } else {
+      const qx = Math.round(pt.x + dx);
+      const qy = Math.round(pt.y + dy);
+      let pQ = points.find(p => Math.hypot(p.x - qx, p.y - qy) < 6);
+      if (!pQ) {
+        pQ = createPoint(qx, qy, getNextLabel(points));
+        setPoints(prev => [...prev, pQ]);
+      }
+      endPointA = pt;
+      endPointB = pQ;
+    }
+
+    if (endPointA && endPointB && endPointA.id !== endPointB.id) {
+      const newSegId = 'seg_' + Date.now();
+      const newSeg: GspSegment = {
+        id: newSegId,
+        p1Id: endPointA.id,
+        p2Id: endPointB.id,
+        style: lineStyle,
+        color: activeColor,
+        width: 1.6
+      };
+      setSegments(prev => [...prev, newSeg]);
+      setSelectedSegmentId(newSegId);
+      showNotice(`Đã dựng đoạn song song ${endPointA.label}${endPointB.label} // ${p1.label}${p2.label}`);
+    }
+  };
+
+  // Xác định giao điểm của hai đoạn thẳng
+  const constructIntersection = (seg1Id: string, seg2Id: string) => {
+    if (seg1Id === seg2Id) return;
+    const s1 = segments.find(s => s.id === seg1Id);
+    const s2 = segments.find(s => s.id === seg2Id);
+    if (!s1 || !s2) return;
+
+    const pA = points.find(p => p.id === s1.p1Id);
+    const pB = points.find(p => p.id === s1.p2Id);
+    const pC = points.find(p => p.id === s2.p1Id);
+    const pD = points.find(p => p.id === s2.p2Id);
+    if (!pA || !pB || !pC || !pD) return;
+
+    const dx1 = pB.x - pA.x;
+    const dy1 = pB.y - pA.y;
+    const dx2 = pD.x - pC.x;
+    const dy2 = pD.y - pC.y;
+    const denom = dx1 * dy2 - dy1 * dx2;
+
+    if (Math.abs(denom) < 1e-5) {
+      showNotice('Hai đoạn thẳng song song hoặc trùng phương, không có giao điểm duy nhất!');
+      return;
+    }
+
+    const t = ((pC.x - pA.x) * dy2 - (pC.y - pA.y) * dx2) / denom;
+    const ix = Math.round(pA.x + t * dx1);
+    const iy = Math.round(pA.y + t * dy1);
+
+    saveSnapshot();
+
+    let interPt = points.find(p => Math.hypot(p.x - ix, p.y - iy) < 6);
+    if (!interPt) {
+      interPt = createPoint(ix, iy, getNextLabel(points));
+      setPoints(prev => [...prev, interPt!]);
+    }
+    setSelectedPointId(interPt.id);
+    showNotice(`Đã xác định giao điểm ${interPt.label} = ${pA.label}${pB.label} ∩ ${pC.label}${pD.label}!`);
+  };
+
   // ==========================================
   // XỬ LÝ SỰ KIỆN MENU CHUỘT PHẢI (CONTEXT MENU)
   // ==========================================
@@ -549,8 +852,9 @@ export default function GspSketchpad({
     const nearbySeg = (!nearbyPt && !nearbyTxt && !nearbyLabel) ? findNearbySegment(x, y) : null;
     const nearbyEl = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg) ? findNearbyEllipse(x, y) : null;
     const nearbyRa = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg && !nearbyEl) ? findNearbyRightAngle(x, y) : null;
+    const nearbyTrig = (!nearbyPt && !nearbyTxt && !nearbyLabel && !nearbySeg && !nearbyEl && !nearbyRa) ? findNearbyTrigAngle(x, y) : null;
 
-    let targetType: 'point' | 'segment' | 'ellipse' | 'right_angle' | 'text' | 'canvas' = 'canvas';
+    let targetType: 'point' | 'segment' | 'ellipse' | 'right_angle' | 'text' | 'trig_angle' | 'canvas' = 'canvas';
     let targetId: string | undefined = undefined;
 
     if (nearbyPt) {
@@ -559,30 +863,41 @@ export default function GspSketchpad({
       setSelectedPointId(nearbyPt.id);
       setSelectedSegmentId(null);
       setSelectedTextId(null);
+      setSelectedTrigAngleId(null);
     } else if (nearbyLabel) {
       targetType = 'point';
       targetId = nearbyLabel.point.id;
       setSelectedPointId(nearbyLabel.point.id);
       setSelectedSegmentId(null);
       setSelectedTextId(null);
+      setSelectedTrigAngleId(null);
     } else if (nearbyTxt) {
       targetType = 'text';
       targetId = nearbyTxt.id;
       setSelectedTextId(nearbyTxt.id);
       setSelectedPointId(null);
       setSelectedSegmentId(null);
+      setSelectedTrigAngleId(null);
     } else if (nearbySeg) {
       targetType = 'segment';
       targetId = nearbySeg.id;
       setSelectedSegmentId(nearbySeg.id);
       setSelectedPointId(null);
       setSelectedTextId(null);
+      setSelectedTrigAngleId(null);
     } else if (nearbyEl) {
       targetType = 'ellipse';
       targetId = nearbyEl.id;
     } else if (nearbyRa) {
       targetType = 'right_angle';
       targetId = nearbyRa.id;
+    } else if (nearbyTrig) {
+      targetType = 'trig_angle';
+      targetId = nearbyTrig.id;
+      setSelectedTrigAngleId(nearbyTrig.id);
+      setSelectedPointId(null);
+      setSelectedSegmentId(null);
+      setSelectedTextId(null);
     }
 
     setContextMenu({
@@ -1091,8 +1406,105 @@ export default function GspSketchpad({
           showNotice(`Đã ký hiệu góc vuông tại đỉnh ${vertexLabel}`);
         }
       }
+    } else if (activeTool === 'parallel') {
+      if (nearbyPt) {
+        if (parallelSegmentId) {
+          constructParallel(nearbyPt.id, parallelSegmentId);
+          setParallelPointId(null);
+          setParallelSegmentId(null);
+        } else {
+          setParallelPointId(nearbyPt.id);
+          showNotice(`Đã chọn điểm [${nearbyPt.label}]. Hãy nhấp chọn một cạnh để kẻ đường song song.`);
+        }
+      } else if (nearbySeg) {
+        if (parallelPointId) {
+          constructParallel(parallelPointId, nearbySeg.id);
+          setParallelPointId(null);
+          setParallelSegmentId(null);
+        } else {
+          setParallelSegmentId(nearbySeg.id);
+          showNotice('Đã chọn cạnh. Hãy nhấp chọn một điểm để kẻ đường song song qua điểm đó.');
+        }
+      } else {
+        const newPt = createPoint(x, y, getNextLabel(points));
+        setPoints(prev => [...prev, newPt]);
+        if (parallelSegmentId) {
+          constructParallel(newPt.id, parallelSegmentId);
+          setParallelPointId(null);
+          setParallelSegmentId(null);
+        } else {
+          setParallelPointId(newPt.id);
+          showNotice(`Đã tạo điểm [${newPt.label}]. Hãy nhấp chọn một đoạn thẳng để kẻ song song.`);
+        }
+      }
+    } else if (activeTool === 'intersection') {
+      if (nearbySeg) {
+        if (!intersectFirstSegmentId) {
+          setIntersectFirstSegmentId(nearbySeg.id);
+          showNotice('Đã chọn đoạn thẳng thứ nhất. Hãy nhấp chọn đoạn thẳng thứ hai để tìm giao điểm.');
+        } else {
+          constructIntersection(intersectFirstSegmentId, nearbySeg.id);
+          setIntersectFirstSegmentId(null);
+        }
+      } else {
+        showNotice('Hãy nhấp chuột vào đoạn thẳng để tìm giao điểm.');
+      }
+    } else if (activeTool === 'trig_angle') {
+      let targetPt = nearbyPt;
+      if (!targetPt) {
+        targetPt = createPoint(x, y, getNextLabel(points));
+        setPoints(prev => [...prev, targetPt!]);
+      }
+
+      const nextSteps = [...trigAngleStepPoints, targetPt.id];
+      if (nextSteps.length === 1) {
+        setTrigAngleStepPoints(nextSteps);
+        showNotice(`Đã chọn đỉnh [${targetPt.label}]. Hãy nhấp chọn điểm trên TIA ĐẦU (Ou).`);
+      } else if (nextSteps.length === 2) {
+        setTrigAngleStepPoints(nextSteps);
+        showNotice(`Đã chọn tia đầu [${targetPt.label}]. Hãy nhấp chọn điểm trên TIA CUỐI (Ov).`);
+      } else if (nextSteps.length === 3) {
+        saveSnapshot();
+        const pO = points.find(p => p.id === nextSteps[0]) || targetPt;
+        const pU = points.find(p => p.id === nextSteps[1]) || targetPt;
+        const pV = targetPt;
+
+        // Tự động tạo các đoạn thẳng tia Ou, Ov nếu chưa có
+        const segsToAdd: GspSegment[] = [];
+        if (!segments.some(s => (s.p1Id === pO.id && s.p2Id === pU.id) || (s.p1Id === pU.id && s.p2Id === pO.id))) {
+          segsToAdd.push({ id: 'seg_' + Date.now() + '_1', p1Id: pO.id, p2Id: pU.id, style: 'solid', color: '#000000', width: 1.6 });
+        }
+        if (!segments.some(s => (s.p1Id === pO.id && s.p2Id === pV.id) || (s.p1Id === pV.id && s.p2Id === pO.id))) {
+          segsToAdd.push({ id: 'seg_' + Date.now() + '_2', p1Id: pO.id, p2Id: pV.id, style: 'solid', color: '#000000', width: 1.6 });
+        }
+        if (segsToAdd.length > 0) {
+          setSegments(prev => [...prev, ...segsToAdd]);
+        }
+
+        const newTa: GspTrigAngle = {
+          id: 'trig_' + Date.now(),
+          vertexPointId: pO.id,
+          startPointId: pU.id,
+          endPointId: pV.id,
+          label: 'α',
+          clockwise: false,
+          turns: 0,
+          radius: 40,
+          color: activeColor || '#0284c7'
+        };
+        setTrigAngles(prev => [...prev, newTa]);
+        setSelectedTrigAngleId(newTa.id);
+        setTrigAngleStepPoints([]);
+        showNotice(`Đã tạo góc lượng giác (${pO.label}${pU.label}, ${pO.label}${pV.label}) chiều dương (+) chuẩn SGK 11!`);
+      }
     } else if (activeTool === 'eraser') {
       saveSnapshot();
+      const nearbyTa = findNearbyTrigAngle(x, y);
+      if (nearbyTa) {
+        setTrigAngles(tas => tas.filter(t => t.id !== nearbyTa.id));
+        showNotice('Đã xóa góc lượng giác');
+        return;
+      }
       const nearbyRa = findNearbyRightAngle(x, y);
       if (nearbyRa) {
         setRightAngles(ras => ras.filter(r => r.id !== nearbyRa.id));
@@ -1112,6 +1524,7 @@ export default function GspSketchpad({
         setCircles(circs => circs.filter(c => c.centerId !== nearbyPt.id && c.radiusPointId !== nearbyPt.id));
         setEllipses(els => els.filter(e => e.centerId !== nearbyPt.id && e.rxPointId !== nearbyPt.id));
         setRightAngles(ras => ras.filter(r => r.vertexId !== nearbyPt.id && r.p1Id !== nearbyPt.id && r.p2Id !== nearbyPt.id));
+        setTrigAngles(tas => tas.filter(t => t.vertexPointId !== nearbyPt.id && t.startPointId !== nearbyPt.id && t.endPointId !== nearbyPt.id));
         showNotice(`Đã xóa điểm ${nearbyPt.label}`);
       } else if (nearbyTxt) {
         setTexts(pts => pts.filter(t => t.id !== nearbyTxt.id));
@@ -1966,6 +2379,87 @@ export default function GspSketchpad({
       ]);
       setTexts([]);
       showNotice('Đã nạp mẫu: Tam giác ABC vuông tại A có đường cao AH');
+    } else if (presetType === 'goc_luong_giac_duong') {
+      const pO = createPoint(360, 320, 'O', -16, 18);
+      const pU = createPoint(540, 320, 'u', 12, 4);
+      const pV = createPoint(450, 164, 'v', 10, -8);
+      setPoints([pO, pU, pV]);
+      setSegments([
+        { id: 's_ou', p1Id: pO.id, p2Id: pU.id, style: 'solid', color: '#000000', width: 1.8 },
+        { id: 's_ov', p1Id: pO.id, p2Id: pV.id, style: 'solid', color: '#000000', width: 1.8 }
+      ]);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTexts([]);
+      setTrigAngles([
+        {
+          id: 'ta_pos',
+          vertexPointId: pO.id,
+          startPointId: pU.id,
+          endPointId: pV.id,
+          label: 'α = 60° (π/3)',
+          clockwise: false,
+          turns: 0,
+          radius: 46,
+          color: '#0284c7'
+        }
+      ]);
+      showNotice('Đã nạp mẫu: Góc lượng giác (Ou, Ov) = +60° (π/3) - SGK Toán 11');
+    } else if (presetType === 'goc_luong_giac_am') {
+      const pO = createPoint(360, 260, 'O', -16, -12);
+      const pU = createPoint(540, 260, 'u', 12, 4);
+      const pV = createPoint(270, 415, 'v', -18, 16);
+      setPoints([pO, pU, pV]);
+      setSegments([
+        { id: 's_ou', p1Id: pO.id, p2Id: pU.id, style: 'solid', color: '#000000', width: 1.8 },
+        { id: 's_ov', p1Id: pO.id, p2Id: pV.id, style: 'solid', color: '#000000', width: 1.8 }
+      ]);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTexts([]);
+      setTrigAngles([
+        {
+          id: 'ta_neg',
+          vertexPointId: pO.id,
+          startPointId: pU.id,
+          endPointId: pV.id,
+          label: 'α = -120°',
+          clockwise: true,
+          turns: 0,
+          radius: 46,
+          color: '#dc2626'
+        }
+      ]);
+      showNotice('Đã nạp mẫu: Góc lượng giác chiều âm (Ou, Ov) = -120° - SGK Toán 11');
+    } else if (presetType === 'goc_luong_giac_xoan_oc') {
+      const pO = createPoint(360, 280, 'O', -16, 18);
+      const pU = createPoint(540, 280, 'u', 12, 4);
+      const pV = createPoint(450, 124, 'v', 10, -8);
+      setPoints([pO, pU, pV]);
+      setSegments([
+        { id: 's_ou', p1Id: pO.id, p2Id: pU.id, style: 'solid', color: '#000000', width: 1.8 },
+        { id: 's_ov', p1Id: pO.id, p2Id: pV.id, style: 'solid', color: '#000000', width: 1.8 }
+      ]);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTexts([]);
+      setTrigAngles([
+        {
+          id: 'ta_spiral',
+          vertexPointId: pO.id,
+          startPointId: pU.id,
+          endPointId: pV.id,
+          label: 'α = 420° (360° + 60°)',
+          clockwise: false,
+          turns: 1,
+          radius: 36,
+          color: '#7c3aed'
+        }
+      ]);
+      showNotice('Đã nạp mẫu: Góc lượng giác xoắn ốc nhiều vòng +420° - SGK Toán 11');
     }
   };
 
@@ -2003,7 +2497,32 @@ export default function GspSketchpad({
       minY = Math.min(minY, p.y - 14, ly - 22);
       maxY = Math.max(maxY, p.y + 14, ly + 6);
     }
+    for (const s of segments) {
+      if (s.hidden) continue;
+      const p1 = points.find(pt => pt.id === s.p1Id);
+      const p2 = points.find(pt => pt.id === s.p2Id);
+      if (p1 && p2) {
+        hasContent = true;
+        minX = Math.min(minX, p1.x - 4, p2.x - 4);
+        maxX = Math.max(maxX, p1.x + 4, p2.x + 4);
+        minY = Math.min(minY, p1.y - 4, p2.y - 4);
+        maxY = Math.max(maxY, p1.y + 4, p2.y + 4);
+      }
+    }
+    for (const ta of trigAngles) {
+      if (ta.hidden) continue;
+      const v = points.find(pt => pt.id === (ta.vertexPointId || ta.vertexId));
+      if (v) {
+        hasContent = true;
+        const r = (ta.radius || 40) + (ta.turns ? ta.turns * 14 : 0) + 26;
+        minX = Math.min(minX, v.x - r);
+        maxX = Math.max(maxX, v.x + r);
+        minY = Math.min(minY, v.y - r);
+        maxY = Math.max(maxY, v.y + r);
+      }
+    }
     for (const c of circles) {
+      if (c.hidden) continue;
       const center = points.find(pt => pt.id === c.centerId);
       if (center) {
         hasContent = true;
@@ -2015,6 +2534,7 @@ export default function GspSketchpad({
       }
     }
     for (const el of ellipses) {
+      if (el.hidden) continue;
       const center = points.find(pt => pt.id === el.centerId);
       if (center) {
         hasContent = true;
@@ -2025,6 +2545,7 @@ export default function GspSketchpad({
       }
     }
     for (const t of texts) {
+      if (t.hidden) continue;
       hasContent = true;
       minX = Math.min(minX, t.x - 8);
       maxX = Math.max(maxX, t.x + 130);
@@ -2153,15 +2674,22 @@ export default function GspSketchpad({
         const tool = ce.detail.tool;
         if (tool === 'clear') {
           handleClearAll();
-        } else if (['select', 'point', 'point_on_segment', 'segment', 'vector', 'circle', 'ellipse', 'right_angle', 'text', 'eraser'].includes(tool)) {
+        } else if (['select', 'point', 'point_on_segment', 'segment', 'parallel', 'intersection', 'trig_angle', 'vector', 'circle', 'ellipse', 'right_angle', 'text', 'eraser'].includes(tool)) {
           setActiveTool(tool as any);
           setDrawingStartPointId(null);
           setAngleVertices([]);
+          setParallelPointId(null);
+          setParallelSegmentId(null);
+          setIntersectFirstSegmentId(null);
+          setTrigAngleStepPoints([]);
           showNotice(`Đã kích hoạt: ${
             tool === 'select' ? 'Chọn & Dời đối tượng' :
             tool === 'point' ? 'Chấm điểm tự do' :
             tool === 'point_on_segment' ? 'Điểm trên cạnh (phụ thuộc)' :
             tool === 'segment' ? 'Vẽ đoạn thẳng' :
+            tool === 'parallel' ? 'Vẽ đoạn thẳng song song qua 1 điểm' :
+            tool === 'intersection' ? 'Xác định giao điểm của hai đoạn thẳng' :
+            tool === 'trig_angle' ? 'Vẽ góc lượng giác định hướng (Toán 11 SGK)' :
             tool === 'vector' ? 'Vẽ véc-tơ' :
             tool === 'circle' ? 'Vẽ đường tròn' :
             tool === 'ellipse' ? 'Vẽ đáy Elip không gian' :
@@ -2194,6 +2722,9 @@ export default function GspSketchpad({
           'cone': 'cone',
           'cylinder': 'cylinder',
           'hinh_cau': 'hinh_cau',
+          'goc_luong_giac_duong': 'goc_luong_giac_duong',
+          'goc_luong_giac_am': 'goc_luong_giac_am',
+          'goc_luong_giac_xoan_oc': 'goc_luong_giac_xoan_oc',
         };
         const presetKey = sampleMap[sample] || sample;
         loadPreset(presetKey);
@@ -2220,11 +2751,43 @@ export default function GspSketchpad({
         const sz = ce.detail.size;
         setPointSize(sz);
         showNotice(`Cỡ chấm điểm: ${sz === 'tiny' ? 'Siêu nhỏ (1.4px)' : sz === 'medium' ? 'Vừa (2.8px)' : 'Nhỏ SGK vừa đủ nhìn (2.0px)'}`);
+      } else if (type === 'gsp_toggle_hide') {
+        saveSnapshot();
+        if (selectedPointId) {
+          setPoints(pts => pts.map(p => p.id === selectedPointId ? { ...p, hidden: !p.hidden } : p));
+          showNotice('Đã đổi trạng thái Ẩn/Hiện của điểm (Ctrl+H)');
+        } else if (selectedSegmentId) {
+          setSegments(segs => segs.map(s => s.id === selectedSegmentId ? { ...s, hidden: !s.hidden } : s));
+          showNotice('Đã đổi trạng thái Ẩn/Hiện của đoạn thẳng (Ctrl+H)');
+        } else if (selectedTrigAngleId) {
+          setTrigAngles(tas => tas.map(ta => ta.id === selectedTrigAngleId ? { ...ta, hidden: !ta.hidden } : ta));
+          showNotice('Đã đổi trạng thái Ẩn/Hiện của góc lượng giác (Ctrl+H)');
+        } else if (selectedTextId) {
+          setTexts(txts => txts.map(t => t.id === selectedTextId ? { ...t, hidden: !t.hidden } : t));
+          showNotice('Đã đổi trạng thái Ẩn/Hiện của chữ chú thích (Ctrl+H)');
+        } else {
+          setShowHiddenElements(prev => !prev);
+          showNotice(showHiddenElements ? 'Đã tắt chế độ xem đối tượng ẩn' : 'Đã bật chế độ xem đối tượng ẩn');
+        }
+      } else if (type === 'gsp_show_all') {
+        saveSnapshot();
+        setPoints(pts => pts.map(p => ({ ...p, hidden: false })));
+        setSegments(segs => segs.map(s => ({ ...s, hidden: false })));
+        setCircles(circs => circs.map(c => ({ ...c, hidden: false })));
+        setEllipses(els => els.map(e => ({ ...e, hidden: false })));
+        setRightAngles(ras => ras.map(r => ({ ...r, hidden: false })));
+        setTexts(txts => txts.map(t => ({ ...t, hidden: false })));
+        setTrigAngles(tas => tas.map(ta => ({ ...ta, hidden: false })));
+        setShowHiddenElements(false);
+        showNotice('Đã hiện lại tất cả các đối tượng bị ẩn (Ctrl+Shift+H)!');
+      } else if (type === 'gsp_toggle_ghost') {
+        setShowHiddenElements(prev => !prev);
+        showNotice(!showHiddenElements ? 'Đã bật chế độ xem mờ đối tượng ẩn (Ghost Mode)' : 'Đã tắt chế độ xem mờ');
       }
     };
     window.addEventListener('lvp_ribbon_action', handleRibbonAction);
     return () => window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
-  }, [points, segments, circles, ellipses, rightAngles, texts, activeTool]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, trigAngles, activeTool, selectedPointId, selectedSegmentId, selectedTrigAngleId, selectedTextId, showHiddenElements]);
 
   // ==========================================
   // HÀM VẼ TOÀN BỘ BẢN VẼ GSP LÊN CANVAS
@@ -2255,6 +2818,7 @@ export default function GspSketchpad({
 
     // 2. Vẽ các đường tròn
     for (const c of circles) {
+      if (c.hidden && (!isInteractive || !showHiddenElements)) continue;
       const center = ptMap.get(c.centerId);
       if (!center) continue;
       let r = c.radius || 50;
@@ -2264,9 +2828,14 @@ export default function GspSketchpad({
       }
 
       ctx.save();
+      if (c.hidden && showHiddenElements) {
+        ctx.globalAlpha = 0.35;
+        ctx.setLineDash([4, 4]);
+      } else if (c.style === 'dashed') {
+        ctx.setLineDash([5, 4]);
+      }
       ctx.strokeStyle = c.color || '#000000';
       ctx.lineWidth = 2.2;
-      if (c.style === 'dashed') ctx.setLineDash([5, 4]);
       ctx.beginPath();
       ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
       ctx.stroke();
@@ -2275,6 +2844,7 @@ export default function GspSketchpad({
 
     // 2.5. Vẽ các hình Elip (Đáy hình nón / hình trụ / elip học tập)
     for (const el of ellipses) {
+      if (el.hidden && (!isInteractive || !showHiddenElements)) continue;
       const center = ptMap.get(el.centerId);
       if (!center) continue;
 
@@ -2301,6 +2871,9 @@ export default function GspSketchpad({
       }
 
       ctx.save();
+      if (el.hidden && showHiddenElements) {
+        ctx.globalAlpha = 0.35;
+      }
       ctx.strokeStyle = el.color || '#000000';
       ctx.lineWidth = el.width || 2.2;
 
@@ -2326,7 +2899,6 @@ export default function GspSketchpad({
         ctx.ellipse(center.x, center.y, rx, ry, 0, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        // solid
         ctx.setLineDash([]);
         ctx.beginPath();
         ctx.ellipse(center.x, center.y, rx, ry, 0, 0, Math.PI * 2);
@@ -2337,6 +2909,7 @@ export default function GspSketchpad({
 
     // 3. Vẽ các đoạn thẳng
     for (const s of segments) {
+      if (s.hidden && (!isInteractive || !showHiddenElements)) continue;
       const p1 = ptMap.get(s.p1Id);
       const p2 = ptMap.get(s.p2Id);
       if (!p1 || !p2) continue;
@@ -2354,11 +2927,30 @@ export default function GspSketchpad({
         ctx.restore();
       }
 
+      // Highlight khi chọn trong công cụ song song hoặc giao điểm
+      if (isInteractive && (parallelSegmentId === s.id || intersectFirstSegmentId === s.id)) {
+        ctx.save();
+        ctx.strokeStyle = parallelSegmentId === s.id ? 'rgba(245, 158, 11, 0.8)' : 'rgba(147, 51, 234, 0.8)';
+        ctx.lineWidth = (s.width || 1.6) + 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.save();
+      if (s.hidden && showHiddenElements) {
+        ctx.globalAlpha = 0.35;
+        ctx.setLineDash([4, 4]);
+      } else if (s.style === 'dashed') {
+        ctx.setLineDash([5, 4]);
+      }
+
       ctx.strokeStyle = s.color || '#000000';
       ctx.lineWidth = s.width || (s.style === 'dashed' ? 1.8 : 2.2);
       ctx.lineCap = 'round';
-      if (s.style === 'dashed') ctx.setLineDash([5, 4]);
 
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
@@ -2384,6 +2976,7 @@ export default function GspSketchpad({
         const notchY = tipY - (arrowLen * 0.72) * Math.sin(angle);
 
         ctx.save();
+        if (s.hidden && showHiddenElements) ctx.globalAlpha = 0.35;
         ctx.fillStyle = s.color || '#000000';
         ctx.setLineDash([]);
         ctx.beginPath();
@@ -2399,6 +2992,7 @@ export default function GspSketchpad({
 
     // 4. Vẽ ký hiệu góc vuông
     for (const ra of rightAngles) {
+      if (ra.hidden && (!isInteractive || !showHiddenElements)) continue;
       const v = ptMap.get(ra.vertexId);
       const p1 = ptMap.get(ra.p1Id);
       const p2 = ptMap.get(ra.p2Id);
@@ -2420,6 +3014,7 @@ export default function GspSketchpad({
       const kCornerY = k1y + u2y * size;
 
       ctx.save();
+      if (ra.hidden && showHiddenElements) ctx.globalAlpha = 0.35;
       ctx.strokeStyle = ra.color || '#000000';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -2428,7 +3023,6 @@ export default function GspSketchpad({
       ctx.lineTo(k2x, k2y);
       ctx.stroke();
 
-      // Nếu có chấm tròn ở giữa (style with_dot)
       if (ra.hasDot) {
         const dotX = v.x + (u1x + u2x) * (size * 0.45);
         const dotY = v.y + (u1y + u2y) * (size * 0.45);
@@ -2437,6 +3031,148 @@ export default function GspSketchpad({
         ctx.fillStyle = ra.color || '#000000';
         ctx.fill();
       }
+      ctx.restore();
+    }
+
+    // 4.5. Vẽ các góc lượng giác định hướng (Toán 11 SGK)
+    for (const ta of trigAngles) {
+      if (ta.hidden && (!isInteractive || !showHiddenElements)) continue;
+      const v = ptMap.get(ta.vertexPointId || ta.vertexId || '');
+      const p1 = ptMap.get(ta.startPointId);
+      const p2 = ptMap.get(ta.endPointId);
+      if (!v || !p1 || !p2) continue;
+
+      ctx.save();
+      if (ta.hidden && showHiddenElements) ctx.globalAlpha = 0.35;
+
+      if (isInteractive && (hoveredTrigAngleId === ta.id || selectedTrigAngleId === ta.id)) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(2, 132, 199, 0.35)';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, ta.radius || 40, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const a1 = Math.atan2(p1.y - v.y, p1.x - v.x);
+      const a2 = Math.atan2(p2.y - v.y, p2.x - v.x);
+      const isAnticlockwise = !ta.clockwise; // Dương (+) = CCW trong canvas anticlockwise
+      const baseR = ta.radius || 40;
+      const color = ta.color || (ta.clockwise ? '#dc2626' : '#0284c7');
+      const turns = ta.turns || 0;
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2.0;
+
+      if (turns > 0) {
+        // Góc lượng giác nhiều vòng (> 360° xoắn ốc Archimedes)
+        const totalSteps = 60 * (turns + 1);
+        let sweep = a2 - a1;
+        if (isAnticlockwise) {
+          while (sweep > 0) sweep -= 2 * Math.PI;
+          sweep -= turns * 2 * Math.PI;
+        } else {
+          while (sweep < 0) sweep += 2 * Math.PI;
+          sweep += turns * 2 * Math.PI;
+        }
+
+        const rStart = 18;
+        const rEnd = baseR + turns * 14;
+
+        ctx.beginPath();
+        for (let i = 0; i <= totalSteps; i++) {
+          const t = i / totalSteps;
+          const curA = a1 + sweep * t;
+          const curR = rStart + (rEnd - rStart) * t;
+          const px = v.x + curR * Math.cos(curA);
+          const py = v.y + curR * Math.sin(curA);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // Mũi tên chỉ chiều quay tại điểm kết thúc a2
+        const tipX = v.x + rEnd * Math.cos(a2);
+        const tipY = v.y + rEnd * Math.sin(a2);
+        const tanA = a2 + (isAnticlockwise ? -Math.PI / 2 : Math.PI / 2);
+        const arrowLen = 12;
+        const w1x = tipX - arrowLen * Math.cos(tanA - 0.45);
+        const w1y = tipY - arrowLen * Math.sin(tanA - 0.45);
+        const w2x = tipX - arrowLen * Math.cos(tanA + 0.45);
+        const w2y = tipY - arrowLen * Math.sin(tanA + 0.45);
+
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(w1x, w1y);
+        ctx.lineTo(w2x, w2y);
+        ctx.closePath();
+        ctx.fill();
+
+        if (ta.label) {
+          const midA = a1 + sweep * 0.5;
+          const lblR = rEnd + 16;
+          const lx = v.x + lblR * Math.cos(midA);
+          const ly = v.y + lblR * Math.sin(midA);
+
+          ctx.font = 'italic bold 15px "Times New Roman", serif';
+          const txtW = ctx.measureText(ta.label).width;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(lx - txtW / 2 - 4, ly - 10, txtW + 8, 20);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(lx - txtW / 2 - 4, ly - 10, txtW + 8, 20);
+          ctx.fillStyle = color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ta.label, lx, ly);
+        }
+      } else {
+        // Cung tròn định hướng thông thường
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, baseR, a1, a2, isAnticlockwise);
+        ctx.stroke();
+
+        const tipX = v.x + baseR * Math.cos(a2);
+        const tipY = v.y + baseR * Math.sin(a2);
+        const tanA = a2 + (isAnticlockwise ? -Math.PI / 2 : Math.PI / 2);
+        const arrowLen = 11;
+        const w1x = tipX - arrowLen * Math.cos(tanA - 0.45);
+        const w1y = tipY - arrowLen * Math.sin(tanA - 0.45);
+        const w2x = tipX - arrowLen * Math.cos(tanA + 0.45);
+        const w2y = tipY - arrowLen * Math.sin(tanA + 0.45);
+
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(w1x, w1y);
+        ctx.lineTo(w2x, w2y);
+        ctx.closePath();
+        ctx.fill();
+
+        if (ta.label) {
+          let sweep = a2 - a1;
+          if (isAnticlockwise) {
+            while (sweep > 0) sweep -= 2 * Math.PI;
+          } else {
+            while (sweep < 0) sweep += 2 * Math.PI;
+          }
+          const midA = a1 + sweep * 0.5;
+          const lblR = baseR + 15;
+          const lx = v.x + lblR * Math.cos(midA);
+          const ly = v.y + lblR * Math.sin(midA);
+
+          ctx.font = 'italic bold 15px "Times New Roman", serif';
+          const txtW = ctx.measureText(ta.label).width;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(lx - txtW / 2 - 3, ly - 9, txtW + 6, 18);
+          ctx.fillStyle = color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ta.label, lx, ly);
+        }
+      }
+
       ctx.restore();
     }
 
@@ -2531,6 +3267,8 @@ export default function GspSketchpad({
       const isHovered = isInteractive && hoveredPointId === p.id;
       const isDrawingStart = isInteractive && drawingStartPointId === p.id;
       const angleStepIdx = isInteractive && activeTool === 'right_angle' ? angleVertices.indexOf(p.id) : -1;
+      const trigStepIdx = isInteractive && activeTool === 'trig_angle' ? trigAngleStepPoints.indexOf(p.id) : -1;
+      const isParallelPt = isInteractive && parallelPointId === p.id;
 
       ctx.save();
       if (angleStepIdx >= 0) {
@@ -2548,6 +3286,36 @@ export default function GspSketchpad({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(`${angleStepIdx + 1}`, p.x, p.y - 18);
+      } else if (trigStepIdx >= 0) {
+        // Điểm đang chọn tạo góc lượng giác (1: Đỉnh, 2: Tia đầu)
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(2, 132, 199, 0.25)';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fill();
+
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillStyle = '#0369a1';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(trigStepIdx === 0 ? 'Đỉnh (O)' : 'Tia đầu (u)', p.x, p.y - 18);
+      } else if (isParallelPt) {
+        // Điểm chọn kẻ đường song song
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fill();
+
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillStyle = '#b45309';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Điểm //', p.x, p.y - 18);
       } else if (isInteractive && (isSelected || isHovered || isDrawingStart)) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, isSelected ? 8 : 6, 0, Math.PI * 2);
@@ -2768,7 +3536,7 @@ export default function GspSketchpad({
     ctx.fillRect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
 
     renderGspScene(ctx, true);
-  }, [points, segments, circles, ellipses, rightAngles, texts, charts, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, pointSize, selectedPointId, hoveredPointId, hoveredLabelPointId, draggedLabelPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
+  }, [points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles, selectedChartId, hoveredChartId, chartRenderTrigger, showGrid, pointDisplayMode, pointSize, selectedPointId, hoveredPointId, hoveredLabelPointId, draggedLabelPointId, selectedSegmentId, hoveredSegmentId, hoveredEllipseId, selectedTextId, hoveredTextId, selectedTrigAngleId, hoveredTrigAngleId, showHiddenElements, parallelPointId, parallelSegmentId, intersectFirstSegmentId, trigAngleStepPoints, drawingStartPointId, drawingCurrentMouse, angleVertices, angleFirstSegmentId, rightAngleSize, rightAngleStyle, ellipseStyle, activeTool, activeColor, lineStyle, snappedSegmentPoint]);
 
   // Nạp sẵn mẫu hình ban đầu nếu trống hoặc khi externalPreset thay đổi
   useEffect(() => {
@@ -2789,6 +3557,9 @@ export default function GspSketchpad({
     if (activeTool === 'right_angle') return 'crosshair';
     if (activeTool === 'point_on_segment') return 'crosshair';
     if (activeTool === 'vector') return 'crosshair';
+    if (activeTool === 'parallel') return 'crosshair';
+    if (activeTool === 'intersection') return 'crosshair';
+    if (activeTool === 'trig_angle') return 'crosshair';
     if (hoveredPointId || hoveredTextId || hoveredLabelPointId || draggedLabelPointId) return 'move';
     if (activeTool === 'select') {
       if (selectedChartId) {
@@ -2959,6 +3730,61 @@ export default function GspSketchpad({
 
               <button
                 onClick={() => {
+                  setActiveTool('parallel');
+                  setDrawingStartPointId(null);
+                  setParallelPointId(null);
+                  setParallelSegmentId(null);
+                  showNotice('Đã chọn công cụ dựng đường song song. Chọn 1 điểm và 1 cạnh.');
+                }}
+                className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeTool === 'parallel'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                title="Dựng đoạn thẳng qua 1 điểm song song với 1 cạnh"
+              >
+                <Equal size={15} />
+                <span>Song song</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTool('intersection');
+                  setDrawingStartPointId(null);
+                  setIntersectFirstSegmentId(null);
+                  showNotice('Đã chọn công cụ giao điểm. Nhấp lần lượt vào 2 đoạn thẳng.');
+                }}
+                className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeTool === 'intersection'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                title="Xác định giao điểm của 2 đoạn thẳng"
+              >
+                <X size={15} />
+                <span>Giao điểm</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTool('trig_angle');
+                  setDrawingStartPointId(null);
+                  setTrigAngleStepPoints([]);
+                  showNotice('Đã chọn góc lượng giác. Nhấp 3 điểm: Đỉnh O ➔ Tia đầu Ou ➔ Tia cuối Ov.');
+                }}
+                className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  activeTool === 'trig_angle'
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                }`}
+                title="Vẽ góc lượng giác định hướng (Toán 11 SGK)"
+              >
+                <RotateCw size={15} />
+                <span>Góc LG</span>
+              </button>
+
+              <button
+                onClick={() => {
                   const next = pointDisplayMode === 'all' ? 'labels_only' : pointDisplayMode === 'labels_only' ? 'hidden' : 'all';
                   setPointDisplayMode(next);
                   showNotice(
@@ -2994,6 +3820,71 @@ export default function GspSketchpad({
               </button>
             </div>
           </div>
+
+          {/* HƯỚNG DẪN CÔNG CỤ SONG SONG */}
+          {activeTool === 'parallel' && (
+            <div className="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-xl border border-teal-200 dark:border-teal-800 space-y-2 animate-fade-in text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-teal-800 dark:text-teal-200 flex items-center gap-1.5">
+                  <Equal size={14} /> Dựng đoạn thẳng song song:
+                </span>
+                <button
+                  onClick={() => setActiveTool('select')}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+              <div className="text-[10px] text-teal-800/80 dark:text-teal-300/80 bg-teal-100/60 dark:bg-teal-900/30 p-2 rounded-lg leading-relaxed">
+                {parallelPointId ? '✅ Đã chọn điểm. Hãy nhấp vào 1 đoạn thẳng để kẻ song song.' :
+                 parallelSegmentId ? '✅ Đã chọn cạnh. Hãy nhấp vào 1 điểm để kẻ song song qua điểm đó.' :
+                 'Nhấp chọn 1 điểm và 1 đoạn thẳng (thứ tự bất kỳ). Hệ thống sẽ tự động cắt các cạnh đa giác đối diện.'}
+              </div>
+            </div>
+          )}
+
+          {/* HƯỚNG DẪN CÔNG CỤ GIAO ĐIỂM */}
+          {activeTool === 'intersection' && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 rounded-xl border border-purple-200 dark:border-purple-800 space-y-2 animate-fade-in text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-purple-800 dark:text-purple-200 flex items-center gap-1.5">
+                  <X size={14} /> Xác định giao điểm:
+                </span>
+                <button
+                  onClick={() => setActiveTool('select')}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+              <div className="text-[10px] text-purple-800/80 dark:text-purple-300/80 bg-purple-100/60 dark:bg-purple-900/30 p-2 rounded-lg leading-relaxed">
+                {intersectFirstSegmentId ? '✅ Đã chọn đoạn thứ nhất. Hãy nhấp chọn đoạn thẳng thứ hai.' :
+                 'Nhấp lần lượt vào 2 đoạn thẳng. Hệ thống sẽ tính toán và tự động gắn điểm giao nhau kèm tên đỉnh.'}
+              </div>
+            </div>
+          )}
+
+          {/* HƯỚNG DẪN CÔNG CỤ GÓC LƯỢNG GIÁC */}
+          {activeTool === 'trig_angle' && (
+            <div className="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 space-y-2 animate-fade-in text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-sky-800 dark:text-sky-200 flex items-center gap-1.5">
+                  <RotateCw size={14} /> Góc lượng giác SGK 11:
+                </span>
+                <button
+                  onClick={() => { setActiveTool('select'); setTrigAngleStepPoints([]); }}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold cursor-pointer"
+                >
+                  ✕ Đóng
+                </button>
+              </div>
+              <div className="text-[10px] text-sky-800/80 dark:text-sky-300/80 bg-sky-100/60 dark:bg-sky-900/30 p-2 rounded-lg leading-relaxed">
+                {trigAngleStepPoints.length === 0 ? 'Bước 1: Nhấp chọn ĐỈNH góc (O).' :
+                 trigAngleStepPoints.length === 1 ? 'Bước 2: Nhấp chọn điểm trên TIA ĐẦU (Ou).' :
+                 'Bước 3: Nhấp chọn điểm trên TIA CUỐI (Ov).'}
+              </div>
+            </div>
+          )}
 
           {/* TÙY CHỈNH KHI ĐANG DÙNG CÔNG CỤ ĐIỂM TRÊN CẠNH */}
           {activeTool === 'point_on_segment' && (
@@ -3729,6 +4620,55 @@ export default function GspSketchpad({
                   </span>
                 </button>
 
+                {/* 4.5. Dựng đoạn thẳng song song qua 1 điểm */}
+                <button
+                  onClick={() => {
+                    setActiveTool('parallel');
+                    setParallelSegmentId(seg.id);
+                    setParallelPointId(null);
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice('Đã chọn cạnh. Hãy nhấp chuột vào 1 điểm để kẻ đường song song.');
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <Equal size={14} className="text-teal-600" />
+                    Dựng đoạn thẳng song song qua 1 điểm...
+                  </span>
+                </button>
+
+                {/* 4.6. Xác định giao điểm với đoạn thẳng khác */}
+                <button
+                  onClick={() => {
+                    setActiveTool('intersection');
+                    setIntersectFirstSegmentId(seg.id);
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice('Đã chọn đoạn thứ nhất. Hãy nhấp vào đoạn thẳng thứ hai để tìm giao điểm.');
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <X size={14} className="text-purple-600" />
+                    Tìm giao điểm với đoạn thẳng khác...
+                  </span>
+                </button>
+
+                {/* 4.7. Ẩn / Hiện đoạn thẳng */}
+                <button
+                  onClick={() => {
+                    saveSnapshot();
+                    setSegments(prev => prev.map(s => s.id === seg.id ? { ...s, hidden: !s.hidden } : s));
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(seg.hidden ? 'Đã hiện đoạn thẳng' : 'Đã ẩn đoạn thẳng (Ctrl+H)');
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    {seg.hidden ? <Eye size={14} className="text-teal-600" /> : <EyeOff size={14} className="text-amber-600" />}
+                    {seg.hidden ? 'Hiện đoạn thẳng này' : 'Ẩn đoạn thẳng này (Ctrl+H)'}
+                  </span>
+                </button>
+
                 {/* 5. Đổi màu đoạn thẳng */}
                 <div className="px-2.5 py-1.5 border-t border-slate-100 dark:border-slate-800">
                   <span className="text-[10px] text-slate-400 font-bold block mb-1">Đổi màu nét:</span>
@@ -3875,6 +4815,39 @@ export default function GspSketchpad({
                   </span>
                 </button>
 
+                {/* 4.5. Dựng đoạn thẳng song song qua điểm này */}
+                <button
+                  onClick={() => {
+                    setActiveTool('parallel');
+                    setParallelPointId(pt.id);
+                    setParallelSegmentId(null);
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(`Đã chọn điểm [${pt.label}]. Hãy nhấp chọn 1 cạnh để kẻ đường song song.`);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <Equal size={14} className="text-teal-600" />
+                    Dựng đoạn song song qua điểm này...
+                  </span>
+                </button>
+
+                {/* 4.6. Ẩn / Hiện điểm */}
+                <button
+                  onClick={() => {
+                    saveSnapshot();
+                    setPoints(prev => prev.map(p => p.id === pt.id ? { ...p, hidden: !p.hidden } : p));
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(pt.hidden ? `Đã hiện điểm ${pt.label}` : `Đã ẩn điểm ${pt.label} (Ctrl+H)`);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    {pt.hidden ? <Eye size={14} className="text-teal-600" /> : <EyeOff size={14} className="text-amber-600" />}
+                    {pt.hidden ? 'Hiện điểm này' : 'Ẩn điểm này (Ctrl+H)'}
+                  </span>
+                </button>
+
                 {/* 5. Xóa điểm */}
                 <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
                   <button
@@ -3885,6 +4858,7 @@ export default function GspSketchpad({
                       setCircles(circs => circs.filter(c => c.centerId !== pt.id && c.radiusPointId !== pt.id));
                       setEllipses(els => els.filter(e => e.centerId !== pt.id && e.rxPointId !== pt.id));
                       setRightAngles(ras => ras.filter(r => r.vertexId !== pt.id && r.p1Id !== pt.id && r.p2Id !== pt.id));
+                      setTrigAngles(tas => tas.filter(t => t.vertexPointId !== pt.id && t.startPointId !== pt.id && t.endPointId !== pt.id));
                       setContextMenu(prev => ({ ...prev, isOpen: false }));
                       showNotice(`Đã xóa điểm ${pt.label}`);
                     }}
@@ -4035,6 +5009,112 @@ export default function GspSketchpad({
             );
           })()}
 
+          {/* CÁC TÙY CHỌN CHO GÓC LƯỢNG GIÁC */}
+          {contextMenu.targetType === 'trig_angle' && (() => {
+            const ta = trigAngles.find(t => t.id === contextMenu.targetId);
+            if (!ta) return null;
+            const pO = points.find(p => p.id === (ta.vertexPointId || ta.vertexId))?.label || 'O';
+            const pU = points.find(p => p.id === ta.startPointId)?.label || 'u';
+            const pV = points.find(p => p.id === ta.endPointId)?.label || 'v';
+
+            return (
+              <div className="space-y-0.5">
+                <div className="px-2 py-1 text-[10px] font-bold text-slate-400">
+                  Góc ({pO}{pU}, {pO}{pV}): {ta.clockwise ? 'Chiều âm (−)' : 'Chiều dương (+)'}
+                </div>
+
+                {/* 1. Đổi chiều quay */}
+                <button
+                  onClick={() => {
+                    saveSnapshot();
+                    const newCw = !ta.clockwise;
+                    setTrigAngles(prev => prev.map(t => t.id === ta.id ? { ...t, clockwise: newCw } : t));
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(`Đã đổi chiều quay thành: ${newCw ? 'Chiều âm (−) cùng chiều KĐH' : 'Chiều dương (+) ngược chiều KĐH'}`);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <RotateCw size={14} className="text-teal-600" />
+                    Đổi chiều quay ({ta.clockwise ? '− ➔ +' : '+ ➔ −'})
+                  </span>
+                </button>
+
+                {/* 2. Sửa nhãn số đo góc */}
+                <button
+                  onClick={() => {
+                    const newLabel = window.prompt('Nhập nhãn số đo góc lượng giác (ví dụ: α, 60°, π/3, −120°, 420°):', ta.label || 'α');
+                    if (newLabel !== null) {
+                      saveSnapshot();
+                      setTrigAngles(prev => prev.map(t => t.id === ta.id ? { ...t, label: newLabel.trim() } : t));
+                      showNotice(`Đã cập nhật nhãn số đo: ${newLabel.trim()}`);
+                    }
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <Edit3 size={14} className="text-teal-600" />
+                    Sửa nhãn số đo...
+                  </span>
+                  <span className="font-serif italic font-bold">{ta.label}</span>
+                </button>
+
+                {/* 3. Đổi số vòng quay (Xoắn ốc) */}
+                <button
+                  onClick={() => {
+                    saveSnapshot();
+                    const nextTurns = ((ta.turns || 0) + 1) % 3;
+                    setTrigAngles(prev => prev.map(t => t.id === ta.id ? { ...t, turns: nextTurns } : t));
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(nextTurns === 0 ? 'Đã chuyển về góc 1 vòng chuẩn' : `Đã chuyển sang góc quay ${nextTurns} vòng xoắn ốc`);
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    <RotateCw size={14} className="text-purple-600" />
+                    Số vòng quay (Xoắn ốc)
+                  </span>
+                  <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                    {ta.turns || 0} vòng
+                  </span>
+                </button>
+
+                {/* 4. Ẩn / Hiện góc lượng giác */}
+                <button
+                  onClick={() => {
+                    saveSnapshot();
+                    setTrigAngles(prev => prev.map(t => t.id === ta.id ? { ...t, hidden: !t.hidden } : t));
+                    setContextMenu(prev => ({ ...prev, isOpen: false }));
+                    showNotice(ta.hidden ? 'Đã hiện góc lượng giác' : 'Đã ẩn góc lượng giác (Ctrl+H)');
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+                >
+                  <span className="flex items-center gap-2">
+                    {ta.hidden ? <Eye size={14} className="text-teal-600" /> : <EyeOff size={14} className="text-amber-600" />}
+                    {ta.hidden ? 'Hiện góc này' : 'Ẩn góc này (Ctrl+H)'}
+                  </span>
+                </button>
+
+                {/* 5. Xóa góc lượng giác */}
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
+                  <button
+                    onClick={() => {
+                      saveSnapshot();
+                      setTrigAngles(prev => prev.filter(t => t.id !== ta.id));
+                      setContextMenu(prev => ({ ...prev, isOpen: false }));
+                      showNotice('Đã xóa góc lượng giác');
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 text-red-600 dark:hover:bg-red-950/40 dark:text-red-400 font-bold transition cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                    Xóa góc lượng giác
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* CÁC TÙY CHỌN CHO CANVAS (VÙNG TRỐNG) */}
           {contextMenu.targetType === 'canvas' && (
             <div className="space-y-0.5">
@@ -4069,6 +5149,45 @@ export default function GspSketchpad({
               >
                 <Type size={14} className="text-teal-600" />
                 Thêm chữ chú thích tại đây
+              </button>
+
+              {/* Hiện tất cả đối tượng bị ẩn */}
+              <button
+                onClick={() => {
+                  saveSnapshot();
+                  setPoints(pts => pts.map(p => ({ ...p, hidden: false })));
+                  setSegments(segs => segs.map(s => ({ ...s, hidden: false })));
+                  setCircles(circs => circs.map(c => ({ ...c, hidden: false })));
+                  setEllipses(els => els.map(e => ({ ...e, hidden: false })));
+                  setRightAngles(ras => ras.map(r => ({ ...r, hidden: false })));
+                  setTexts(txts => txts.map(t => ({ ...t, hidden: false })));
+                  setTrigAngles(tas => tas.map(ta => ({ ...ta, hidden: false })));
+                  setShowHiddenElements(false);
+                  setContextMenu(prev => ({ ...prev, isOpen: false }));
+                  showNotice('Đã hiện lại tất cả các đối tượng bị ẩn (Ctrl+Shift+H)!');
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+              >
+                <span className="flex items-center gap-2">
+                  <Eye size={14} className="text-teal-600" />
+                  Hiện tất cả đối tượng ẩn
+                </span>
+                <span className="text-[10px] opacity-60">Ctrl+Shift+H</span>
+              </button>
+
+              {/* Chế độ xem mờ đối tượng ẩn */}
+              <button
+                onClick={() => {
+                  setShowHiddenElements(prev => !prev);
+                  setContextMenu(prev => ({ ...prev, isOpen: false }));
+                  showNotice(!showHiddenElements ? 'Đã bật chế độ xem mờ đối tượng ẩn (Ghost Mode)' : 'Đã tắt chế độ xem mờ');
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer font-medium"
+              >
+                <span className="flex items-center gap-2">
+                  <EyeOff size={14} className="text-amber-600" />
+                  {showHiddenElements ? 'Tắt xem mờ đối tượng ẩn' : 'Bật xem mờ đối tượng ẩn (Ghost)'}
+                </span>
               </button>
 
               <div className="border-t border-slate-100 dark:border-slate-800 pt-1">

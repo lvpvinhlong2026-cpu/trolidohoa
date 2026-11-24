@@ -44,7 +44,7 @@ export default function UserGuide() {
             <ul className="list-disc pl-5 text-sm text-teal-700 dark:text-teal-200 space-y-1.5">
               <li><strong>Chuẩn độ phân giải 300 DPI:</strong> Mọi hình vẽ, bảng biến thiên và biểu đồ đều được gắn metadata pHYs 300 DPI, khi dán vào Word (Ctrl + V) không bị mờ nhòe hay vỡ hạt.</li>
               <li><strong>Chế độ in đen trắng (Hoa văn SGK):</strong> Tự động gán hoa văn (gạch chéo, chấm bi, sọc caro) cho các cột và lát quạt, phục vụ tối ưu cho việc in đề thi photocopy.</li>
-              <li><strong>Hoạt động mượt mà offline & AI thông minh:</strong> Các công cụ vẽ hoạt động tức thì trên trình duyệt; phần AI (GeoGebra 3D, mô phỏng) hỗ trợ sinh mã nhanh.</li>
+              <li><strong>Hoạt động mượt mà 100% offline:</strong> Toàn bộ các công cụ đồ họa toán học (Đồ thị 2D, Bảng biến thiên, Hình phẳng GSP, Thống kê & Xác suất) hoạt động tức thì, bảo mật tuyệt đối, xuất ảnh 300 DPI chuẩn Word.</li>
             </ul>
           </div>
         </div>
@@ -171,20 +171,6 @@ export default function UserGuide() {
     },
 
     {
-      id: 'geogebra_guide',
-      title: 'GeoGebra 3D AI',
-      icon: <Layers size={18} />,
-      content: (
-        <div className="space-y-5">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">Trợ Lý Dựng Hình GeoGebra 3D AI</h2>
-          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Sử dụng trí tuệ nhân tạo Gemini để tự động sinh lệnh dựng hình GeoGebra 3D từ mô tả tiếng Việt (ví dụ: "Cho hình chóp S.ABCD đáy hình vuông cạnh a, SA vuông góc đáy").
-          </p>
-        </div>
-      )
-    },
-
-    {
       id: 'probability_tree_guide',
       title: 'Sơ đồ Cây Xác suất & Định lý Bayes',
       icon: <GitFork size={18} />,
@@ -205,20 +191,6 @@ export default function UserGuide() {
               <li><strong>Xuất ảnh 300 DPI:</strong> 1-click chép thẳng vào Clipboard Word hoặc tải ảnh PNG độ phân giải in ấn 300 DPI.</li>
             </ul>
           </div>
-        </div>
-      )
-    },
-
-    {
-      id: 'simulation_guide',
-      title: 'Mô phỏng Khái niệm Tương tác',
-      icon: <MonitorPlay size={18} />,
-      content: (
-        <div className="space-y-5">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">Mô Phỏng Khái Niệm Tương Tác Toán Học</h2>
-          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Sinh các mô phỏng HTML5/Canvas động minh họa định lý Pytago, đường tròn lượng giác, ý nghĩa hình học của đạo hàm, tích phân diện tích hình phẳng.
-          </p>
         </div>
       )
     }

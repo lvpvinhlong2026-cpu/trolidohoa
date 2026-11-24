@@ -31,7 +31,7 @@ import {
 } from '../utils/functionGraphEngine';
 import InequalityGraphTool from './InequalityGraphTool';
 import NumberLineTool from './NumberLineTool';
-import MathFontSelector, { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
+import { MathFontChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface Props {
   apiKey?: string;
@@ -1829,19 +1829,7 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT, subT
                     ))}
                   </div>
                 )}
-
-                <div className="text-[10px] text-teal-800/80 dark:text-teal-300/80 leading-relaxed bg-white/70 dark:bg-slate-800/70 p-2 rounded-lg border border-teal-200/50 dark:border-teal-800/50 space-y-1">
-                  <div>💡 <strong>Di chuyển:</strong> Bấm trực tiếp vào chữ trên đồ thị để kéo rê đến vị trí mong muốn.</div>
-                  <div>🗑️ <strong>Xóa nhanh:</strong> Click vào chữ để hiện nút <strong>[Xóa]</strong>, hoặc nhấn phím <strong>Delete / Backspace</strong>, hoặc <strong>nhấp chuột phải</strong> vào chữ trên đồ thị.</div>
-                </div>
               </div>
-            </div>
-
-            {/* GHI CHÚ XUẤT ẢNH: ĐÃ CHUYỂN TOÀN BỘ NÚT LÊN THANH RIBBON WORD ĐỂ ĐỒNG BỘ */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
-                Xuất ảnh 300 DPI trực tiếp bằng nút <strong>"Cắt nhanh"</strong> hoặc <strong>"Copy vào Word"</strong> trên thanh Ribbon phía trên
-              </span>
             </div>
           </div>
 
@@ -1849,72 +1837,8 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT, subT
         {/* CỘT PHẢI: KHUNG VẼ CANVAS TRỰC TIẾP (7 CỘT) */}
         {/* ========================================================= */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs flex flex-col items-center justify-center min-h-[460px]">
-          <div className="w-full flex flex-col gap-2 pb-3 mb-2 border-b border-slate-100 dark:border-slate-800">
-            {/* Cụm Phông chữ, Nét vẽ, Độ đậm chữ & Cỡ chữ (Layout 2 dòng chuẩn mẫu) */}
-            <MathFontSelector
-              font={graphFont}
-              onFontChange={val => {
-                setGraphFont(val);
-                if (val === 'latex') {
-                  setGraphConfig(prev => ({
-                    ...prev,
-                    isBoldLabels: false,
-                    showExtremaDots: false,
-                    curveWidth: 2.0,
-                    axisWidth: 1.4
-                  }));
-                } else {
-                  setGraphConfig(prev => ({
-                    ...prev,
-                    isBoldLabels: true,
-                    curveWidth: 2.6,
-                    axisWidth: 1.8
-                  }));
-                }
-              }}
-              stroke={(graphConfig.curveWidth ?? 2.4) <= 1.8 ? 'thin' : (graphConfig.curveWidth ?? 2.4) >= 3.2 ? 'bold' : 'standard'}
-              onStrokeChange={s => {
-                const w = s === 'thin' ? 1.6 : s === 'bold' ? 3.6 : 2.4;
-                setGraphConfig(prev => ({ ...prev, curveWidth: w }));
-              }}
-              isBold={graphConfig.isBoldLabels !== false}
-              onBoldChange={b => setGraphConfig(prev => ({ ...prev, isBoldLabels: b }))}
-              size="sm"
-              extraRow1Right={
-                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Cỡ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
-                  </span>
-                  <input
-                    type="range"
-                    min="0.75"
-                    max="1.6"
-                    step="0.05"
-                    value={fontScale}
-                    onChange={e => setFontScale(parseFloat(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
-                  />
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              }
-            />
-
-            {/* Dòng 2 (Chỉ có ở Đồ thị Oxy): Thu phóng Oxy & Lưới tọa độ */}
+          <div className="w-full flex flex-col gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+            {/* Thanh điều khiển hiển thị (Thu phóng, Bước chia & Cỡ chữ nhãn) */}
             {activeSubTab === 'graph' && (
               <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
                 {/* Thu phóng phạm vi Oxy */}
@@ -1963,6 +1887,38 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT, subT
                       }}
                       className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 cursor-pointer"
                       title="Thu hẹp trục Oxy (+)"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cỡ chữ nhãn */}
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Cỡ chữ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min="0.75"
+                    max="1.6"
+                    step="0.05"
+                    value={fontScale}
+                    onChange={e => setFontScale(parseFloat(e.target.value))}
+                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                  />
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
+                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
+                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
                     >
                       +
                     </button>

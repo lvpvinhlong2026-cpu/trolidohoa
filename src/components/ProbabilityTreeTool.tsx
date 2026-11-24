@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import { cropCanvasToContent } from '../utils/dpiUtils';
-import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
+import { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 export interface Stage2Branch {
   id: string;
@@ -721,6 +721,12 @@ export default function ProbabilityTreeTool() {
         handleCopy300Dpi();
       } else if (type === 'download_png') {
         handleDownloadPng();
+      } else if (type === 'set_font' && ce.detail.font) {
+        setFontChoice(ce.detail.font);
+      } else if (type === 'set_stroke' && ce.detail.stroke) {
+        setStrokeChoice(ce.detail.stroke === 2.5 ? 'bold' : 'standard');
+      } else if (type === 'toggle_bold') {
+        setIsBold(prev => !prev);
       } else if (type === 'tree_select_type') {
         const structure = ce.detail.structure;
         if (structure === 'Định lý Bayes' || structure?.includes('Bayes')) {
@@ -865,18 +871,7 @@ export default function ProbabilityTreeTool() {
               </div>
             </div>
 
-            {/* Phông chữ & Nét vẽ hiển thị */}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
-              <MathFontSelector
-                font={fontChoice}
-                onFontChange={setFontChoice}
-                stroke={strokeChoice}
-                onStrokeChange={setStrokeChoice}
-                isBold={isBold}
-                onBoldChange={setIsBold}
-                size="sm"
-              />
-            </div>
+
 
             {/* Bật tắt nhãn và công thức */}
             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
