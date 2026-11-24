@@ -39,6 +39,7 @@ import {
   ArrowDown,
   ArrowRight,
   RotateCw,
+  RotateCcw,
   Plus,
   Minus,
   Equal,
@@ -864,6 +865,62 @@ export default function RibbonCommandPanel({
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
               Trục & Hình chiếu
+            </div>
+          </div>
+
+          {/* Nhóm 3 – Phông chữ & Di chuyển Text */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-1.5 flex-1">
+              <div className="flex flex-col gap-1 justify-center">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_set_font', font: 'times' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
+                    title="Phông Times New Roman SGK"
+                  >
+                    Times SGK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'trig_set_font', font: 'latex' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono font-bold transition cursor-pointer"
+                    title="Phông KaTeX / LaTeX Math"
+                  >
+                    LaTeX
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 text-[11px]">
+                  {[
+                    { label: '85%', scale: 0.85 },
+                    { label: '100%', scale: 1.0 },
+                    { label: '120%', scale: 1.2 },
+                    { label: '140%', scale: 1.4 },
+                  ].map(sz => (
+                    <button
+                      key={sz.label}
+                      type="button"
+                      onClick={() => onRibbonAction?.({ type: 'trig_set_font_scale', scale: sz.scale })}
+                      className="h-[24px] px-1.5 rounded-[3px] text-[10px] font-bold border border-[#E1DFDD] hover:bg-[#EDEBE9] transition cursor-pointer"
+                    >
+                      {sz.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'trig_reset_text' })}
+                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
+                title="Đặt lại vị trí ban đầu của tất cả các chữ"
+              >
+                <RotateCcw size={16} className="mb-1 text-slate-600" />
+                <span className="text-[10px] leading-tight font-medium">Đặt lại chữ</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Phông & Cỡ chữ
             </div>
           </div>
 

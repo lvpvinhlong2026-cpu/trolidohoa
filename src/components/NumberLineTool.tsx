@@ -456,88 +456,255 @@ export default function NumberLineTool({ fontScale = 1.0, graphFont = 'times', i
               </div>
 
               {/* Nhập Tập A */}
-              <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-700 dark:text-slate-300 block">
-                    Tập A: {setA.startInclusive ? '[' : '('}{setA.start}; {setA.end}{setA.endInclusive ? ']' : ')'}
+                    Tập A: {setA.startInclusive ? '[' : '('}{setA.start === '-inf' ? '-∞' : setA.start}; {setA.end === '+inf' ? '+∞' : setA.end}{setA.endInclusive ? ']' : ')'}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      disabled={setA.start === '-inf'}
                       onClick={() => setSetA(prev => ({ ...prev, startInclusive: !prev.startInclusive }))}
-                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      title="Đổi dấu ngoặc đầu mút trái"
+                      className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border ${setA.start === '-inf' ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'}`}
+                      title={setA.start === '-inf' ? 'Đầu mút -∞ luôn dùng ngoặc tròn (' : 'Đổi dấu ngoặc đầu mút trái'}
                     >
                       {setA.startInclusive ? '[' : '('}
                     </button>
                     <button
                       type="button"
+                      disabled={setA.end === '+inf'}
                       onClick={() => setSetA(prev => ({ ...prev, endInclusive: !prev.endInclusive }))}
-                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      title="Đổi dấu ngoặc đầu mút phải"
+                      className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border ${setA.end === '+inf' ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'}`}
+                      title={setA.end === '+inf' ? 'Đầu mút +∞ luôn dùng ngoặc tròn )' : 'Đổi dấu ngoặc đầu mút phải'}
                     >
                       {setA.endInclusive ? ']' : ')'}
                     </button>
                   </div>
                 </div>
+
                 <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={setA.start as number}
-                    onChange={e => setSetA({ ...setA, start: parseFloat(e.target.value) || 0, startLabel: e.target.value })}
-                    className="w-1/2 p-1 text-center font-bold rounded border bg-white dark:bg-slate-900"
-                    placeholder="Mốc đầu A"
-                  />
-                  <input
-                    type="number"
-                    value={setA.end as number}
-                    onChange={e => setSetA({ ...setA, end: parseFloat(e.target.value) || 0, endLabel: e.target.value })}
-                    className="w-1/2 p-1 text-center font-bold rounded border bg-white dark:bg-slate-900"
-                    placeholder="Mốc cuối A"
-                  />
+                  <div className="w-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (setA.start === '-inf') {
+                          setSetA(prev => ({ ...prev, start: -2, startLabel: '-2' }));
+                        } else {
+                          setSetA(prev => ({ ...prev, start: '-inf', startInclusive: false, startLabel: '-∞' }));
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-bold border transition cursor-pointer shrink-0 ${
+                        setA.start === '-inf' 
+                          ? 'bg-teal-600 text-white border-teal-600' 
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="Chọn đầu mút là âm vô cùng -∞"
+                    >
+                      -∞
+                    </button>
+                    <input
+                      type="text"
+                      value={setA.start === '-inf' ? '-∞' : (setA.startLabel ?? setA.start)}
+                      onChange={e => {
+                        const val = e.target.value.trim();
+                        if (val === '-inf' || val === '-∞' || val === '-vvc') {
+                          setSetA(prev => ({ ...prev, start: '-inf', startInclusive: false, startLabel: '-∞' }));
+                        } else {
+                          const n = parseFloat(val);
+                          setSetA(prev => ({ ...prev, start: isNaN(n) ? 0 : n, startLabel: val }));
+                        }
+                      }}
+                      className="w-full p-1 text-center font-bold rounded border bg-white dark:bg-slate-900 text-xs"
+                      placeholder="Mốc đầu A (-∞ hoặc số)"
+                    />
+                  </div>
+
+                  <div className="w-1/2 flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={setA.end === '+inf' ? '+∞' : (setA.endLabel ?? setA.end)}
+                      onChange={e => {
+                        const val = e.target.value.trim();
+                        if (val === '+inf' || val === 'inf' || val === '+∞' || val === '∞' || val === '+vvc') {
+                          setSetA(prev => ({ ...prev, end: '+inf', endInclusive: false, endLabel: '+∞' }));
+                        } else {
+                          const n = parseFloat(val);
+                          setSetA(prev => ({ ...prev, end: isNaN(n) ? 0 : n, endLabel: val }));
+                        }
+                      }}
+                      className="w-full p-1 text-center font-bold rounded border bg-white dark:bg-slate-900 text-xs"
+                      placeholder="Mốc cuối A (+∞ hoặc số)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (setA.end === '+inf') {
+                          setSetA(prev => ({ ...prev, end: 3, endLabel: '3' }));
+                        } else {
+                          setSetA(prev => ({ ...prev, end: '+inf', endInclusive: false, endLabel: '+∞' }));
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-bold border transition cursor-pointer shrink-0 ${
+                        setA.end === '+inf' 
+                          ? 'bg-teal-600 text-white border-teal-600' 
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="Chọn đầu mút là dương vô cùng +∞"
+                    >
+                      +∞
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Nhập Tập B */}
-              <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-700 dark:text-slate-300 block">
-                    Tập B: {setB.startInclusive ? '[' : '('}{setB.start}; {setB.end}{setB.endInclusive ? ']' : ')'}
+                    Tập B: {setB.startInclusive ? '[' : '('}{setB.start === '-inf' ? '-∞' : setB.start}; {setB.end === '+inf' ? '+∞' : setB.end}{setB.endInclusive ? ']' : ')'}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      disabled={setB.start === '-inf'}
                       onClick={() => setSetB(prev => ({ ...prev, startInclusive: !prev.startInclusive }))}
-                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      title="Đổi dấu ngoặc đầu mút trái"
+                      className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border ${setB.start === '-inf' ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'}`}
+                      title={setB.start === '-inf' ? 'Đầu mút -∞ luôn dùng ngoặc tròn (' : 'Đổi dấu ngoặc đầu mút trái'}
                     >
                       {setB.startInclusive ? '[' : '('}
                     </button>
                     <button
                       type="button"
+                      disabled={setB.end === '+inf'}
                       onClick={() => setSetB(prev => ({ ...prev, endInclusive: !prev.endInclusive }))}
-                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      title="Đổi dấu ngoặc đầu mút phải"
+                      className={`px-1.5 py-0.5 rounded text-[11px] font-mono font-bold border ${setB.end === '+inf' ? 'opacity-40 cursor-not-allowed bg-slate-100' : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer'}`}
+                      title={setB.end === '+inf' ? 'Đầu mút +∞ luôn dùng ngoặc tròn )' : 'Đổi dấu ngoặc đầu mút phải'}
                     >
                       {setB.endInclusive ? ']' : ')'}
                     </button>
                   </div>
                 </div>
+
                 <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={setB.start as number}
-                    onChange={e => setSetB({ ...setB, start: parseFloat(e.target.value) || 0, startLabel: e.target.value })}
-                    className="w-1/2 p-1 text-center font-bold rounded border bg-white dark:bg-slate-900"
-                    placeholder="Mốc đầu B"
-                  />
-                  <input
-                    type="number"
-                    value={setB.end as number}
-                    onChange={e => setSetB({ ...setB, end: parseFloat(e.target.value) || 0, endLabel: e.target.value })}
-                    className="w-1/2 p-1 text-center font-bold rounded border bg-white dark:bg-slate-900"
-                    placeholder="Mốc cuối B"
-                  />
+                  <div className="w-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (setB.start === '-inf') {
+                          setSetB(prev => ({ ...prev, start: 1, startLabel: '1' }));
+                        } else {
+                          setSetB(prev => ({ ...prev, start: '-inf', startInclusive: false, startLabel: '-∞' }));
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-bold border transition cursor-pointer shrink-0 ${
+                        setB.start === '-inf' 
+                          ? 'bg-teal-600 text-white border-teal-600' 
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="Chọn đầu mút là âm vô cùng -∞"
+                    >
+                      -∞
+                    </button>
+                    <input
+                      type="text"
+                      value={setB.start === '-inf' ? '-∞' : (setB.startLabel ?? setB.start)}
+                      onChange={e => {
+                        const val = e.target.value.trim();
+                        if (val === '-inf' || val === '-∞' || val === '-vvc') {
+                          setSetB(prev => ({ ...prev, start: '-inf', startInclusive: false, startLabel: '-∞' }));
+                        } else {
+                          const n = parseFloat(val);
+                          setSetB(prev => ({ ...prev, start: isNaN(n) ? 0 : n, startLabel: val }));
+                        }
+                      }}
+                      className="w-full p-1 text-center font-bold rounded border bg-white dark:bg-slate-900 text-xs"
+                      placeholder="Mốc đầu B (-∞ hoặc số)"
+                    />
+                  </div>
+
+                  <div className="w-1/2 flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={setB.end === '+inf' ? '+∞' : (setB.endLabel ?? setB.end)}
+                      onChange={e => {
+                        const val = e.target.value.trim();
+                        if (val === '+inf' || val === 'inf' || val === '+∞' || val === '∞' || val === '+vvc') {
+                          setSetB(prev => ({ ...prev, end: '+inf', endInclusive: false, endLabel: '+∞' }));
+                        } else {
+                          const n = parseFloat(val);
+                          setSetB(prev => ({ ...prev, end: isNaN(n) ? 0 : n, endLabel: val }));
+                        }
+                      }}
+                      className="w-full p-1 text-center font-bold rounded border bg-white dark:bg-slate-900 text-xs"
+                      placeholder="Mốc cuối B (+∞ hoặc số)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (setB.end === '+inf') {
+                          setSetB(prev => ({ ...prev, end: 5, endLabel: '5' }));
+                        } else {
+                          setSetB(prev => ({ ...prev, end: '+inf', endInclusive: false, endLabel: '+∞' }));
+                        }
+                      }}
+                      className={`px-2 py-1 rounded text-xs font-bold border transition cursor-pointer shrink-0 ${
+                        setB.end === '+inf' 
+                          ? 'bg-teal-600 text-white border-teal-600' 
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 hover:bg-slate-100'
+                      }`}
+                      title="Chọn đầu mút là dương vô cùng +∞"
+                    >
+                      +∞
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mẫu nhanh các phép toán tập vô cùng thường gặp SGK Toán 10 */}
+              <div className="pt-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Mẫu tập vô cực SGK Toán 10:</span>
+                <div className="grid grid-cols-2 gap-1 text-[11px]">
+                  {[
+                    {
+                      label: 'A=(−∞; 3], B=[−1; +∞)',
+                      apply: () => {
+                        setSetA({ start: '-inf', end: 3, startInclusive: false, endInclusive: true, startLabel: '-∞', endLabel: '3' });
+                        setSetB({ start: -1, end: '+inf', startInclusive: true, endInclusive: false, startLabel: '-1', endLabel: '+∞' });
+                      }
+                    },
+                    {
+                      label: 'A=(−∞; 1), B=(0; +∞)',
+                      apply: () => {
+                        setSetA({ start: '-inf', end: 1, startInclusive: false, endInclusive: false, startLabel: '-∞', endLabel: '1' });
+                        setSetB({ start: 0, end: '+inf', startInclusive: false, endInclusive: false, startLabel: '0', endLabel: '+∞' });
+                      }
+                    },
+                    {
+                      label: 'A=[−2; +∞), B=(−∞; 4]',
+                      apply: () => {
+                        setSetA({ start: -2, end: '+inf', startInclusive: true, endInclusive: false, startLabel: '-2', endLabel: '+∞' });
+                        setSetB({ start: '-inf', end: 4, startInclusive: false, endInclusive: true, startLabel: '-∞', endLabel: '4' });
+                      }
+                    },
+                    {
+                      label: 'A=(−∞; 2], B=(2; +∞)',
+                      apply: () => {
+                        setSetA({ start: '-inf', end: 2, startInclusive: false, endInclusive: true, startLabel: '-∞', endLabel: '2' });
+                        setSetB({ start: 2, end: '+inf', startInclusive: false, endInclusive: false, startLabel: '2', endLabel: '+∞' });
+                      }
+                    },
+                  ].map(ex => (
+                    <button
+                      key={ex.label}
+                      type="button"
+                      onClick={ex.apply}
+                      className="px-1.5 py-1 rounded bg-teal-50/70 hover:bg-teal-100 text-teal-800 dark:bg-slate-800 dark:text-teal-300 border border-teal-200 dark:border-slate-700 text-[10px] font-bold text-left transition cursor-pointer truncate"
+                      title={ex.label}
+                    >
+                      {ex.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

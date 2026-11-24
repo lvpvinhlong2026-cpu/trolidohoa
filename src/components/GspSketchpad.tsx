@@ -3532,6 +3532,9 @@ export default function GspSketchpad({
   }, [externalPreset]);
 
   const getCanvasCursor = () => {
+    // 1. Khi đang kéo dời đối tượng: hiện bàn tay nắm (grabbing)
+    if (draggedPointId || draggedTextId || draggedLabelPointId || chartDragState) return 'grabbing';
+
     if (activeTool === 'eraser') return 'not-allowed';
     if (activeTool === 'text') return 'text';
     if (activeTool === 'right_angle') return 'crosshair';
@@ -3539,8 +3542,11 @@ export default function GspSketchpad({
     if (activeTool === 'vector') return 'crosshair';
     if (activeTool === 'parallel') return 'crosshair';
     if (activeTool === 'intersection') return 'crosshair';
-    if (activeTool === 'trig_angle') return 'crosshair';
-    if (hoveredPointId || hoveredTextId || hoveredLabelPointId || draggedLabelPointId) return 'move';
+
+    // 2. Khi chọn đối tượng hoặc rê chuột lên đối tượng: hiện hình bàn tay (pointer)
+    if (hoveredPointId || hoveredTextId || hoveredLabelPointId || hoveredSegmentId || hoveredChartId || hoveredEllipseId) return 'pointer';
+    if (selectedPointId || selectedSegmentId || selectedTextId || selectedChartId) return 'pointer';
+
     if (activeTool === 'select') {
       if (selectedChartId) {
         const sc = charts.find(c => c.id === selectedChartId);
@@ -3552,8 +3558,6 @@ export default function GspSketchpad({
           }
         }
       }
-      if (hoveredChartId) return 'move';
-      if (hoveredSegmentId) return 'pointer';
       return 'default';
     }
     return 'crosshair';
