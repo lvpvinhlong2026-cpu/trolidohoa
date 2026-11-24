@@ -474,18 +474,18 @@ export default function App() {
               items={toolMenuItems}
               placement="bottom-right"
               menuWidth="w-72 sm:w-80"
-              buttonClassName="bg-white hover:bg-[#EDEBE9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#242424] dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 rounded-[4px]"
+              buttonClassName="bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#242424] dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-full shadow-xs px-3.5 py-1.5"
             />
 
             {/* Quick Command Palette Search (Ctrl + K) */}
             <button
               onClick={() => setShowCommandPalette(true)}
-              className="flex items-center gap-2 px-3 py-1 rounded-[4px] text-xs font-normal bg-white hover:bg-[#EDEBE9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#605E5C] dark:text-slate-300 transition cursor-pointer border border-[#E1DFDD] dark:border-slate-700"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-slate-50/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition cursor-pointer border border-slate-200/90 dark:border-slate-700 shadow-xs"
               title="Tìm nhanh công cụ đồ họa Toán học (Ctrl + K)"
             >
-              <Search size={14} className="text-[#0F6CBD]" />
+              <Search size={14} className="text-[#0d9488] dark:text-teal-400" />
               <span className="hidden md:inline">Tìm kiếm</span>
-              <kbd className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#F3F2F1] dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-700 text-[#605E5C]">
+              <kbd className="hidden md:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 shadow-2xs">
                 Ctrl K
               </kbd>
             </button>

@@ -76,8 +76,11 @@ function renderCustomIcon(
 ) {
   if (!icon) return null;
   if (React.isValidElement(icon)) return icon;
-  const Component = icon as React.ComponentType<{ size?: number; className?: string }>;
-  return <Component size={size} className={className} />;
+  if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && ('render' in icon || '$$typeof' in icon))) {
+    const Component = icon as React.ComponentType<{ size?: number; className?: string }>;
+    return <Component size={size} className={className} />;
+  }
+  return null;
 }
 
 /* =========================================================================
@@ -271,11 +274,11 @@ export const CustomDropdownMenu: React.FC<CustomDropdownMenuProps> = ({
           aria-expanded={isOpen}
           aria-controls={menuId}
           aria-label={ariaLabel}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border outline-none ${themeRing} focus:ring-2 ${
+          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer border outline-none ${themeRing} focus:ring-2 ${
             isOpen
               ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white border-slate-300 dark:border-slate-600 shadow-sm'
               : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
-          } ${buttonClassName}`}
+          } ${buttonClassName || 'rounded-xl'}`}
         >
           {IconProp && (
             <span className="shrink-0">
