@@ -574,13 +574,27 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
         else setGraphConfig(prev => ({ ...prev, type: mappedType }));
       } else if (type === 'switch_input_mode' && inputMode) {
         setGraphMode(inputMode);
+      } else if (type === 'set_font' && ce.detail.font) {
+        setGraphFont(ce.detail.font);
+      } else if (type === 'set_bold') {
+        setGraphConfig(prev => ({ ...prev, isBoldLabels: ce.detail.bold }));
+      } else if (type === 'set_stroke' && ce.detail.stroke) {
+        setGraphConfig(prev => ({ ...prev, curveWidth: ce.detail.stroke }));
       } else if (type === 'copy_word') {
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleCopyImage(graphDataUrl, 'Đồ thị Oxy');
+        } else if (activeSubTab === 'inequality') {
+          window.dispatchEvent(new CustomEvent('lvp_ineq_copy'));
+        } else if (activeSubTab === 'number_line') {
+          window.dispatchEvent(new CustomEvent('lvp_nl_copy'));
         }
       } else if (type === 'download_png') {
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleDownloadImage(graphDataUrl, 'do_thi_oxy.png');
+        } else if (activeSubTab === 'inequality') {
+          window.dispatchEvent(new CustomEvent('lvp_ineq_download'));
+        } else if (activeSubTab === 'number_line') {
+          window.dispatchEvent(new CustomEvent('lvp_nl_download'));
         }
       } else if (type === 'select_graph_preset' && config) {
         setGraphConfig(prev => ({ ...prev, ...config }));
@@ -1811,35 +1825,13 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
               </div>
             </div>
 
-            {/* HÀNG NÚT TÁC VỤ SAO CHÉP & TẢI ẢNH */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <button
-              onClick={() => {
-                const currentUrl = graphDataUrl;
-                const label = 'Đồ thị Oxy';
-                handleCopyImage(currentUrl, label);
-              }}
-              className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
-              title="Sao chép toàn bộ ảnh vào Clipboard (PNG) để dán trực tiếp Ctrl+V vào Word"
-            >
-              <Copy size={15} />
-              Copy ảnh (Ctrl+V vào Word)
-            </button>
-
-            <button
-              onClick={() => {
-                const currentUrl = graphDataUrl;
-                const fname = 'Do_thi_Oxy_300dpi.png';
-                handleDownloadImage(currentUrl, fname);
-              }}
-              className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-              title="Tải ảnh PNG độ phân giải 300 DPI"
-            >
-              <Download size={15} />
-              Tải PNG
-            </button>
+            {/* GHI CHÚ XUẤT ẢNH: ĐÃ CHUYỂN TOÀN BỘ NÚT LÊN THANH RIBBON WORD ĐỂ ĐỒNG BỘ */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                Xuất ảnh 300 DPI trực tiếp bằng nút <strong>"Cắt nhanh"</strong> hoặc <strong>"Copy vào Word"</strong> trên thanh Ribbon phía trên
+              </span>
+            </div>
           </div>
-        </div>
 
         {/* ========================================================= */}
         {/* CỘT PHẢI: KHUNG VẼ CANVAS TRỰC TIẾP (7 CỘT) */}

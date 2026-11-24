@@ -758,23 +758,9 @@ export default function ProbabilityTreeTool() {
             </div>
           </div>
 
-          {/* Các nút hành động xuất ảnh 300 DPI */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopy300Dpi}
-              className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-              title="Sao chép ảnh độ phân giải cao 300 DPI (Dán vào Microsoft Word bằng Ctrl + V)"
-            >
-              <Copy size={15} />
-              <span>Chép vào Word (300 DPI)</span>
-            </button>
-            <button
-              onClick={handleDownloadPng}
-              className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-            >
-              <Download size={15} />
-              <span>Tải PNG</span>
-            </button>
+          {/* GHI CHÚ XUẤT ẢNH: ĐÃ ĐỒNG BỘ LÊN THANH RIBBON WORD */}
+          <div className="flex items-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <span>Xuất sơ đồ cây 300 DPI bằng nút <strong>"Cắt nhanh"</strong> hoặc <strong>"Copy vào Word"</strong> trên thanh Ribbon</span>
           </div>
         </div>
 

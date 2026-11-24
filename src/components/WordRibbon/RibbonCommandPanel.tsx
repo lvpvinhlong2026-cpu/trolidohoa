@@ -2,7 +2,12 @@
  * @license
  * RibbonCommandPanel.tsx
  * Tầng 2: Thanh công cụ Ribbon Command Panel (~96px, nền #FFFFFF, viền #E1DFDD)
- * Chứa đầy đủ các nhóm chức năng cho 7 Tab chính + 1 Contextual Tab
+ * Chứa đầy đủ các nhóm chức năng cho 6 Tab chính + 1 Contextual Tab:
+ * - Chia thành các Command Groups ngăn cách bằng đường kẻ dọc mảnh (#E1DFDD)
+ * - Mỗi nhóm có nhãn tên nhóm (11px, #605E5C) căn giữa sát mép dưới
+ * - Nút lớn (icon 24-28px, chữ dưới), nút nhỏ 2 hàng
+ * - Nút Cắt nhanh - Kéo dán Word & Copy vào Word (300 DPI, lề 24px)
+ * - Kết nối trực tiếp với các phân hệ đồ họa toán học GDPT 2018
  */
 
 import React from 'react';
@@ -36,6 +41,15 @@ import {
   Plus,
   Minus,
   Crop,
+  Eye,
+  EyeOff,
+  Circle,
+  CircleDot,
+  Dot,
+  CornerDownRight,
+  Type,
+  Eraser,
+  MonitorPlay,
   Table as TableIcon
 } from 'lucide-react';
 import { 
@@ -58,6 +72,69 @@ export interface RibbonCommandPanelProps {
   onOpenAiModal: () => void;
   onSelectTemplate: (category: string, presetKey: string) => void;
   onRibbonAction?: (action: { type: string; [key: string]: any }) => void;
+  graphSubTab?: 'graph' | 'inequality' | 'number_line';
+  bbtMasterMode?: 'auto' | 'variation' | 'sign_chart';
+  bbtIsBold?: boolean;
+  bbtStroke?: number;
+  gspActiveTool?: string;
+  space3dTool?: 'geogebra' | 'viewer3d' | 'simulation';
+  statsTool?: 'statistics' | 'tree';
+  onSetSpace3dTool?: (tool: 'geogebra' | 'viewer3d' | 'simulation') => void;
+  onSetStatsTool?: (tool: 'statistics' | 'tree') => void;
+}
+
+// Nhóm xuất Word chung tiện dụng cho mọi tab
+function ExportGroup({
+  onCopyWord,
+  onDownloadPng,
+  onDownloadSvg,
+}: {
+  onCopyWord: () => void;
+  onDownloadPng: () => void;
+  onDownloadSvg: () => void;
+}) {
+  return (
+    <div className="flex flex-col justify-between px-2 min-w-[220px] ml-auto shrink-0 select-none">
+      <div className="flex items-center gap-1.5 flex-1">
+        {/* Nút Cắt nhanh - Kéo dán Word (Chuẩn ảnh đính kèm của Thầy/Cô) */}
+        <button
+          type="button"
+          onClick={onCopyWord}
+          className="h-[64px] min-w-[66px] px-2.5 flex flex-col items-center justify-center rounded-[8px] bg-[#FFFBEB] hover:bg-[#FEF3C7] active:bg-[#FDE68A] border border-[#F59E0B] text-[#92400E] font-semibold transition cursor-pointer shadow-xs"
+          title="Cắt nhanh ảnh với lề chuẩn 24px, độ phân giải 300 DPI và tự động lưu vào Clipboard để dán vào Word (Ctrl + V)"
+        >
+          <Crop size={20} className="mb-0.5 text-[#D97706]" />
+          <span className="text-[11px] font-bold leading-tight text-[#78350F]">Cắt nhanh</span>
+          <span className="text-[9px] text-[#B45309] font-medium leading-tight">Kéo dán Word</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onCopyWord}
+          className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] active:bg-[#0C5494] text-white font-semibold transition cursor-pointer shadow-xs"
+          title="Tự động căn lề 24px đều 4 cạnh, xuất 300 DPI và sao chép vào Clipboard (Ctrl + V vào Word)"
+        >
+          <Copy size={18} className="mb-1" />
+          <span className="text-[11px] font-bold leading-tight">Copy vào Word</span>
+          <span className="text-[9px] opacity-90 font-normal">300 DPI • Lề 24px</span>
+        </button>
+
+        <AccessibleDropdown
+          label="Tải PNG"
+          icon={Download}
+          variant="large"
+          ariaLabel="Menu tải ảnh"
+          items={[
+            { id: 'png', label: 'Tải PNG (300 DPI, Lề 24px)', shortcut: 'PNG', onClick: onDownloadPng },
+            { id: 'svg', label: 'Tải Vector SVG sắc nét', shortcut: 'SVG', onClick: onDownloadSvg },
+          ]}
+        />
+      </div>
+      <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto">
+        Xuất sang Word
+      </div>
+    </div>
+  );
 }
 
 export default function RibbonCommandPanel({
@@ -72,6 +149,15 @@ export default function RibbonCommandPanel({
   onOpenAiModal,
   onSelectTemplate,
   onRibbonAction,
+  graphSubTab = 'graph',
+  bbtMasterMode = 'auto',
+  bbtIsBold = false,
+  bbtStroke = 1.5,
+  gspActiveTool = 'select',
+  space3dTool = 'geogebra',
+  statsTool = 'statistics',
+  onSetSpace3dTool,
+  onSetStatsTool,
 }: RibbonCommandPanelProps) {
 
   // Update Typography
@@ -98,22 +184,24 @@ export default function RibbonCommandPanel({
       className="h-[96px] bg-white dark:bg-slate-900 border-b border-[#E1DFDD] dark:border-slate-800 shadow-[0_2px_4px_rgba(0,0,0,0.04)] px-3 flex items-center overflow-x-auto scrollbar-thin select-none"
     >
       {/* =========================================================================
-          TAB 2: TRANG CHỦ (HOME - TAB MẶC ĐỊNH)
+          TAB 1: TRANG CHỦ (HOME - TAB MẶC ĐỊNH)
           ========================================================================= */}
       {activeTab === 'home' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          
-          {/* Nhóm 1 – Thao tác (Clipboard) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[130px]">
-            <div className="flex items-center gap-1.5 flex-1">
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Thao tác (Clipboard & AI) */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-2 flex-1">
               <button
                 type="button"
                 onClick={onOpenAiModal}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] dark:hover:bg-slate-800 text-[#0F6CBD] font-semibold transition cursor-pointer"
-                title="Dán đề bài toán để AI tự động nhận diện và dựng hình"
+                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 transition cursor-pointer text-center group"
+                title="Dán đề bài toán để AI tự động nhận diện và vẽ hình (GDPT 2018)"
               >
-                <Sparkles size={24} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-bold">Dán đề (AI)</span>
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 text-white flex items-center justify-center mb-1 shadow-xs group-hover:scale-105 transition-transform">
+                  <Sparkles size={16} />
+                </div>
+                <span className="text-xs font-bold leading-tight text-[#0F6CBD]">Dán đề (AI)</span>
+                <span className="text-[10px] text-[#605E5C] dark:text-slate-400">Tự dựng hình</span>
               </button>
 
               <div className="flex flex-col gap-1 justify-center">
@@ -121,36 +209,32 @@ export default function RibbonCommandPanel({
                   <button
                     type="button"
                     onClick={onUndo}
-                    className="p-1 rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 transition cursor-pointer"
+                    className="h-[26px] px-2 flex items-center gap-1 rounded-[3px] border border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 text-xs transition cursor-pointer"
                     title="Hoàn tác (Ctrl + Z)"
                   >
-                    <Undo2 size={15} />
+                    <Undo2 size={13} />
+                    <span>Hoàn tác</span>
                   </button>
                   <button
                     type="button"
                     onClick={onRedo}
-                    className="p-1 rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 transition cursor-pointer"
+                    className="h-[26px] px-2 flex items-center gap-1 rounded-[3px] border border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 text-xs transition cursor-pointer"
                     title="Làm lại (Ctrl + Y)"
                   >
-                    <Redo2 size={15} />
+                    <Redo2 size={13} />
+                    <span>Làm lại</span>
                   </button>
                 </div>
+
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => {}}
-                    className="p-1 rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200 transition cursor-pointer"
-                    title="Nhân bản đối tượng đã chọn"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_select_tool', tool: 'clear' })}
+                    className="h-[26px] px-2 flex items-center gap-1 rounded-[3px] border border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-rose-50 text-rose-600 text-xs transition cursor-pointer"
+                    title="Làm sạch bản vẽ"
                   >
-                    <Copy size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {}}
-                    className="p-1 rounded-[4px] border border-transparent hover:border-rose-300 hover:bg-rose-50 text-rose-600 transition cursor-pointer"
-                    title="Xóa đối tượng đang chọn"
-                  >
-                    <Trash2 size={15} />
+                    <Trash2 size={13} />
+                    <span>Làm sạch</span>
                   </button>
                 </div>
               </div>
@@ -163,16 +247,14 @@ export default function RibbonCommandPanel({
           {/* Nhóm 2 – Kiểu chữ & Nhãn (Typography) */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
-              {/* Hàng 1: Font & Cỡ chữ */}
               <div className="flex items-center gap-1.5">
                 <select
                   value={doc.typography.fontFamily}
                   onChange={(e) => updateTypo('fontFamily', e.target.value)}
-                  className="h-[24px] px-2 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[130px]"
+                  className="h-[24px] px-1.5 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[125px]"
                 >
                   <option value="Times New Roman">Times New Roman</option>
                   <option value="Cambria Math">Cambria Math</option>
-                  <option value="Computer Modern">Computer Modern</option>
                   <option value="Arial">Arial</option>
                 </select>
 
@@ -187,11 +269,13 @@ export default function RibbonCommandPanel({
                 </select>
               </div>
 
-              {/* Hàng 2: B, I, Sub, Super, Màu */}
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => updateTypo('isBold', !doc.typography.isBold)}
+                  onClick={() => {
+                    updateTypo('isBold', !doc.typography.isBold);
+                    onRibbonAction?.({ type: 'set_bold', bold: !doc.typography.isBold });
+                  }}
                   className={`p-1 rounded-[3px] border transition cursor-pointer ${
                     doc.typography.isBold
                       ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
@@ -216,11 +300,7 @@ export default function RibbonCommandPanel({
                 <button
                   type="button"
                   onClick={() => updateTypo('isSubscript', !doc.typography.isSubscript)}
-                  className={`p-1 rounded-[3px] border transition cursor-pointer ${
-                    doc.typography.isSubscript
-                      ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
-                      : 'border-transparent hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
-                  }`}
+                  className="p-1 rounded-[3px] border border-transparent hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200"
                   title="Chỉ số dưới (x₁)"
                 >
                   <Subscript size={14} />
@@ -228,24 +308,18 @@ export default function RibbonCommandPanel({
                 <button
                   type="button"
                   onClick={() => updateTypo('isSuperscript', !doc.typography.isSuperscript)}
-                  className={`p-1 rounded-[3px] border transition cursor-pointer ${
-                    doc.typography.isSuperscript
-                      ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
-                      : 'border-transparent hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
-                  }`}
+                  className="p-1 rounded-[3px] border border-transparent hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200"
                   title="Chỉ số trên (x²)"
                 >
                   <Superscript size={14} />
                 </button>
-                <div className="flex items-center gap-1 ml-1 pl-1 border-l border-[#E1DFDD] dark:border-slate-700">
-                  <input
-                    type="color"
-                    value={doc.typography.color}
-                    onChange={(e) => updateTypo('color', e.target.value)}
-                    className="w-5 h-5 rounded cursor-pointer border-0 p-0"
-                    title="Màu chữ / ký hiệu"
-                  />
-                </div>
+                <input
+                  type="color"
+                  value={doc.typography.color}
+                  onChange={(e) => updateTypo('color', e.target.value)}
+                  className="w-5 h-5 rounded cursor-pointer border-0 ml-1"
+                  title="Màu chữ ký hiệu"
+                />
               </div>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
@@ -254,32 +328,38 @@ export default function RibbonCommandPanel({
           </div>
 
           {/* Nhóm 3 – Nét vẽ (Stroke & Fill) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[190px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
-              {/* Hàng 1: Độ dày nét & Kiểu nét */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <select
                   value={doc.strokeFill.strokeWidth}
-                  onChange={(e) => updateStrokeFill('strokeWidth', Number(e.target.value))}
-                  className="h-[24px] px-1.5 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[90px]"
+                  onChange={(e) => {
+                    const w = Number(e.target.value);
+                    updateStrokeFill('strokeWidth', w);
+                    onRibbonAction?.({ type: 'set_stroke', stroke: w });
+                  }}
+                  className="h-[24px] px-1 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[75px]"
                 >
-                  <option value={0.75}>Nét 0.75pt</option>
-                  <option value={1}>Nét 1.0pt</option>
-                  <option value={1.5}>Nét 1.5pt</option>
-                  <option value={2}>Nét 2.0pt</option>
+                  <option value="0.75">0.75 pt</option>
+                  <option value="1">1.0 pt</option>
+                  <option value="1.5">1.5 pt</option>
+                  <option value="2">2.0 pt</option>
                 </select>
 
                 <select
                   value={doc.strokeFill.strokeStyle}
-                  onChange={(e) => updateStrokeFill('strokeStyle', e.target.value)}
-                  className="h-[24px] px-1.5 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[95px]"
+                  onChange={(e) => {
+                    const st = e.target.value as any;
+                    updateStrokeFill('strokeStyle', st);
+                    onRibbonAction?.({ type: 'gsp_set_line_style', style: st });
+                  }}
+                  className="h-[24px] px-1.5 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[90px]"
                 >
                   <option value="solid">― Nét liền</option>
                   <option value="dashed">- - Nét đứt</option>
                 </select>
               </div>
 
-              {/* Hàng 2: Màu nét & Tô nền / Gạch sọc */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 text-[11px]">
                   <span>Nét:</span>
@@ -292,11 +372,11 @@ export default function RibbonCommandPanel({
                   />
                 </div>
                 <div className="flex items-center gap-1 text-[11px]">
-                  <span>Tô/Gạch:</span>
+                  <span>Gạch sọc:</span>
                   <select
                     value={doc.strokeFill.hatching}
                     onChange={(e) => updateStrokeFill('hatching', e.target.value)}
-                    className="h-[22px] px-1 text-[11px] border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800"
+                    className="h-[22px] px-1 text-[11px] border border-[#E1DFDD] rounded-[3px] bg-white dark:bg-slate-800"
                   >
                     <option value="none">Trống</option>
                     <option value="diagonal_left">Gạch chéo /////</option>
@@ -311,56 +391,65 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 4 – Xuất sang Word (Export) */}
-          <div className="flex flex-col justify-between px-2 min-w-[240px]">
-            <div className="flex items-center gap-2 flex-1">
-              {/* Nút Cắt nhanh - Kéo dán Word (Chuẩn ảnh đính kèm của Thầy/Cô) */}
-              <button
-                type="button"
-                onClick={onCopyWord}
-                className="h-[64px] min-w-[66px] px-2.5 flex flex-col items-center justify-center rounded-[8px] bg-[#FFFBEB] hover:bg-[#FEF3C7] active:bg-[#FDE68A] border border-[#F59E0B] text-[#92400E] font-semibold transition cursor-pointer shadow-xs select-none"
-                title="Cắt nhanh ảnh với lề chuẩn 24px, độ phân giải 300 DPI và tự động lưu vào Clipboard để dán vào Word (Ctrl + V)"
-              >
-                <Crop size={22} className="mb-0.5 text-[#D97706]" />
-                <span className="text-xs font-bold leading-tight text-[#78350F]">Cắt nhanh</span>
-                <span className="text-[10px] text-[#B45309] font-medium leading-tight">Kéo dán Word</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onCopyWord}
-                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] bg-[#0F6CBD] hover:bg-[#115EA3] active:bg-[#0C5494] text-white font-semibold transition cursor-pointer shadow-xs select-none"
-                title="Tự động căn lề 24px đều 4 cạnh, xuất 300 DPI và sao chép vào Clipboard (Ctrl + V vào Word)"
-              >
-                <Copy size={20} className="mb-1" />
-                <span className="text-xs font-bold leading-tight">Copy vào Word</span>
-                <span className="text-[9px] opacity-90 font-normal">300 DPI • Lề 24px</span>
-              </button>
-
-              <AccessibleDropdown
-                label="Tải PNG"
-                icon={Download}
-                variant="large"
-                ariaLabel="Menu tải ảnh"
-                items={[
-                  { id: 'png', label: 'Tải PNG (300 DPI, Lề 24px)', shortcut: 'PNG', onClick: onDownloadPng },
-                  { id: 'svg', label: 'Tải Vector SVG sắc nét', shortcut: 'SVG', onClick: onDownloadSvg },
-                ]}
-              />
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Xuất sang Word
-            </div>
-          </div>
+          {/* Nhóm 4 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          TAB 3: ĐỒ THỊ 2D (GIẢI TÍCH 10 – 11 – 12)
+          TAB 2: ĐỒ THỊ 2D (GIẢI TÍCH 10 – 11 – 12)
           ========================================================================= */}
       {activeTab === 'graph_2d' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          {/* Nhóm 1 – Hàm số mẫu */}
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Phân hệ con */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
+            <div className="flex items-center gap-1 flex-1">
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_subtab', subtab: 'graph' })}
+                className={`h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  graphSubTab === 'graph' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <TrendingUp size={20} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[11px] leading-tight">Đồ thị Oxy</span>
+                <span className="text-[9px] text-[#605E5C]">Khảo sát hàm số</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_subtab', subtab: 'inequality' })}
+                className={`h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  graphSubTab === 'inequality' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <Sliders size={20} className="mb-1 text-teal-600" />
+                <span className="text-[11px] leading-tight">Miền nghiệm BPT</span>
+                <span className="text-[9px] text-[#605E5C]">BPT bậc 1 (L10)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_subtab', subtab: 'number_line' })}
+                className={`h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  graphSubTab === 'number_line' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <Minus size={20} className="mb-1 text-indigo-600" />
+                <span className="text-[11px] leading-tight">Trục số</span>
+                <span className="text-[9px] text-[#605E5C]">Khoảng & đoạn</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Phân hệ đồ thị
+            </div>
+          </div>
+
+          {/* Nhóm 2 – Hàm số mẫu */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-2 flex-1">
               <AccessibleDropdown
@@ -370,13 +459,12 @@ export default function RibbonCommandPanel({
                 menuWidth="w-72"
                 ariaLabel="Chọn hàm số mẫu SGK"
                 items={[
-                  { id: 'parabola', label: 'Parabol (Lớp 10)', subLabel: 'y = ax² + bx + c', onClick: () => onSelectTemplate('graph_2d', 'parabola') },
-                  { id: 'trig', label: 'Lượng giác sin / cos / tan (Lớp 11)', subLabel: 'Chu kỳ, tiệm cận', onClick: () => onSelectTemplate('graph_2d', 'trig_sin') },
-                  { id: 'exp_log', label: 'Mũ & Lôgarit (Lớp 11)', subLabel: 'y = aˣ, y = logₐx', onClick: () => onSelectTemplate('graph_2d', 'exp_log') },
-                  { id: 'cubic', label: 'Bậc 3: 2 Cực trị (Lớp 12)', subLabel: 'y = ax³ + bx² + cx + d', onClick: () => onSelectTemplate('graph_2d', 'cubic') },
-                  { id: 'rat_1_1', label: 'Phân thức bậc 1/1 (Lớp 12)', subLabel: 'y = (ax+b)/(cx+d)', onClick: () => onSelectTemplate('graph_2d', 'rational_1_1') },
-                  { id: 'rat_2_1', label: 'Phân thức bậc 2/1 (Lớp 12)', subLabel: 'Tiệm cận xiên & đứng', onClick: () => onSelectTemplate('graph_2d', 'rational_2_1') },
-                  { id: 'derivative', label: 'Hàm đạo hàm f\'(x) & Gián đoạn', subLabel: 'Xét dấu & nghiệm f\'(x)', onClick: () => onSelectTemplate('graph_2d', 'derivative') },
+                  { id: 'parabola', label: 'Parabol (Lớp 10)', subLabel: 'y = ax² + bx + c', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'parabola' }) },
+                  { id: 'cubic', label: 'Bậc 3: 2 Cực trị (Lớp 12)', subLabel: 'y = ax³ + bx² + cx + d', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'cubic' }) },
+                  { id: 'rat_1_1', label: 'Phân thức bậc 1/1 (Lớp 12)', subLabel: 'y = (ax+b)/(cx+d)', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'fraction_1_1' }) },
+                  { id: 'rat_2_1', label: 'Phân thức bậc 2/1 (Lớp 12)', subLabel: 'Tiệm cận xiên & đứng', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'fraction_2_1' }) },
+                  { id: 'trig', label: 'Lượng giác sin / cos / tan (Lớp 11)', subLabel: 'Chu kỳ, tiệm cận', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'trig_sin' }) },
+                  { id: 'exp_log', label: 'Mũ & Lôgarit (Lớp 11)', subLabel: 'y = aˣ, y = logₐx', onClick: () => onRibbonAction?.({ type: 'select_fn_type', fnType: 'exp' }) },
                 ]}
               />
             </div>
@@ -385,47 +473,34 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 2 – Yếu tố đồ thị */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[220px]">
+          {/* Nhóm 3 – Yếu tố đồ thị */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[200px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showAsymptotes: !p.graph2D.showAsymptotes } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer flex items-center gap-1 ${
-                    doc.graph2D.showAsymptotes ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
+                  onClick={() => onRibbonAction?.({ type: 'switch_input_mode', inputMode: 'coeffs' })}
+                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
                 >
-                  <span>Tiệm cận (Nét đứt)</span>
+                  <span>Nhập hệ số (a,b,c)</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showTangent: !p.graph2D.showTangent } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer flex items-center gap-1 ${
-                    doc.graph2D.showTangent ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
+                  onClick={() => onRibbonAction?.({ type: 'switch_input_mode', inputMode: 'text' })}
+                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
                 >
-                  <span>Tiếp tuyến tại M₀</span>
+                  <span>Nhập công thức f(x)</span>
                 </button>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showExtrema: !p.graph2D.showExtrema } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer flex items-center gap-1 ${
-                    doc.graph2D.showExtrema ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                >
-                  <span>Điểm Cực trị / Uốn</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, gridType: p.graph2D.gridType === 'decimal' ? 'pi' : 'decimal' } }))}
+                  onClick={() => onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showGrid: !p.graph2D.showGrid } }))}
                   className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
                 >
                   <Grid size={13} />
-                  <span>{doc.graph2D.gridType === 'decimal' ? 'Trục Oxy (Số)' : 'Trục Oxy (π)'}</span>
+                  <span>Bật/Tắt lưới tọa độ</span>
                 </button>
               </div>
             </div>
@@ -434,282 +509,307 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 3 – Miền & Conic */}
-          <div className="flex flex-col justify-between px-2 min-w-[200px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('graph_2d', 'inequality_region')}
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Sliders size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Miền nghiệm BPT</span>
-                <span className="text-[9px] text-[#605E5C]">Gạch bỏ phần loại</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('graph_2d', 'integral_area')}
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <TableIcon size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Diện tích Tích phân</span>
-                <span className="text-[9px] text-[#605E5C]">Tô gạch sọc ∫</span>
-              </button>
-
-              <AccessibleDropdown
-                label="Đường Conic"
-                variant="large"
-                ariaLabel="Menu Conic"
-                items={[
-                  { id: 'elip', label: 'Elip (Tiêu điểm F₁, F₂)', onClick: () => onSelectTemplate('graph_2d', 'conic_ellipse') },
-                  { id: 'hypebol', label: 'Hypebol (Tiệm cận xiên)', onClick: () => onSelectTemplate('graph_2d', 'conic_hyperbola') },
-                  { id: 'parabol_conic', label: 'Parabol (Đường chuẩn Δ)', onClick: () => onSelectTemplate('graph_2d', 'conic_parabola') },
-                ]}
-              />
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Miền & Conic
-            </div>
-          </div>
+          {/* Nhóm 4 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          TAB 4: BẢNG BIẾN THIÊN (BBT & XÉT DẤU)
+          TAB 3: BẢNG BIẾN THIÊN (BBT & XÉT DẤU)
           ========================================================================= */}
       {activeTab === 'bbt' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          {/* Nhóm 1 – Tạo nhanh */}
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Chế độ BBT */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
+            <div className="flex items-center gap-1.5 flex-1">
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_bbt_mode', mode: 'auto' })}
+                className={`h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  bbtMasterMode === 'auto' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <Sparkles size={20} className="mb-1 text-teal-600" />
+                <span className="text-[11px] leading-tight">BBT Tự động</span>
+                <span className="text-[9px] text-[#605E5C]">Khảo sát từ f(x)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_bbt_mode', mode: 'variation' })}
+                className={`h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  bbtMasterMode === 'variation' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <TableIcon size={20} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[11px] leading-tight">BBT Tùy biến</span>
+                <span className="text-[9px] text-[#605E5C]">Thêm cột/dòng tự do</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'switch_bbt_mode', mode: 'sign_chart' })}
+                className={`h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  bbtMasterMode === 'sign_chart' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <CheckSquare size={20} className="mb-1 text-amber-600" />
+                <span className="text-[11px] leading-tight">Xét dấu</span>
+                <span className="text-[9px] text-[#605E5C]">Tam thức bậc 2</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Chế độ BBT
+            </div>
+          </div>
+
+          {/* Nhóm 2 – Tạo nhanh (Mẫu BBT) */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-2 flex-1">
               <AccessibleDropdown
-                label="Tạo nhanh BBT"
+                label="Mẫu BBT chuẩn"
                 icon={TableIcon}
                 variant="large"
-                menuWidth="w-68"
-                ariaLabel="Chọn mẫu bảng biến thiên"
+                menuWidth="w-72"
+                ariaLabel="Menu mẫu BBT"
                 items={[
-                  { id: 'quad_sign', label: 'Bảng xét dấu tam thức bậc 2', subLabel: 'Trong trái - ngoài cùng', onClick: () => onSelectTemplate('bbt', 'quadratic_sign') },
-                  { id: 'cubic_bbt', label: 'BBT hàm bậc 3 (2 cực trị)', subLabel: 'Nét cong lên xuống', onClick: () => onSelectTemplate('bbt', 'cubic') },
-                  { id: 'rat_11_bbt', label: 'BBT phân thức bậc 1/1', subLabel: 'Hai gạch song song ||', onClick: () => onSelectTemplate('bbt', 'rational_1_1') },
-                  { id: 'rat_21_bbt', label: 'BBT phân thức bậc 2/1', subLabel: 'Tiệm cận xiên', onClick: () => onSelectTemplate('bbt', 'rational_2_1') },
-                  { id: 'custom_bbt', label: 'Bảng biến thiên trống tùy biến', subLabel: 'Tự thêm cột nghiệm', onClick: () => onSelectTemplate('bbt', 'custom') },
+                  { id: 'quad_sign', label: 'Bảng xét dấu tam thức bậc hai', subLabel: 'ax² + bx + c (Toán 10)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'quadratic_roots' }) },
+                  { id: 'cubic_2ext', label: 'BBT hàm bậc ba (2 cực trị)', subLabel: 'y = x³ - 3x + 1 (Toán 12)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'cubic_2_extrema' }) },
+                  { id: 'rat_1_1', label: 'BBT phân thức bậc 1/1 (Nghịch biến)', subLabel: 'Tiệm cận đứng x=1, ngang y=2', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'fraction_1_1_dec' }) },
+                  { id: 'rat_2_1', label: 'BBT phân thức bậc 2/1 (2 cực trị)', subLabel: 'Tiệm cận xiên & đứng (L12)', onClick: () => onRibbonAction?.({ type: 'select_bbt_preset', presetKey: 'fraction_2_1' }) },
                 ]}
               />
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Tạo nhanh
+              Tạo nhanh mẫu
             </div>
           </div>
 
-          {/* Nhóm 2 – Cấu trúc bảng */}
+          {/* Nhóm 3 – Định dạng bảng */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
             <div className="flex flex-col justify-center gap-1 flex-1">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'times' })}
+                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
                 >
-                  <Plus size={13} className="text-[#0F6CBD]" />
-                  <span>Thêm cột nghiệm</span>
+                  <span>Times New Roman</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'latex' })}
+                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono transition cursor-pointer"
                 >
-                  <Minus size={13} className="text-rose-500" />
-                  <span>Xóa cột</span>
+                  <span>LaTeX KaTeX</span>
                 </button>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, bbt: { ...p.bbt, hasDoubleBar: !p.bbt.hasDoubleBar } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer flex items-center gap-1 ${
-                    doc.bbt.hasDoubleBar ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
+                  onClick={() => onRibbonAction?.({ type: 'set_bold', bold: !bbtIsBold })}
+                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-bold transition cursor-pointer ${
+                    bbtIsBold ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
                   }`}
                 >
-                  <span>Chèn hai gạch ||</span>
+                  <span>In đậm nhãn</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {}}
+                  onClick={() => onRibbonAction?.({ type: 'set_stroke', stroke: bbtStroke === 1.5 ? 2.5 : 1.5 })}
                   className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
                 >
-                  <span>Đổi dấu + / - / 0</span>
+                  <span>Nét: {bbtStroke}pt</span>
                 </button>
               </div>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Cấu trúc bảng
+              Định dạng bảng
             </div>
           </div>
 
-          {/* Nhóm 3 – Mũi tên & Ký hiệu */}
-          <div className="flex flex-col justify-between px-2 min-w-[190px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => {}}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <ArrowUp size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Mũi tên biến thiên</span>
-                <span className="text-[9px] text-[#605E5C]">Chuẩn SGK GDPT</span>
-              </button>
-
-              <div className="flex flex-col gap-1 justify-center">
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Chèn -∞ / +∞</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Giá trị Cực trị</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Mũi tên & Ký hiệu
-            </div>
-          </div>
+          {/* Nhóm 4 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          TAB 5: HÌNH PHẲNG & LƯỢNG GIÁC
+          TAB 4: HÌNH PHẲNG & LƯỢNG GIÁC
           ========================================================================= */}
       {activeTab === 'plane_trig' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          {/* Nhóm 1 – Tập hợp (L10) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[140px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('plane_trig', 'number_line')}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Minus size={22} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Trục số ( [ ) ]</span>
-                <span className="text-[9px] text-[#605E5C]">Tự động gạch sọc</span>
-              </button>
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Công cụ dựng hình GSP */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-1 flex-1">
+              {[
+                { id: 'select', label: 'Chọn', icon: Sliders },
+                { id: 'point', label: 'Điểm', icon: CircleDot },
+                { id: 'point_on_segment', label: 'Điểm cạnh', icon: Dot },
+                { id: 'segment', label: 'Đoạn', icon: Minus },
+                { id: 'vector', label: 'Vectơ', icon: ArrowRight },
+                { id: 'circle', label: 'Đường tròn', icon: Circle },
+                { id: 'ellipse', label: 'Elip', icon: Circle },
+                { id: 'right_angle', label: 'Góc vuông', icon: CornerDownRight },
+                { id: 'text', label: 'Nhãn', icon: Type },
+                { id: 'eraser', label: 'Tẩy', icon: Eraser },
+              ].map(t => {
+                const IconComp = t.icon;
+                const isActive = gspActiveTool === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_select_tool', tool: t.id })}
+                    className={`h-[64px] min-w-[42px] px-1.5 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                      isActive ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                    }`}
+                    title={t.label}
+                  >
+                    <IconComp size={18} className={`mb-1 ${isActive ? 'text-[#0F6CBD]' : 'text-slate-600'}`} />
+                    <span className="text-[10px] leading-tight">{t.label}</span>
+                  </button>
+                );
+              })}
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Tập hợp (L10)
+              Công cụ dựng hình GSP
             </div>
           </div>
 
-          {/* Nhóm 2 – Lượng giác (L10 – L11) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[170px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('plane_trig', 'unit_circle_half')}
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Compass size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Nửa đường tròn</span>
-                <span className="text-[9px] text-[#605E5C]">0° đến 180° (L10)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('plane_trig', 'trig_circle_full')}
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Compass size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Đường tròn LG</span>
-                <span className="text-[9px] text-[#605E5C]">Trục sin, cos, tan</span>
-              </button>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Lượng giác (L10 – L11)
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Hình học phẳng & Vectơ */}
-          <div className="flex flex-col justify-between px-2 min-w-[210px]">
+          {/* Nhóm 2 – Kho mẫu hình học & Lượng giác */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-1.5 flex-1">
               <AccessibleDropdown
-                label="Hình cơ bản"
+                label="Kho mẫu SGK"
                 icon={Compass}
                 variant="large"
-                ariaLabel="Menu Hình học phẳng"
+                menuWidth="w-72"
+                ariaLabel="Kho mẫu hình học"
                 items={[
-                  { id: 'tri_general', label: 'Tam giác thường ABC', onClick: () => onSelectTemplate('plane_trig', 'triangle_general') },
-                  { id: 'tri_right', label: 'Tam giác vuông (Đường cao AH)', onClick: () => onSelectTemplate('plane_trig', 'triangle_right') },
-                  { id: 'tri_equi', label: 'Tam giác đều', onClick: () => onSelectTemplate('plane_trig', 'triangle_equi') },
-                  { id: 'incirc', label: 'Đường tròn nội / ngoại tiếp', onClick: () => onSelectTemplate('plane_trig', 'circle_incirc') },
-                  { id: 'quad', label: 'Tứ giác / Hình bình hành', onClick: () => onSelectTemplate('plane_trig', 'quadrilateral') },
+                  { id: 'tri_vuong', label: 'Tam giác vuông (Đường cao AH)', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'tam_giac_vuong' }) },
+                  { id: 'tri_deu', label: 'Tam giác đều', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'tam_giac_deu' }) },
+                  { id: 'hbh', label: 'Hình bình hành ABCD', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_binh_hanh' }) },
+                  { id: 'hthang', label: 'Hình thang vuông', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_thang_vuong' }) },
+                  { id: 'trig', label: 'Đường tròn lượng giác đầy đủ', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'duong_tron_luong_giac' }) },
+                  { id: 'div1', label: '', divider: true, onClick: () => {} },
+                  { id: 'cone', label: 'Hình nón (đáy elip đứt-liền)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cone' }) },
+                  { id: 'cylinder', label: 'Hình trụ (2 đáy elip)', subLabel: 'Toán 12 GDPT 2018', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'cylinder' }) },
+                  { id: 'pyr_quad', label: 'Chóp tứ giác đều S.ABCD', subLabel: 'SO ⊥ đáy', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'pyramid_regular_quad' }) },
+                  { id: 'pyr_tri', label: 'Chóp tam giác đều S.ABC', subLabel: 'SG ⊥ đáy', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'pyramid_regular_tri' }) },
+                  { id: 'pyr_sa', label: 'Chóp S.ABCD (SA ⊥ đáy)', subLabel: 'Cạnh bên vuông góc', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'chop_sa_vuong_day' }) },
+                  { id: 'box', label: 'Hình hộp chữ nhật ABCD.A\'B\'C\'D\'', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'box_abcd' }) },
+                  { id: 'sphere', label: 'Mặt cầu (bán kính R & elip)', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_cau' }) },
                 ]}
               />
 
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('plane_trig', 'vector')}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <ArrowUp size={20} className="text-[#0F6CBD] mb-1 rotate-45" />
-                <span className="text-[11px] font-medium leading-tight">Vectơ & Tổng</span>
-                <span className="text-[9px] text-[#605E5C]">Góc hai vectơ</span>
-              </button>
-
               <div className="flex flex-col gap-1 justify-center">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_toggle_grid' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Bật/Tắt lưới tọa độ"
+                  >
+                    <Grid size={13} />
+                    <span>Lưới</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRibbonAction?.({ type: 'gsp_toggle_point_mode' })}
+                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                    title="Hiện / Ẩn chấm tròn điểm"
+                  >
+                    <Eye size={13} />
+                    <span>Điểm</span>
+                  </button>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
+                  onClick={() => onRibbonAction?.({ type: 'gsp_set_line_style', style: 'toggle' })}
+                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
+                  title="Chuyển đổi nét liền và nét đứt (khuất)"
                 >
-                  <span>Ký hiệu góc vuông ∟</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Đánh dấu bằng nhau ||</span>
+                  <span className="font-mono font-bold text-[#0F6CBD]">┅/─</span>
+                  <span>Đổi nét ⇄</span>
                 </button>
               </div>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Hình học phẳng & Vectơ
+              Kho mẫu & Hiển thị
             </div>
           </div>
+
+          {/* Nhóm 3 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          TAB 6: KHÔNG GIAN 3D & OXYZ (L11 – L12)
+          TAB 5: KHÔNG GIAN 3D & OXYZ (L11 – L12)
           ========================================================================= */}
       {activeTab === 'space_3d' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          {/* Nhóm 1 – Khối cơ bản */}
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Chọn công cụ 3D */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
+            <div className="flex items-center gap-1.5 flex-1">
+              <button
+                type="button"
+                onClick={() => onSetSpace3dTool?.('geogebra')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  space3dTool === 'geogebra' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <Layers size={22} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[11px] leading-tight">GeoGebra 3D AI</span>
+                <span className="text-[9px] text-[#605E5C]">Dựng hình Oxyz</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSetSpace3dTool?.('simulation')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  space3dTool === 'simulation' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+              >
+                <MonitorPlay size={22} className="mb-1 text-teal-600" />
+                <span className="text-[11px] leading-tight">Mô phỏng 3D</span>
+                <span className="text-[9px] text-[#605E5C]">Xoay 360 độ</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Công cụ Không gian
+            </div>
+          </div>
+
+          {/* Nhóm 2 – Khối cơ bản Oxyz */}
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-2 flex-1">
               <AccessibleDropdown
-                label="Khối hình 3D"
+                label="Mẫu khối 3D"
                 icon={Box}
                 variant="large"
                 menuWidth="w-72"
                 ariaLabel="Menu khối hình 3D"
                 items={[
-                  { id: 'pyr_quad', label: 'Chóp tứ giác đều S.ABCD', subLabel: 'SO ⊥ đáy', onClick: () => onSelectTemplate('space_3d', 'pyramid_quad') },
-                  { id: 'pyr_tri', label: 'Chóp tam giác đều S.ABC', subLabel: 'SG ⊥ đáy', onClick: () => onSelectTemplate('space_3d', 'pyramid_tri') },
-                  { id: 'pyr_sa', label: 'Chóp S.ABCD có SA ⊥ đáy', subLabel: 'Góc vuông tại A', onClick: () => onSelectTemplate('space_3d', 'pyramid_sa_perp') },
-                  { id: 'prism', label: 'Lăng trụ đứng / xiên', subLabel: 'ABC.A\'B\'C\'', onClick: () => onSelectTemplate('space_3d', 'prism') },
-                  { id: 'box_cube', label: 'Hình hộp chữ nhật / Lập phương', subLabel: 'ABCD.A\'B\'C\'D\'', onClick: () => onSelectTemplate('space_3d', 'box') },
-                  { id: 'sphere', label: 'Mặt cầu tâm O bán kính R', subLabel: 'Đường xích đạo elip', onClick: () => onSelectTemplate('space_3d', 'sphere') },
-                  { id: 'cone_cyl', label: 'Khối tròn xoay (Nón / Trụ)', subLabel: 'Đáy elip đứt liền SGK', onClick: () => onSelectTemplate('space_3d', 'cone') },
+                  { id: 'pyr_quad', label: 'Chóp tứ giác đều S.ABCD', subLabel: 'SO ⊥ đáy', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'chop_tu_giac' }) },
+                  { id: 'pyr_sa', label: 'Chóp S.ABCD có SA ⊥ đáy', subLabel: 'Góc vuông tại A', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'chop_sa_vuong_day' }) },
+                  { id: 'prism', label: 'Lăng trụ đứng ABC.A\'B\'C\'', subLabel: 'Đáy tam giác', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'lang_tru_dung' }) },
+                  { id: 'cube', label: 'Hình lập phương / Hình hộp', subLabel: 'ABCD.A\'B\'C\'D\'', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'lap_phuong' }) },
+                  { id: 'sphere', label: 'Mặt cầu tâm O bán kính R', subLabel: 'Oxyz', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'mat_cau' }) },
+                  { id: 'cone_cyl', label: 'Khối tròn xoay (Nón / Trụ)', subLabel: 'Đáy elip đứt liền', onClick: () => onRibbonAction?.({ type: 'geogebra_select_object', obj: 'khoi_non' }) },
                 ]}
               />
             </div>
@@ -718,246 +818,116 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 2 – Hệ trục Oxyz (L12) */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
-            <div className="flex flex-col justify-center gap-1 flex-1">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, space3D: { ...p.space3D, showOxyz: !p.space3D.showOxyz } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer ${
-                    doc.space3D.showOxyz ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                >
-                  <span>Bật/Tắt Hệ trục Oxyz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, space3D: { ...p.space3D, showProjectionDashed: !p.space3D.showProjectionDashed } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer ${
-                    doc.space3D.showProjectionDashed ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                >
-                  <span>Chiếu (x;y;z)</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Mặt phẳng & VTPT n</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Đường thẳng & VTCP u</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Hệ trục Oxyz (L12)
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Hiển thị 3D & Ký hiệu */}
-          <div className="flex flex-col justify-between px-2 min-w-[210px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onUpdateDoc(p => ({ ...p, space3D: { ...p.space3D, autoHiddenLines: !p.space3D.autoHiddenLines } }))}
-                className={`h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
-                  doc.space3D.autoHiddenLines
-                    ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
-                    : 'border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424]'
-                }`}
-                title="Tự động phân loại nét liền / nét đứt theo góc nhìn camera 3D"
-              >
-                <RotateCw size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Nét đứt tự động</span>
-                <span className="text-[9px] text-[#605E5C]">Theo góc xoay 3D</span>
-              </button>
-
-              <div className="flex flex-col gap-1 justify-center">
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Góc nhị diện / Cung góc</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUpdateDoc(p => ({ ...p, space3D: { ...p.space3D, showSectionPlane: !p.space3D.showSectionPlane } }))}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer ${
-                    doc.space3D.showSectionPlane ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                >
-                  <span>Thiết diện (Mặt cắt)</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Hiển thị 3D & Ký hiệu
-            </div>
-          </div>
+          {/* Nhóm 3 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          TAB 7: THỐNG KÊ & XÁC SUẤT (L10 – L11 – L12)
+          TAB 6: THỐNG KÊ & XÁC SUẤT (L10 – L11 – L12)
           ========================================================================= */}
       {activeTab === 'stats_prob' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px]">
-          {/* Nhóm 1 – Sơ đồ Xác suất */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[170px]">
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          {/* Nhóm 1 – Chọn phân hệ */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
             <div className="flex items-center gap-1.5 flex-1">
               <button
                 type="button"
-                onClick={() => onSelectTemplate('stats_prob', 'venn_2')}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
+                onClick={() => onSetStatsTool?.('statistics')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  statsTool === 'statistics' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
               >
-                <PieChart size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Biểu đồ Ven</span>
-                <span className="text-[9px] text-[#605E5C]">2 - 3 vòng tròn giao</span>
+                <BarChart2 size={22} className="mb-1 text-teal-600" />
+                <span className="text-[11px] leading-tight">Thống kê THPT</span>
+                <span className="text-[9px] text-[#605E5C]">Biểu đồ hộp & Ghép nhóm</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => onSelectTemplate('stats_prob', 'bayes_tree')}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
+                onClick={() => onSetStatsTool?.('tree')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  statsTool === 'tree' ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold' : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
               >
-                <GitFork size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Cây xác suất</span>
-                <span className="text-[9px] text-[#605E5C]">Bayes / Tổ hợp</span>
+                <GitFork size={22} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[11px] leading-tight">Cây Xác suất</span>
+                <span className="text-[9px] text-[#605E5C]">Định lý Bayes (L12)</span>
               </button>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Sơ đồ Xác suất
+              Phân hệ
             </div>
           </div>
 
-          {/* Nhóm 2 – Biểu đồ Thống kê */}
-          <div className="flex flex-col justify-between px-2 min-w-[210px]">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('stats_prob', 'box_plot')}
-                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Sliders size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Biểu đồ hộp (Box-plot)</span>
-                <span className="text-[9px] text-[#605E5C]">Q₁, Q₂, Q₃, Ngoại lệ</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onSelectTemplate('stats_prob', 'histogram')}
-                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <BarChart2 size={20} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium leading-tight">Biểu đồ Tần số</span>
-                <span className="text-[9px] text-[#605E5C]">Ghép nhóm GDPT 2018</span>
-              </button>
+          {/* Nhóm 2 – Dạng biểu đồ */}
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-2 flex-1">
+              <AccessibleDropdown
+                label="Dạng biểu đồ"
+                icon={PieChart}
+                variant="large"
+                ariaLabel="Menu dạng biểu đồ"
+                items={[
+                  { id: 'boxplot', label: 'Biểu đồ hộp (Box-plot) L10 & L12', subLabel: 'Min, Q1, Q2, Q3, Max', onClick: () => onRibbonAction?.({ type: 'select_stat_chart', chart: 'boxplot' }) },
+                  { id: 'histogram', label: 'Biểu đồ tần số ghép nhóm (Histogram)', subLabel: 'Các cột chữ nhật liền kề', onClick: () => onRibbonAction?.({ type: 'select_stat_chart', chart: 'histogram' }) },
+                  { id: 'tree_bayes', label: 'Sơ đồ cây Bayes (Toán 12)', subLabel: 'Xác suất toàn phần & Bayes', onClick: () => onRibbonAction?.({ type: 'tree_select_type', structure: 'bayes' }) },
+                ]}
+              />
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Biểu đồ Thống kê
+              Dạng biểu đồ
             </div>
           </div>
+
+          {/* Nhóm 3 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
 
       {/* =========================================================================
-          CONTEXTUAL TAB: ĐỊNH DẠNG ĐỐI TƯỢNG (HIỆN KHI CHỌN ĐỐI TƯỢNG)
+          CONTEXTUAL TAB: ĐỊNH DẠNG ĐỐI TƯỢNG (Chỉ hiện khi chọn đối tượng)
           ========================================================================= */}
       {activeTab === 'format' && (
-        <div className="flex items-stretch gap-2 shrink-0 h-[84px] animate-in fade-in">
-          {/* Nhóm Căn chỉnh */}
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
           <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
             <div className="flex items-center gap-1.5 flex-1">
               <button
                 type="button"
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
+                onClick={() => onUpdateDoc(p => ({ ...p, typography: { ...p.typography, isBold: !p.typography.isBold } }))}
+                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] cursor-pointer"
               >
-                <Maximize2 size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium">Căn giữa trang</span>
+                <Bold size={18} className="text-[#0F6CBD] mb-1" />
+                <span className="text-xs font-medium">In đậm nhãn</span>
               </button>
-              <div className="flex flex-col gap-1 justify-center">
-                <button
-                  type="button"
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Căn trái</span>
-                </button>
-                <button
-                  type="button"
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Căn phải</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => onUpdateDoc(p => ({ ...p, typography: { ...p.typography, isItalic: !p.typography.isItalic } }))}
+                className="h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] cursor-pointer"
+              >
+                <Italic size={18} className="text-[#0F6CBD] mb-1" />
+                <span className="text-xs font-medium">In nghiêng x, y</span>
+              </button>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Căn chỉnh
+              Định dạng đối tượng đang chọn
             </div>
           </div>
 
-          {/* Nhóm Thứ tự & Xoay */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Layers size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium">Lên trên cùng</span>
-              </button>
-              <div className="flex flex-col gap-1 justify-center">
-                <button
-                  type="button"
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Xuống dưới cùng</span>
-                </button>
-                <button
-                  type="button"
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Xoay 90°</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Thứ tự & Xoay
-            </div>
-          </div>
-
-          {/* Nhóm Khóa & Đổi tên */}
-          <div className="flex flex-col justify-between px-2">
-            <div className="flex items-center gap-1.5 flex-1">
-              <button
-                type="button"
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <Lock size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium">Khóa vị trí</span>
-              </button>
-              <button
-                type="button"
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:border-[#E1DFDD] hover:bg-[#EDEBE9] text-[#242424] transition cursor-pointer text-center"
-              >
-                <CheckSquare size={18} className="text-[#0F6CBD] mb-1" />
-                <span className="text-[11px] font-medium">Đổi tên đỉnh</span>
-              </button>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Quản lý đối tượng
-            </div>
-          </div>
+          {/* Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
         </div>
       )}
     </div>

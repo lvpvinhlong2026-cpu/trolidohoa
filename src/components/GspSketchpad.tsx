@@ -155,6 +155,7 @@ export default function GspSketchpad({
   const [pointSize, setPointSize] = useState<'small' | 'tiny' | 'medium'>('small');
   const [activeColor, setActiveColor] = useState<string>('#000000');
   const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(false);
 
   // Menu chuột phải (Context Menu) tương tác nhanh
   const [contextMenu, setContextMenu] = useState<{
@@ -2200,7 +2201,9 @@ export default function GspSketchpad({
         setShowGrid(prev => !prev);
         showNotice('Đã đổi chế độ lưới toạ độ');
       } else if (type === 'gsp_set_line_style') {
-        const style = ce.detail.style === 'dashed' ? 'dashed' : 'solid';
+        const style = ce.detail.style === 'toggle'
+          ? (lineStyle === 'dashed' ? 'solid' : 'dashed')
+          : (ce.detail.style === 'dashed' ? 'dashed' : 'solid');
         setLineStyle(style);
         showNotice(`Nét vẽ chuyển sang: ${style === 'dashed' ? 'Nét đứt' : 'Nét liền'}`);
       } else if (type === 'gsp_toggle_point_mode') {
@@ -2816,8 +2819,9 @@ export default function GspSketchpad({
       )}
 
       {/* KHUNG CHÍNH CHỨA THANH CÔNG CỤ & BẢNG VẼ */}
-      <div className={`grid grid-cols-1 ${isSplitView ? 'lg:grid-cols-1' : 'lg:grid-cols-12'} gap-4 items-start`}>
-        {/* CỘT TRÁI: HỘP CÔNG CỤ GSP ĐƠN GIẢN */}
+      <div className={`grid grid-cols-1 ${isSplitView || !showLeftSidebar ? 'lg:grid-cols-1' : 'lg:grid-cols-12'} gap-4 items-start`}>
+        {/* CỘT TRÁI: HỘP CÔNG CỤ GSP ĐƠN GIẢN (CHỈ HIỂN THỊ KHI BẬT BẢNG CHI TIẾT) */}
+        {showLeftSidebar && (
         <div className={`${isSplitView ? 'w-full' : 'lg:col-span-3'} bg-white dark:bg-slate-900 p-4 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs space-y-4`}>
           {/* Logo GSP & Tiêu đề */}
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -3378,13 +3382,30 @@ export default function GspSketchpad({
             <input type="file" ref={fileInputRef} onChange={handleOpenJson} accept=".json" className="hidden" />
           </div>
         </div>
+        )}
 
         {/* CỘT PHẢI: BẢNG VẼ CANVAS VÀ THANH CÔNG CỤ XUẤT ẢNH */}
-        <div className={`${isSplitView ? 'w-full' : 'lg:col-span-9'} bg-white dark:bg-slate-900 p-4 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs space-y-3`}>
+        <div className={`${isSplitView || !showLeftSidebar ? 'w-full' : 'lg:col-span-9'} bg-white dark:bg-slate-900 p-4 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs space-y-3`}>
           {/* THANH ĐIỀU KHIỂN TRÊN ĐẦU CANVAS */}
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
             {/* Lịch sử Hoàn tác (Undo/Redo) & Thao tác nhanh */}
             <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                  showLeftSidebar 
+                    ? 'bg-teal-50 text-teal-700 border-teal-300 dark:bg-teal-950/60 dark:text-teal-300' 
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                }`}
+                title="Bật/Tắt bảng công cụ phụ và danh sách mẫu"
+              >
+                <Sliders size={13} />
+                <span>{showLeftSidebar ? 'Đóng bảng phụ' : 'Bảng chi tiết'}</span>
+              </button>
+
+              <div className="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
+
               <button
                 onClick={handleUndo}
                 disabled={history.length === 0}
@@ -3464,35 +3485,16 @@ export default function GspSketchpad({
               </button>
             </div>
 
-            {/* NÚT XUẤT WORD, TẢI ẢNH 300 DPI VÀ MÔ HÌNH 3D XOAY 360 ĐỘ */}
+            {/* NÚT TÍNH NĂNG ĐẶC BIỆT (MÔ HÌNH 3D XOAY 360 ĐỘ) - CÁC NÚT XUẤT ẢNH WORD ĐÃ CHUYỂN LÊN RIBBON */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* NÚT MÔ HÌNH 3D TƯƠNG TÁC XOAY 360 ĐỘ (CÓ PHÂN LOẠI NÉT THẤY/KHUẤT) */}
               <button
                 onClick={() => setShow3DViewerModal(true)}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 hover:from-teal-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                className="px-3 py-1.5 bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 hover:from-teal-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
                 title="Mô hình 3D tương tác xoay 360 độ cho hình vừa vẽ (Tự động phân loại nét thấy và nét khuất chuẩn SGK)"
               >
-                <Box size={15} />
+                <Box size={14} />
                 <span>Mô hình 3D xoay 360°</span>
-              </button>
-
-              <button
-                onClick={handleCopyImage}
-                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                title="Sao chép toàn bộ ảnh độ nét cao 300 DPI trực tiếp vào Clipboard để dán (Ctrl+V) vào Word"
-              >
-                <Copy size={14} />
-                <span>Copy ảnh (Dán Word)</span>
-              </button>
-
-
-              <button
-                onClick={handleDownloadPng}
-                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Tải ảnh PNG chuẩn in ấn 300 DPI"
-              >
-                <Download size={14} />
-                <span>PNG (300 DPI)</span>
               </button>
             </div>
           </div>

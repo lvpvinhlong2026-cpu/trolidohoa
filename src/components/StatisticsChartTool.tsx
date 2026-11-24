@@ -730,34 +730,9 @@ export default function StatisticsChartTool() {
               </div>
             </div>
 
-            {/* CÁC NÚT SAO CHÉP / TẢI VỀ */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyImage}
-                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="Sao chép ảnh chất lượng cao để dán ngay (Ctrl+V) vào Microsoft Word"
-              >
-                {copyStatus === 'copied' ? <Check size={14} /> : <Copy size={14} />}
-                <span>{copyStatus === 'copied' ? 'Đã sao chép!' : 'Sao chép ảnh (Dán Word)'}</span>
-              </button>
-
-              <button
-                onClick={handleDownloadPng}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                title="Tải ảnh PNG độ phân giải 300 DPI"
-              >
-                <Download size={13} />
-                <span>PNG</span>
-              </button>
-
-              <button
-                onClick={handleDownloadSvg}
-                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1"
-                title="Tải ảnh định dạng vector SVG (phóng to không vỡ nét)"
-              >
-                <Download size={13} />
-                <span>SVG</span>
-              </button>
+            {/* GHI CHÚ XUẤT ẢNH: ĐỒNG BỘ LÊN THANH RIBBON WORD */}
+            <div className="flex items-center text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              <span>Xuất biểu đồ 300 DPI bằng nút <strong>"Cắt nhanh"</strong> hoặc <strong>"Copy vào Word"</strong> trên thanh Ribbon</span>
             </div>
           </div>
 

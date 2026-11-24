@@ -352,6 +352,29 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
     }
   };
 
+  // Lắng nghe sự kiện từ thanh Ribbon Word
+  useEffect(() => {
+    const handleRibbonAction = (e: Event) => {
+      const ce = e as CustomEvent;
+      if (!ce.detail) return;
+      if (ce.detail.type === 'copy_word') {
+        handleCopy();
+      } else if (ce.detail.type === 'download_png') {
+        handleDownload();
+      }
+    };
+    const onIneqCopy = () => handleCopy();
+    const onIneqDownload = () => handleDownload();
+    window.addEventListener('lvp_ribbon_action', handleRibbonAction);
+    window.addEventListener('lvp_ineq_copy', onIneqCopy);
+    window.addEventListener('lvp_ineq_download', onIneqDownload);
+    return () => {
+      window.removeEventListener('lvp_ribbon_action', handleRibbonAction);
+      window.removeEventListener('lvp_ineq_copy', onIneqCopy);
+      window.removeEventListener('lvp_ineq_download', onIneqDownload);
+    };
+  }, [config, zoom, fontScale, graphFont]);
+
   // Thêm BPT mới
   const handleAddIneq = (str?: string) => {
     const text = (str || newIneqInput).trim();
@@ -681,22 +704,11 @@ export default function InequalityGraphTool({ fontScale: initialFontScale = 1.0,
             </label>
           </div>
 
-          {/* NÚT COPY & TẢI ẢNH */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <button
-              onClick={handleCopy}
-              className="flex-1 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
-            >
-              <Copy size={15} />
-              Copy ảnh (Ctrl+V vào Word)
-            </button>
-            <button
-              onClick={handleDownload}
-              className="px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-            >
-              <Download size={15} />
-              Tải PNG
-            </button>
+          {/* GHI CHÚ XUẤT ẢNH: ĐÃ ĐỒNG BỘ LÊN THANH RIBBON WORD */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+              Xuất ảnh miền nghiệm 300 DPI trực tiếp bằng nút <strong>"Cắt nhanh"</strong> hoặc <strong>"Copy vào Word"</strong> trên thanh Ribbon Word
+            </span>
           </div>
         </div>
 
