@@ -150,7 +150,7 @@ export const INITIAL_ARTBOARD_DOC: ArtboardDocument = {
   category: 'graph_2d',
   typography: {
     fontFamily: 'Times New Roman',
-    fontSize: 14,
+    fontSize: 12,
     isBold: false,
     isItalic: true,
     isSubscript: false,

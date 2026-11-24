@@ -126,6 +126,142 @@ function ExportGroup({
   );
 }
 
+// Nhóm định dạng đồ thị thống nhất toàn hệ thống (Times New Roman, LaTeX KaTeX, 12 ˅, B, I, Lưới Oxy)
+interface MathFormattingGroupProps {
+  fontFamily: string;
+  onSelectFont: (font: 'times' | 'latex') => void;
+  fontSize: number;
+  onChangeFontSize: (size: number) => void;
+  isBold: boolean;
+  onToggleBold: () => void;
+  isItalic: boolean;
+  onToggleItalic: () => void;
+  showGrid?: boolean;
+  onToggleGrid?: () => void;
+  gridLabel?: string;
+  groupTitle?: string;
+  extraControls?: React.ReactNode;
+}
+
+function MathFormattingGroup({
+  fontFamily,
+  onSelectFont,
+  fontSize,
+  onChangeFontSize,
+  isBold,
+  onToggleBold,
+  isItalic,
+  onToggleItalic,
+  showGrid,
+  onToggleGrid,
+  gridLabel = 'Lưới Oxy',
+  groupTitle = 'Định dạng đồ thị',
+  extraControls,
+}: MathFormattingGroupProps) {
+  const isTimes = !fontFamily || fontFamily.toLowerCase().includes('times');
+  const isLatex = fontFamily.toLowerCase().includes('latex') || fontFamily.toLowerCase().includes('katex');
+
+  return (
+    <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px] select-none">
+      <div className="flex flex-col justify-center gap-1 flex-1">
+        {/* Hàng 1: Times New Roman, LaTeX KaTeX, Cỡ chữ (12 ˅) */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onSelectFont('times')}
+            className={`h-[26px] px-2 rounded-[3px] text-xs border font-serif font-bold transition cursor-pointer ${
+              isTimes && !isLatex
+                ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
+                : 'border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
+            }`}
+            title="Phông chữ Times New Roman chuẩn tài liệu Word"
+          >
+            <span>Times New Roman</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => onSelectFont('latex')}
+            className={`h-[26px] px-2 rounded-[3px] text-xs border font-mono transition cursor-pointer ${
+              isLatex
+                ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold'
+                : 'border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
+            }`}
+            title="Phông chữ công thức LaTeX KaTeX"
+          >
+            <span>LaTeX KaTeX</span>
+          </button>
+
+          {/* Chọn kích thước chữ (12 ˅) chuẩn Office Ribbon */}
+          <select
+            value={fontSize || 12}
+            onChange={(e) => onChangeFontSize(Number(e.target.value))}
+            className="h-[26px] px-1 text-xs font-semibold border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[52px] cursor-pointer hover:border-[#0F6CBD] transition"
+            title="Kích thước chữ (pt)"
+          >
+            {[10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Hàng 2: In đậm (B), In nghiêng (I), Lưới Oxy */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleBold}
+            className={`w-[26px] h-[26px] flex items-center justify-center rounded-[3px] border transition cursor-pointer ${
+              isBold
+                ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold'
+                : 'border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
+            }`}
+            title="In đậm (Bold)"
+          >
+            <Bold size={14} className="stroke-[2.5]" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleItalic}
+            className={`w-[26px] h-[26px] flex items-center justify-center rounded-[3px] border transition cursor-pointer ${
+              isItalic
+                ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold'
+                : 'border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
+            }`}
+            title="In nghiêng (Italic - Chuẩn biến số x, y, A, B)"
+          >
+            <Italic size={14} className="stroke-[2.5]" />
+          </button>
+
+          {onToggleGrid && (
+            <button
+              type="button"
+              onClick={onToggleGrid}
+              className={`h-[26px] px-2 rounded-[3px] text-xs border font-medium transition cursor-pointer flex items-center gap-1 ${
+                showGrid
+                  ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
+                  : 'border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9] text-[#242424] dark:text-slate-200'
+              }`}
+              title="Bật/Tắt hiển thị lưới tọa độ Oxy"
+            >
+              <Grid size={13} className="text-[#0F6CBD]" />
+              <span>{gridLabel}</span>
+            </button>
+          )}
+
+          {extraControls}
+        </div>
+      </div>
+
+      <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+        {groupTitle}
+      </div>
+    </div>
+  );
+}
+
 export default function RibbonCommandPanel({
   activeTab,
   doc,
@@ -232,11 +368,11 @@ export default function RibbonCommandPanel({
                 </select>
 
                 <select
-                  value={doc.typography.fontSize}
+                  value={doc.typography.fontSize || 12}
                   onChange={(e) => updateTypo('fontSize', Number(e.target.value))}
                   className="h-[24px] px-1 text-xs border border-[#E1DFDD] dark:border-slate-700 rounded-[3px] bg-white dark:bg-slate-800 text-[#242424] dark:text-slate-100 outline-none w-[55px]"
                 >
-                  {[13, 14, 15, 16, 18, 20, 22, 26].map(s => (
+                  {[10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24].map(s => (
                     <option key={s} value={s}>{s} pt</option>
                   ))}
                 </select>
@@ -423,67 +559,47 @@ export default function RibbonCommandPanel({
           </div>
 
           {/* Nhóm 2 – Định dạng đồ thị */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
-            <div className="flex flex-col justify-center gap-1 flex-1">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'times' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
-                  title="Phông chữ Times New Roman chuẩn tài liệu Word"
-                >
-                  <span>Times New Roman</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'latex' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono transition cursor-pointer"
-                  title="Phông chữ công thức LaTeX KaTeX"
-                >
-                  <span>LaTeX KaTeX</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_bold', bold: !bbtIsBold })}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-bold transition cursor-pointer ${
-                    bbtIsBold ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                  title="In đậm nhãn trục & điểm cực trị"
-                >
-                  <span>In đậm nhãn</span>
-                </button>
-                {graphSubTab === 'number_line' ? (
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction?.({ type: 'nl_toggle_mode' })}
-                    className="h-[26px] px-2 rounded-[3px] text-xs border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold transition cursor-pointer flex items-center gap-1"
-                    title="Đổi giữa Trục số đơn và Phép toán tập hợp (Giao, Hợp, Hiệu)"
-                  >
-                    <span>🔀 Giao / Hợp / Hiệu</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onRibbonAction?.({ type: 'toggle_grid' });
-                      onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showGrid: !p.graph2D.showGrid } }));
-                    }}
-                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer flex items-center gap-1"
-                    title="Bật/Tắt lưới tọa độ Oxy"
-                  >
-                    <Grid size={12} className="text-[#0F6CBD]" />
-                    <span>Lưới Oxy</span>
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              {graphSubTab === 'number_line' ? 'Định dạng trục số' : 'Định dạng đồ thị'}
-            </div>
-          </div>
+          <MathFormattingGroup
+            fontFamily={doc.typography.fontFamily}
+            onSelectFont={(f) => {
+              updateTypo('fontFamily', f === 'latex' ? 'LaTeX KaTeX' : 'Times New Roman');
+              onRibbonAction?.({ type: 'set_font', font: f });
+            }}
+            fontSize={doc.typography.fontSize || 12}
+            onChangeFontSize={(sz) => {
+              updateTypo('fontSize', sz);
+              onRibbonAction?.({ type: 'set_font_size', size: sz });
+            }}
+            isBold={doc.typography.isBold || bbtIsBold}
+            onToggleBold={() => {
+              const nb = !(doc.typography.isBold || bbtIsBold);
+              updateTypo('isBold', nb);
+              onRibbonAction?.({ type: 'set_bold', bold: nb });
+            }}
+            isItalic={doc.typography.isItalic}
+            onToggleItalic={() => {
+              const ni = !doc.typography.isItalic;
+              updateTypo('isItalic', ni);
+              onRibbonAction?.({ type: 'set_italic', italic: ni });
+            }}
+            showGrid={doc.graph2D.showGrid}
+            onToggleGrid={() => {
+              onRibbonAction?.({ type: 'toggle_grid' });
+              onUpdateDoc(p => ({ ...p, graph2D: { ...p.graph2D, showGrid: !p.graph2D.showGrid } }));
+            }}
+            gridLabel="Lưới Oxy"
+            groupTitle={graphSubTab === 'number_line' ? 'Định dạng trục số' : 'Định dạng đồ thị'}
+            extraControls={graphSubTab === 'number_line' ? (
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'nl_toggle_mode' })}
+                className="h-[26px] px-2 rounded-[3px] text-xs border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold transition cursor-pointer flex items-center gap-1"
+                title="Đổi giữa Trục số đơn và Phép toán tập hợp (Giao, Hợp, Hiệu)"
+              >
+                <span>🔀 Giao / Hợp / Hiệu</span>
+              </button>
+            ) : null}
+          />
 
           {/* Nhóm 4 – Xuất sang Word */}
           <ExportGroup
@@ -544,48 +660,41 @@ export default function RibbonCommandPanel({
           </div>
 
           {/* Nhóm 2 – Định dạng bảng */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
-            <div className="flex flex-col justify-center gap-1 flex-1">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'times' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
-                >
-                  <span>Times New Roman</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'latex' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono transition cursor-pointer"
-                >
-                  <span>LaTeX KaTeX</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_bold', bold: !bbtIsBold })}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-bold transition cursor-pointer ${
-                    bbtIsBold ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                >
-                  <span>In đậm nhãn</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_stroke', stroke: bbtStroke === 1.5 ? 2.5 : 1.5 })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                >
-                  <span>Nét: {bbtStroke}pt</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Định dạng bảng
-            </div>
-          </div>
+          <MathFormattingGroup
+            fontFamily={doc.typography.fontFamily}
+            onSelectFont={(f) => {
+              updateTypo('fontFamily', f === 'latex' ? 'LaTeX KaTeX' : 'Times New Roman');
+              onRibbonAction?.({ type: 'set_font', font: f });
+            }}
+            fontSize={doc.typography.fontSize || 12}
+            onChangeFontSize={(sz) => {
+              updateTypo('fontSize', sz);
+              onRibbonAction?.({ type: 'set_font_size', size: sz });
+            }}
+            isBold={doc.typography.isBold || bbtIsBold}
+            onToggleBold={() => {
+              const nb = !(doc.typography.isBold || bbtIsBold);
+              updateTypo('isBold', nb);
+              onRibbonAction?.({ type: 'set_bold', bold: nb });
+            }}
+            isItalic={doc.typography.isItalic}
+            onToggleItalic={() => {
+              const ni = !doc.typography.isItalic;
+              updateTypo('isItalic', ni);
+              onRibbonAction?.({ type: 'set_italic', italic: ni });
+            }}
+            groupTitle="Định dạng đồ thị"
+            extraControls={
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'set_stroke', stroke: bbtStroke === 1.5 ? 2.5 : 1.5 })}
+                className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
+                title="Độ dày nét kẻ bảng"
+              >
+                <span>Nét: {bbtStroke}pt</span>
+              </button>
+            }
+          />
 
           {/* Nhóm 4 – Xuất sang Word */}
           <ExportGroup
@@ -855,62 +964,6 @@ export default function RibbonCommandPanel({
               </button>
               <button
                 type="button"
-                onClick={() => onRibbonAction?.({ type: 'trig_toggle_grid' })}
-                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
-                title="Bật/Tắt lưới tọa độ"
-              >
-                <Grid size={18} className="mb-1 text-slate-500" />
-                <span className="text-[10px] leading-tight">Lưới tọa độ</span>
-              </button>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Trục & Hình chiếu
-            </div>
-          </div>
-
-          {/* Nhóm 3 – Phông chữ & Di chuyển Text */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
-            <div className="flex items-center gap-1.5 flex-1">
-              <div className="flex flex-col gap-1 justify-center">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction?.({ type: 'trig_set_font', font: 'times' })}
-                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
-                    title="Phông Times New Roman SGK"
-                  >
-                    Times SGK
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction?.({ type: 'trig_set_font', font: 'latex' })}
-                    className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono font-bold transition cursor-pointer"
-                    title="Phông KaTeX / LaTeX Math"
-                  >
-                    LaTeX
-                  </button>
-                </div>
-                <div className="flex items-center gap-1 text-[11px]">
-                  {[
-                    { label: '85%', scale: 0.85 },
-                    { label: '100%', scale: 1.0 },
-                    { label: '120%', scale: 1.2 },
-                    { label: '140%', scale: 1.4 },
-                  ].map(sz => (
-                    <button
-                      key={sz.label}
-                      type="button"
-                      onClick={() => onRibbonAction?.({ type: 'trig_set_font_scale', scale: sz.scale })}
-                      className="h-[24px] px-1.5 rounded-[3px] text-[10px] font-bold border border-[#E1DFDD] hover:bg-[#EDEBE9] transition cursor-pointer"
-                    >
-                      {sz.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
                 onClick={() => onRibbonAction?.({ type: 'trig_reset_text' })}
                 className="h-[64px] px-2 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EDEBE9] transition cursor-pointer text-center"
                 title="Đặt lại vị trí ban đầu của tất cả các chữ"
@@ -920,9 +973,46 @@ export default function RibbonCommandPanel({
               </button>
             </div>
             <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Phông & Cỡ chữ
+              Trục & Hình chiếu
             </div>
           </div>
+
+          {/* Nhóm 3 – Định dạng đồ thị (Chuẩn thống nhất toàn hệ thống) */}
+          <MathFormattingGroup
+            fontFamily={doc.typography.fontFamily}
+            onSelectFont={(f) => {
+              updateTypo('fontFamily', f === 'latex' ? 'LaTeX KaTeX' : 'Times New Roman');
+              onRibbonAction?.({ type: 'trig_set_font', font: f });
+              onRibbonAction?.({ type: 'set_font', font: f });
+            }}
+            fontSize={doc.typography.fontSize || 12}
+            onChangeFontSize={(sz) => {
+              updateTypo('fontSize', sz);
+              onRibbonAction?.({ type: 'trig_set_font_scale', scale: sz / 12, size: sz });
+              onRibbonAction?.({ type: 'set_font_size', size: sz });
+            }}
+            isBold={doc.typography.isBold}
+            onToggleBold={() => {
+              const nb = !doc.typography.isBold;
+              updateTypo('isBold', nb);
+              onRibbonAction?.({ type: 'trig_toggle_bold', bold: nb });
+              onRibbonAction?.({ type: 'set_bold', bold: nb });
+            }}
+            isItalic={doc.typography.isItalic}
+            onToggleItalic={() => {
+              const ni = !doc.typography.isItalic;
+              updateTypo('isItalic', ni);
+              onRibbonAction?.({ type: 'trig_toggle_italic', italic: ni });
+              onRibbonAction?.({ type: 'set_italic', italic: ni });
+            }}
+            showGrid={doc.graph2D.showGrid}
+            onToggleGrid={() => {
+              onRibbonAction?.({ type: 'trig_toggle_grid' });
+              onRibbonAction?.({ type: 'toggle_grid' });
+            }}
+            gridLabel="Lưới Oxy"
+            groupTitle="Định dạng đồ thị"
+          />
 
           {/* Nhóm 3 – Xuất sang Word */}
           <ExportGroup
@@ -1005,53 +1095,42 @@ export default function RibbonCommandPanel({
             </div>
           </div>
 
-          {/* Nhóm 3 – Định dạng biểu đồ */}
-          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800 min-w-[210px]">
-            <div className="flex flex-col justify-center gap-1 flex-1">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'times' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-serif font-bold transition cursor-pointer"
-                  title="Phông chữ Times New Roman"
-                >
-                  <span>Times New Roman</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_font', font: 'latex' })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-mono transition cursor-pointer"
-                  title="Phông chữ LaTeX KaTeX"
-                >
-                  <span>LaTeX KaTeX</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_bold', bold: !bbtIsBold })}
-                  className={`h-[26px] px-2 rounded-[3px] text-xs border font-bold transition cursor-pointer ${
-                    bbtIsBold ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]' : 'border-[#E1DFDD] hover:bg-[#EDEBE9]'
-                  }`}
-                  title="In đậm nhãn số liệu & xác suất"
-                >
-                  <span>In đậm nhãn</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRibbonAction?.({ type: 'set_stroke', stroke: bbtStroke === 1.5 ? 2.5 : 1.5 })}
-                  className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
-                  title="Độ dày đường nét biểu đồ"
-                >
-                  <span>Nét: {bbtStroke || 1.5}pt</span>
-                </button>
-              </div>
-            </div>
-            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
-              Định dạng biểu đồ
-            </div>
-          </div>
+          {/* Nhóm 3 – Định dạng biểu đồ (Thống nhất toàn hệ thống) */}
+          <MathFormattingGroup
+            fontFamily={doc.typography.fontFamily}
+            onSelectFont={(f) => {
+              updateTypo('fontFamily', f === 'latex' ? 'LaTeX KaTeX' : 'Times New Roman');
+              onRibbonAction?.({ type: 'set_font', font: f });
+            }}
+            fontSize={doc.typography.fontSize || 12}
+            onChangeFontSize={(sz) => {
+              updateTypo('fontSize', sz);
+              onRibbonAction?.({ type: 'set_font_size', size: sz });
+            }}
+            isBold={doc.typography.isBold || bbtIsBold}
+            onToggleBold={() => {
+              const nb = !(doc.typography.isBold || bbtIsBold);
+              updateTypo('isBold', nb);
+              onRibbonAction?.({ type: 'set_bold', bold: nb });
+            }}
+            isItalic={doc.typography.isItalic}
+            onToggleItalic={() => {
+              const ni = !doc.typography.isItalic;
+              updateTypo('isItalic', ni);
+              onRibbonAction?.({ type: 'set_italic', italic: ni });
+            }}
+            groupTitle="Định dạng đồ thị"
+            extraControls={
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'set_stroke', stroke: bbtStroke === 1.5 ? 2.5 : 1.5 })}
+                className="h-[26px] px-2 rounded-[3px] text-xs border border-[#E1DFDD] hover:bg-[#EDEBE9] font-medium transition cursor-pointer"
+                title="Độ dày đường nét biểu đồ"
+              >
+                <span>Nét: {bbtStroke || 1.5}pt</span>
+              </button>
+            }
+          />
 
           {/* Nhóm 4 – Xuất sang Word */}
           <ExportGroup

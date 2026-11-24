@@ -98,11 +98,13 @@ export default function TrigAngleTool({
   const [showAngleLabel, setShowAngleLabel] = useState<boolean>(true);   // Nhãn số đo góc
   const [showPointCoord, setShowPointCoord] = useState<boolean>(true);   // Tọa độ M(cos, sin)
   const [strokeWeight, setStrokeWeight] = useState<number>(1.8);         // Độ dày nét
+  const [circleRadius, setCircleRadius] = useState<number>(130);         // Bán kính đường tròn chuẩn SGK (nhỏ gọn, cân xứng)
 
-  // Tùy chọn phông chữ và kích thước chữ (như các phần khác)
+  // Tùy chọn phông chữ và kích thước chữ (đồng bộ từ Ribbon)
   const [mathFont, setMathFont] = useState<MathFontChoice>('times');
   const [fontScale, setFontScale] = useState<number>(1.0);               // Tỉ lệ cỡ chữ: 0.8 - 1.6
   const [isBold, setIsBold] = useState<boolean>(true);                   // Chữ in đậm
+  const [isItalic, setIsItalic] = useState<boolean>(true);               // Chữ in nghiêng
 
   // Tương tác dời vị trí chữ (drag text)
   const [textOffsets, setTextOffsets] = useState<Record<string, { x: number; y: number }>>({});
@@ -153,11 +155,14 @@ export default function TrigAngleTool({
     const scaledSize = Math.round(fontSize * fontScale);
     const fontFam = mathFont === 'latex' ? MATH_FONT_FAMILIES.latex : MATH_FONT_FAMILIES.times;
     
-    let weightPrefix = isBold ? 'bold ' : '';
-    if (fontStyle === 'bold_italic') {
+    let weightPrefix = '';
+    const shouldItalic = isItalic && (fontStyle === 'italic' || fontStyle === 'bold_italic');
+    if (isBold && shouldItalic) {
       weightPrefix = 'bold italic ';
-    } else if (fontStyle === 'italic') {
-      weightPrefix = isBold ? 'bold italic ' : 'italic ';
+    } else if (isBold) {
+      weightPrefix = 'bold ';
+    } else if (shouldItalic) {
+      weightPrefix = 'italic ';
     }
     ctx.font = `${weightPrefix}${scaledSize}px ${fontFam}`;
     ctx.textAlign = textAlign;
@@ -404,14 +409,15 @@ export default function TrigAngleTool({
     } else {
       // =========================================================================
       // CHẾ ĐỘ 2: ĐƯỜNG TRÒN LƯỢNG GIÁC OXY CHUẨN SGK TOÁN 11
+      // Đường tròn nhỏ gọn, cân xứng với hệ trục tọa độ
       // =========================================================================
-      const originX = width / 2 - 20;
-      const originY = height / 2 + 10;
-      const R = 175;
+      const originX = width / 2;
+      const originY = height / 2;
+      const R = circleRadius; // Mặc định 130px (nhỏ gọn, chuẩn SGK)
 
       // 2.1 Trục Ox (Trục cos)
-      const xStart = 45;
-      const xEnd = width - 65;
+      const xStart = 80;
+      const xEnd = width - 80;
       ctx.strokeStyle = '#1E293B';
       ctx.lineWidth = strokeWeight;
       ctx.beginPath();
@@ -421,13 +427,29 @@ export default function TrigAngleTool({
       drawArrowHead(ctx, xEnd, originY, 0, '#1E293B', 10, 4.5);
 
       // 2.2 Trục Oy (Trục sin)
-      const yStart = height - 40;
-      const yEnd = 40;
+      const yStart = height - 50;
+      const yEnd = 50;
       ctx.beginPath();
       ctx.moveTo(originX, yStart);
       ctx.lineTo(originX, yEnd);
       ctx.stroke();
       drawArrowHead(ctx, originX, yEnd, -Math.PI / 2, '#1E293B', 10, 4.5);
+
+      // Vạch chia đơn vị chuẩn tại -1 và +1 trên cả 2 trục
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      // Trục Ox
+      ctx.moveTo(originX + R, originY - 3.5);
+      ctx.lineTo(originX + R, originY + 3.5);
+      ctx.moveTo(originX - R, originY - 3.5);
+      ctx.lineTo(originX - R, originY + 3.5);
+      // Trục Oy
+      ctx.moveTo(originX - 3.5, originY - R);
+      ctx.lineTo(originX + 3.5, originY - R);
+      ctx.moveTo(originX - 3.5, originY + R);
+      ctx.lineTo(originX + 3.5, originY + R);
+      ctx.stroke();
 
       // 2.3 Đường tròn lượng giác tâm O, bán kính R
       ctx.strokeStyle = '#0F6CBD';
@@ -469,18 +491,18 @@ export default function TrigAngleTool({
         ctx.lineWidth = 1.3;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.moveTo(ax, 35);
-        ctx.lineTo(ax, height - 35);
+        ctx.moveTo(ax, 50);
+        ctx.lineTo(ax, height - 50);
         ctx.stroke();
         ctx.restore();
 
-        renderDraggableText(ctx, 'text_tan', 'Trục tang (t\'At)', ax + 8, 48, 13, '#D97706', 'normal');
+        renderDraggableText(ctx, 'text_tan', 'Trục tang (t\'At)', ax + 8, 62, 13, '#D97706', 'normal');
 
         // Giao điểm T
         if (Math.abs(cosVal) > 1e-4) {
           const tVal = Math.tan(angleRad);
           const ty = originY - tVal * R;
-          if (ty >= 30 && ty <= height - 30) {
+          if (ty >= 40 && ty <= height - 40) {
             ctx.fillStyle = '#D97706';
             ctx.beginPath();
             ctx.arc(ax, ty, 4, 0, Math.PI * 2);
@@ -497,8 +519,8 @@ export default function TrigAngleTool({
         ctx.lineWidth = 1.3;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.moveTo(40, by);
-        ctx.lineTo(width - 50, by);
+        ctx.moveTo(60, by);
+        ctx.lineTo(width - 60, by);
         ctx.stroke();
         ctx.restore();
 
@@ -508,7 +530,7 @@ export default function TrigAngleTool({
         if (Math.abs(sinVal) > 1e-4) {
           const cVal = 1 / Math.tan(angleRad);
           const sx = originX + cVal * R;
-          if (sx >= 30 && sx <= width - 30) {
+          if (sx >= 50 && sx <= width - 50) {
             ctx.fillStyle = '#7C3AED';
             ctx.beginPath();
             ctx.arc(sx, by, 4, 0, Math.PI * 2);
@@ -531,8 +553,8 @@ export default function TrigAngleTool({
       ctx.stroke();
 
       // Tia OM (tia cuối, kéo dài qua M một chút)
-      const extX = originX + (R + 26) * cosVal;
-      const extY = originY - (R + 26) * sinVal;
+      const extX = originX + (R + 22) * cosVal;
+      const extY = originY - (R + 22) * sinVal;
       ctx.strokeStyle = '#DC2626';
       ctx.lineWidth = strokeWeight + 0.4;
       ctx.beginPath();
@@ -560,7 +582,7 @@ export default function TrigAngleTool({
       ctx.lineWidth = strokeWeight + 0.2;
 
       if (absAngle <= 360) {
-        const arcR = 40;
+        const arcR = Math.min(36, R * 0.3);
         if (absAngle >= 4) {
           ctx.beginPath();
           ctx.arc(originX, originY, arcR, 0, -angleRad, isPositive);
@@ -569,13 +591,13 @@ export default function TrigAngleTool({
           const tipX = originX + arcR * Math.cos(-angleRad);
           const tipY = originY + arcR * Math.sin(-angleRad);
           const tangentAngle = isPositive ? -angleRad - Math.PI / 2 : -angleRad + Math.PI / 2;
-          drawArrowHead(ctx, tipX, tipY, tangentAngle, curveColor, 9, 4.5);
+          drawArrowHead(ctx, tipX, tipY, tangentAngle, curveColor, 8.5, 4);
         }
       } else {
         // Đường xoắn ốc Archimedes
-        const rStart = 26;
+        const rStart = 20;
         const turns = absAngle / 360;
-        const deltaRPerTurn = Math.min(18, Math.max(10, 115 / turns));
+        const deltaRPerTurn = Math.min(14, Math.max(7, (R - 35) / turns));
         const totalRad = (absAngle * Math.PI) / 180;
         const numSteps = Math.min(700, Math.max(200, Math.floor(absAngle * 2)));
 
@@ -603,7 +625,7 @@ export default function TrigAngleTool({
         const vy = b * Math.sin(finalPhi) + finalR * Math.cos(finalPhi) * s;
         const tangentAngle = Math.atan2(vy, vx);
 
-        drawArrowHead(ctx, tipX, tipY, tangentAngle, curveColor, 9.5, 4.5);
+        drawArrowHead(ctx, tipX, tipY, tangentAngle, curveColor, 9, 4.5);
       }
       ctx.restore();
 
@@ -639,7 +661,7 @@ export default function TrigAngleTool({
       renderDraggableText(ctx, 'text_O', 'O', originX - 16, originY + 16, 16, '#1E293B', 'italic');
       renderDraggableText(ctx, 'text_x', 'x', xEnd + 6, originY + 5, 16, '#1E293B', 'italic');
       renderDraggableText(ctx, 'text_y', 'y', originX - 6, yEnd - 8, 16, '#1E293B', 'italic');
-      renderDraggableText(ctx, 'text_cos_axis', '(trục cos)', xEnd - 65, originY + 20, 12, '#64748B', 'normal');
+      renderDraggableText(ctx, 'text_cos_axis', '(trục cos)', xEnd - 60, originY + 18, 12, '#64748B', 'normal');
       renderDraggableText(ctx, 'text_sin_axis', '(trục sin)', originX + 10, yEnd + 16, 12, '#64748B', 'normal');
 
       // Điểm A, A', B, B'
@@ -668,7 +690,7 @@ export default function TrigAngleTool({
         const signPrefix = angleDeg >= 0 ? '+' : '';
         const angleStr = `${signPrefix}${angleDeg}° (${formatRadian(angleDeg)})`;
         const midRad = absAngle <= 360 ? -angleRad / 2 : (isPositive ? -0.4 : 0.4);
-        const labelDist = absAngle <= 360 ? 58 : 72;
+        const labelDist = Math.max(45, R * 0.42);
         const lx = originX + labelDist * Math.cos(midRad);
         const ly = originY + labelDist * Math.sin(midRad);
         renderDraggableText(ctx, 'text_angle', angleStr, lx, ly, 15, curveColor, 'bold_italic');
@@ -689,12 +711,14 @@ export default function TrigAngleTool({
     mathFont,
     fontScale,
     isBold,
+    isItalic,
     textOffsets,
     hoveredTextId,
     draggedTextId,
     sinVal,
     cosVal,
-    angleRad
+    angleRad,
+    circleRadius
   ]);
 
   useEffect(() => {
@@ -710,6 +734,8 @@ export default function TrigAngleTool({
         setAngleDeg(action.angle);
       } else if (action.type === 'trig_set_mode') {
         setAngleMode(action.mode);
+      } else if (action.type === 'trig_set_circle_radius') {
+        setCircleRadius(action.radius);
       } else if (action.type === 'trig_step_angle') {
         setAngleDeg(prev => prev + action.delta);
       } else if (action.type === 'trig_toggle_projections') {
@@ -718,14 +744,28 @@ export default function TrigAngleTool({
         setShowTanAxis(prev => !prev);
       } else if (action.type === 'trig_toggle_cot') {
         setShowCotAxis(prev => !prev);
-      } else if (action.type === 'trig_toggle_grid') {
+      } else if (action.type === 'trig_toggle_grid' || action.type === 'toggle_grid') {
         setShowGrid(prev => !prev);
       } else if (action.type === 'trig_reset_text') {
         setTextOffsets({});
-      } else if (action.type === 'trig_set_font') {
+      } else if (action.type === 'trig_set_font' || action.type === 'set_font') {
         setMathFont(action.font);
       } else if (action.type === 'trig_set_font_scale') {
         setFontScale(action.scale);
+      } else if (action.type === 'set_font_size') {
+        setFontScale(action.size ? action.size / 12 : 1.0);
+      } else if (action.type === 'trig_toggle_bold' || action.type === 'set_bold') {
+        if (action.bold !== undefined) {
+          setIsBold(action.bold);
+        } else {
+          setIsBold(prev => !prev);
+        }
+      } else if (action.type === 'trig_toggle_italic' || action.type === 'set_italic') {
+        if (action.italic !== undefined) {
+          setIsItalic(action.italic);
+        } else {
+          setIsItalic(prev => !prev);
+        }
       } else if (action.type === 'copy_word') {
         handleCopyWordAction();
       } else if (action.type === 'download_png') {
@@ -770,13 +810,13 @@ export default function TrigAngleTool({
 
     // 2. Nếu ở chế độ đường tròn: kiểm tra bấm trúng điểm M để xoay góc
     if (angleMode === 'unit_circle') {
-      const originX = 840 / 2 - 20;
-      const originY = 580 / 2 + 10;
-      const R = 175;
+      const originX = 840 / 2;
+      const originY = 580 / 2;
+      const R = circleRadius;
       const mx = originX + R * cosVal;
       const my = originY - R * sinVal;
 
-      if (Math.hypot(x - mx, y - my) <= 20) {
+      if (Math.hypot(x - mx, y - my) <= 22) {
         setIsDraggingM(true);
       }
     }
@@ -801,8 +841,8 @@ export default function TrigAngleTool({
 
     // 2. Đang kéo xoay điểm M
     if (isDraggingM && angleMode === 'unit_circle') {
-      const originX = 840 / 2 - 20;
-      const originY = 580 / 2 + 10;
+      const originX = 840 / 2;
+      const originY = 580 / 2;
       let rawRad = Math.atan2(-(y - originY), x - originX);
       let rawDeg = Math.round((rawRad * 180) / Math.PI);
       if (rawDeg < 0) rawDeg += 360;
@@ -931,26 +971,6 @@ export default function TrigAngleTool({
             >
               <RotateCcw size={12} />
               <span>Đặt lại chữ</span>
-            </button>
-
-            {/* Nút Copy vào Word */}
-            <button
-              type="button"
-              onClick={handleCopyWordAction}
-              className="h-[28px] px-3 bg-[#0F6CBD] hover:bg-[#115EA3] active:bg-[#0C5494] text-white rounded-[3px] font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
-              title="Sao chép ảnh độ phân giải cao 300 DPI vào clipboard để dán trực tiếp vào Microsoft Word"
-            >
-              {copyStatus === 'success' ? <Check size={14} /> : <Copy size={13} />}
-              <span>{copyStatus === 'success' ? 'Đã sao chép 300 DPI!' : 'Sao chép vào Word'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadPngAction}
-              className="h-[28px] px-2.5 border border-[#E1DFDD] dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-[3px] font-medium text-xs flex items-center gap-1 transition cursor-pointer"
-              title="Tải ảnh PNG chuẩn 300 DPI"
-            >
-              <Download size={13} />
-              <span>Tải PNG</span>
             </button>
           </div>
         </div>
@@ -1092,115 +1112,49 @@ export default function TrigAngleTool({
           </div>
         </div>
 
-        {/* Khối 2: Tùy chỉnh Phông chữ & Kích thước chữ (Theo yêu cầu) */}
-        <div className="bg-white dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-800 rounded-[4px] p-3.5 shadow-2xs space-y-3">
-          <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Type size={14} className="text-[#0F6CBD]" />
-              <span>Phông chữ & Cỡ chữ</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsBold(prev => !prev)}
-              className={`px-2 py-0.5 rounded text-xs font-bold border transition cursor-pointer flex items-center gap-1 ${
-                isBold 
-                  ? 'bg-[#0F6CBD] text-white border-[#0F6CBD]' 
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200'
-              }`}
-              title="Bật/Tắt in đậm ký hiệu"
-            >
-              <Bold size={11} />
-              <span>In đậm</span>
-            </button>
-          </div>
-
-          {/* Chọn loại phông chữ */}
-          <div className="space-y-1">
-            <span className="text-[11px] font-semibold text-slate-500 block">Kiểu phông Toán học:</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setMathFont('times')}
-                className={`py-1 px-2 rounded text-xs font-bold border transition cursor-pointer text-center ${
-                  mathFont === 'times'
-                    ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
-                    : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Times New Roman SGK
-              </button>
-              <button
-                type="button"
-                onClick={() => setMathFont('latex')}
-                className={`py-1 px-2 rounded text-xs font-bold border transition cursor-pointer text-center ${
-                  mathFont === 'latex'
-                    ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
-                    : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                KaTeX / LaTeX Math
-              </button>
+        {/* Khối tùy chỉnh kích thước đường tròn khi ở chế độ unit_circle */}
+        {angleMode === 'unit_circle' && (
+          <div className="bg-white dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-800 rounded-[4px] p-3 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+              <span>Đường kính đường tròn Oxy</span>
+              <span className="font-mono text-[#0F6CBD] font-bold">R = {circleRadius}px</span>
             </div>
-          </div>
-
-          {/* Điều chỉnh kích thước chữ */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-              <span>Cỡ chữ hiển thị:</span>
-              <span className="font-mono text-[#0F6CBD] font-bold">{Math.round(fontScale * 100)}%</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
-                className="p-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 cursor-pointer"
-                title="Giảm cỡ chữ"
-              >
-                <ZoomOut size={13} />
-              </button>
-              <input
-                type="range"
-                min="0.75"
-                max="1.6"
-                step="0.05"
-                value={fontScale}
-                onChange={e => setFontScale(parseFloat(e.target.value))}
-                className="flex-1 accent-[#0F6CBD] cursor-pointer"
-              />
-              <button
-                type="button"
-                onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
-                className="p-1 rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 cursor-pointer"
-                title="Tăng cỡ chữ"
-              >
-                <ZoomIn size={13} />
-              </button>
-            </div>
-
-            {/* Presets cỡ chữ nhanh */}
-            <div className="grid grid-cols-4 gap-1 pt-1 text-[10px] font-bold">
+            <div className="grid grid-cols-4 gap-1 text-[10px] font-bold">
               {[
-                { label: '85%', scale: 0.85 },
-                { label: 'Chuẩn', scale: 1.0 },
-                { label: '120%', scale: 1.2 },
-                { label: '140%', scale: 1.4 },
-              ].map(p => (
+                { label: 'Nhỏ', r: 115 },
+                { label: 'Chuẩn', r: 130 },
+                { label: 'Vừa', r: 145 },
+                { label: 'Lớn', r: 160 },
+              ].map(opt => (
                 <button
-                  key={p.label}
+                  key={opt.label}
                   type="button"
-                  onClick={() => setFontScale(p.scale)}
+                  onClick={() => setCircleRadius(opt.r)}
                   className={`py-1 rounded border transition cursor-pointer text-center ${
-                    fontScale === p.scale
+                    circleRadius === opt.r
                       ? 'bg-[#0F6CBD] text-white border-[#0F6CBD]'
                       : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-600 dark:text-slate-300'
                   }`}
                 >
-                  {p.label}
+                  {opt.label}
                 </button>
               ))}
             </div>
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="text-[10px] text-slate-400">105px</span>
+              <input
+                type="range"
+                min="105"
+                max="165"
+                step="5"
+                value={circleRadius}
+                onChange={e => setCircleRadius(Number(e.target.value))}
+                className="flex-1 accent-[#0F6CBD] cursor-pointer"
+              />
+              <span className="text-[10px] text-slate-400">165px</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Khối 3: Kho mẫu góc SGK Toán 11 */}
         <div className="bg-white dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-800 rounded-[4px] p-3.5 shadow-2xs space-y-3">

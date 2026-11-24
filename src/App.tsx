@@ -328,7 +328,7 @@ export default function App() {
       {/* =====================================================================
           1. THANH HEADER TRÊN CÙNG (36PX - THANH LỊCH & TINH GỌN CHUẨN FLUENT)
           ===================================================================== */}
-      <header className="h-[36px] min-h-[36px] px-3 sm:px-4 bg-[#F3F2F1] dark:bg-slate-900 border-b border-[#E1DFDD] dark:border-slate-800 flex items-center justify-between select-none z-30">
+      <header className="h-[38px] min-h-[38px] px-3 sm:px-4 bg-[#F3F2F1] dark:bg-slate-900 border-b border-[#E1DFDD] dark:border-slate-800 flex items-center justify-between select-none z-30">
         {/* Bên trái: Tên ứng dụng thanh lịch & Thông tin tác giả */}
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-5 h-5 rounded-[3px] bg-[#0F6CBD] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
@@ -337,11 +337,11 @@ export default function App() {
           <div className="flex flex-col min-w-0 justify-center">
             <div className="flex items-center gap-1.5">
               <h1 className="text-xs sm:text-sm font-bold tracking-tight text-[#242424] dark:text-white uppercase truncate leading-none">
-                TRỢ LÝ ĐỒ HỌA TOÁN HỌC
+                TRỢ LÍ ĐỒ HỌA TOÁN HỌC
               </h1>
             </div>
-            <span className="hidden xl:inline-block text-[10px] text-[#605E5C] dark:text-slate-400 font-normal truncate leading-tight">
-              GV Lê Vĩnh Phúc (Trường THPT Lê Hoàng Chiếu, tỉnh Vĩnh Long)
+            <span className="text-[10px] text-[#605E5C] dark:text-slate-400 font-semibold uppercase truncate leading-tight mt-0.5">
+              GV: LÊ VĨNH PHÚC
             </span>
           </div>
         </div>
