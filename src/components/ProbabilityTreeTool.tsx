@@ -723,10 +723,19 @@ export default function ProbabilityTreeTool() {
         handleDownloadPng();
       } else if (type === 'set_font' && ce.detail.font) {
         setFontChoice(ce.detail.font);
+      } else if (type === 'set_font_size' && ce.detail.size) {
+        const sz = Number(ce.detail.size);
+        if (!isNaN(sz) && sz > 0) {
+          setFontSizeScale(sz / 12);
+        }
       } else if (type === 'set_stroke' && ce.detail.stroke) {
         setStrokeChoice(ce.detail.stroke === 2.5 ? 'bold' : 'standard');
-      } else if (type === 'toggle_bold') {
-        setIsBold(prev => !prev);
+      } else if (type === 'set_bold' || type === 'toggle_bold') {
+        if (ce.detail.bold !== undefined) {
+          setIsBold(ce.detail.bold);
+        } else {
+          setIsBold(prev => !prev);
+        }
       } else if (type === 'tree_select_type') {
         const structure = ce.detail.structure;
         if (structure === 'Định lý Bayes' || structure?.includes('Bayes')) {

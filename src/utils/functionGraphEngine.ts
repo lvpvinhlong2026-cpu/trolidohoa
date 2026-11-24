@@ -107,6 +107,7 @@ export interface GraphConfig {
   curveColor?: string;         // Màu sắc đường cong đồ thị (mặc định '#000000')
   axisWidth?: number;          // Độ dày trục tọa độ Oxy (mặc định 2.0px)
   isBoldLabels?: boolean;      // In đậm chữ số và nhãn tọa độ (mặc định true)
+  isItalic?: boolean;          // In nghiêng chữ số và nhãn tọa độ (mặc định true)
   dotRadius?: number;          // Bán kính chấm tròn cực trị & giao điểm (mặc định 2.4px, nhỏ gọn chuẩn SGK)
   showExtremaDots?: boolean;   // Hiển thị chấm tròn đen tại các điểm cực trị (false cho chuẩn TikZ/LaTeX như hình)
   showIntersectionDots?: boolean; // Hiển thị chấm tròn đen tại các giao điểm trục (false cho chuẩn TikZ/LaTeX)
@@ -523,6 +524,8 @@ export function renderGraphToCanvas(
   const width = options?.width ?? 440;
   const height = options?.height ?? 400;
   const isBoldLabels = config.isBoldLabels ?? true;
+  const isItalicLabels = config.isItalic ?? true;
+  const italicPrefix = isItalicLabels ? 'italic ' : '';
 
   canvas.width = Math.round(width * dpiScale);
   canvas.height = Math.round(height * dpiScale);
@@ -1307,7 +1310,7 @@ export function renderGraphToCanvas(
 
         ctx.save();
         const sFontSz = Math.round(24 * fontScale);
-        ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${sFontSz}px ${mathFontFam}`;
+        ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${sFontSz}px ${mathFontFam}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -1403,7 +1406,7 @@ export function renderGraphToCanvas(
 
   // 4. Nhãn trục Ox, Oy, gốc O (Font to rõ, chuẩn in ấn SGK & Word có viền Halo trắng)
   const axisLabelFontSz = Math.round(25 * fontScale);
-  ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
+  ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
 
   // Nhãn x nằm ngay phía trên mũi tên trục Ox
   if (axY >= 10 && axY <= height - 10) {
@@ -1436,7 +1439,7 @@ export function renderGraphToCanvas(
 
   // Nhãn y nằm ngay bên phải mũi tên trục Oy
   if (axX >= 10 && axX <= width - 10) {
-    ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
+    ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     const labelY_x = Math.min(width - 14, Math.max(14, axX + 8)) + (config.axisLabelYOffset?.x ?? 0);
@@ -1491,7 +1494,7 @@ export function renderGraphToCanvas(
     const drawOX = bestO.x + (config.originOffset?.x ?? 0);
     const drawOY = bestO.y + (config.originOffset?.y ?? 0);
 
-    ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
+    ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${axisLabelFontSz}px ${mathFontFam}`;
     ctx.textAlign = bestO.align;
     ctx.textBaseline = bestO.baseline;
     ctx.strokeStyle = '#FFFFFF';
@@ -1678,7 +1681,7 @@ export function renderGraphToCanvas(
 
       // Ghi nhãn chữ A, B cạnh đầu mút (vị trí tối ưu không bao giờ đè đồ thị)
       const pointLabelFontSz = Math.round(21 * fontScale);
-      ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
+      ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
       const bestPos = getBestPointLabelPos(sx, sy, ep.label, pointLabelFontSz);
       ctx.textAlign = bestPos.align;
       ctx.textBaseline = bestPos.baseline;
@@ -1730,8 +1733,8 @@ export function renderGraphToCanvas(
       ctx.stroke();
 
       // Chấm tròn cực trị (bán kính nhỏ gọn thanh mảnh chuẩn SGK)
-      const showExtremaDots = config.showExtremaDots ?? (!isLatex);
-      if (showExtremaDots) {
+      const showExtremaDots = config.showExtremaDots ?? (dotRadius > 0);
+      if (showExtremaDots && dotRadius > 0) {
         ctx.setLineDash([]);
         ctx.fillStyle = '#000000';
         ctx.beginPath();
@@ -1802,7 +1805,7 @@ export function renderGraphToCanvas(
       if (cp.label && cp.label.trim()) {
         const lbl = cp.label.trim();
         const pointLabelFontSz = Math.round(21 * fontScale);
-        ctx.font = `italic ${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
+        ctx.font = `${italicPrefix}${isBoldLabels ? 'bold ' : 'normal '}${pointLabelFontSz}px ${mathFontFam}`;
         const bestPos = getBestPointLabelPos(sx, sy, lbl, pointLabelFontSz);
         ctx.textAlign = bestPos.align;
         ctx.textBaseline = bestPos.baseline;
@@ -1836,8 +1839,8 @@ export function renderGraphToCanvas(
       const sy = toScreenY(pt.y);
 
       // Chấm tròn tại giao điểm (bán kính nhỏ gọn thanh mảnh chuẩn SGK)
-      const showIntersectionDots = config.showIntersectionDots ?? (!isLatex);
-      if (showIntersectionDots) {
+      const showIntersectionDots = config.showIntersectionDots ?? (dotRadius > 0);
+      if (showIntersectionDots && dotRadius > 0) {
         ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.arc(sx, sy, dotRadius, 0, Math.PI * 2);
@@ -1870,6 +1873,7 @@ export function renderGraphToCanvas(
     drawMathText(ctx, item.text, drawX, drawY, {
       fontSize: numFontSz,
       isBold: isBoldLabels,
+      isItalic: isItalicLabels,
       fontFamily: numFontFam,
       align: 'center',
       withHalo: true,
@@ -1900,6 +1904,7 @@ export function renderGraphToCanvas(
     drawMathText(ctx, item.text, drawX, drawY, {
       fontSize: numFontSz,
       isBold: isBoldLabels,
+      isItalic: isItalicLabels,
       fontFamily: numFontFam,
       align: item.align,
       withHalo: true,

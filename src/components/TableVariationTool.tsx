@@ -98,7 +98,7 @@ function drawBBTToCanvas(
   fontChoice: MathFontChoice,
   colorStyle: 'monochrome' | 'colored',
   scale: number = 3.0,
-  fontSizeMode: 'standard' | 'large' | 'extra' = 'large',
+  fontSizeMode: any = 'large',
   tableWidthMode: 'auto' | 'compact' | 'wide' = 'auto',
   strokeChoice: MathStrokeChoice = 'standard',
   isBold: boolean = true
@@ -106,7 +106,10 @@ function drawBBTToCanvas(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const fontMultiplier = fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35;
+  const numSize = Number(fontSizeMode);
+  const fontMultiplier = !isNaN(numSize) && numSize > 0
+    ? (numSize / 12) * 1.35
+    : (fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35);
   const strokeMultiplier = strokeChoice === 'thin' ? 0.75 : strokeChoice === 'bold' ? 1.4 : 1.0;
   const numPts = points.length;
 
@@ -419,7 +422,7 @@ export default function TableVariationTool() {
   const [bbtMode, setBbtMode] = useState<BBTType>('variation');
   const [fontChoice, setFontChoice] = useState<MathFontChoice>('times');
   const [colorStyle, setColorStyle] = useState<'monochrome' | 'colored'>('monochrome');
-  const [fontSizeMode, setFontSizeMode] = useState<'standard' | 'large' | 'extra'>('large');
+  const [fontSizeMode, setFontSizeMode] = useState<any>('large');
   const [tableWidthMode, setTableWidthMode] = useState<'auto' | 'compact' | 'wide'>('auto');
   const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
   const [isBoldLabels, setIsBoldLabels] = useState<boolean>(true);
@@ -494,8 +497,13 @@ export default function TableVariationTool() {
       setAnalyzedData(result);
 
       if (autoCanvasRef.current && result) {
+        const numSize = Number(fontSizeMode);
+        const autoScale = !isNaN(numSize) && numSize > 0
+          ? (numSize / 12) * 1.15
+          : (fontSizeMode === 'extra' ? 1.25 : fontSizeMode === 'large' ? 1.15 : 1.0);
+
         renderBBTToCanvas(result, autoCanvasRef.current, 2.4, {
-          fontSizeScale: fontSizeMode === 'extra' ? 1.25 : fontSizeMode === 'large' ? 1.15 : 1.0,
+          fontSizeScale: autoScale,
           fontFamily: MATH_FONT_FAMILIES[fontChoice],
           strokeChoice,
           isBold: isBoldLabels
@@ -792,8 +800,12 @@ export default function TableVariationTool() {
         setFontChoice(font);
       } else if (type === 'set_stroke' && stroke) {
         setStrokeChoice(stroke);
-      } else if (type === 'set_bold' !== undefined && bold !== undefined) {
-        setIsBoldLabels(bold);
+      } else if (type === 'set_bold') {
+        if (bold !== undefined) {
+          setIsBoldLabels(bold);
+        } else {
+          setIsBoldLabels(prev => !prev);
+        }
       } else if (type === 'select_bbt_preset' && presetKey) {
         loadPreset(presetKey);
       }
@@ -1136,17 +1148,6 @@ export default function TableVariationTool() {
           {/* CỘT PHẢI: KHUNG VẼ CANVAS TỰ ĐỘNG & THANH CÔNG CỤ (7 CỘT) */}
           <div className="lg:col-span-7 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[460px] space-y-4">
             
-            {/* TIÊU ĐỀ KHUNG VẼ (ĐIỀU KHIỂN XUẤT ẢNH & ĐỊNH DẠNG TẠI THANH RIBBON WORD Ở TRÊN) */}
-            <div className="w-full flex items-center justify-between pb-1 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <span className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
-                <Sparkles size={15} />
-                <span>Bản vẽ Bảng biến thiên tự động (Độ nét cao 300 DPI)</span>
-              </span>
-              <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                Chép Word & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
-              </span>
-            </div>
-
             {/* VÙNG HIỂN THỊ CANVAS */}
             <div className="w-full overflow-x-auto p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-center min-h-[280px]">
               <canvas ref={autoCanvasRef} className="max-w-full h-auto" />
@@ -1388,20 +1389,12 @@ export default function TableVariationTool() {
 
             {/* CỘT PHẢI (7 CỘT): KHUNG VẼ BẢNG BIẾN THIÊN & NÚT XUẤT */}
             <div className="lg:col-span-7 space-y-4">
-              {/* TIÊU ĐỀ KHUNG VẼ (ĐIỀU KHIỂN XUẤT ẢNH & ĐỊNH DẠNG TẠI THANH RIBBON WORD Ở TRÊN) */}
-              <div className="w-full flex items-center justify-between pb-1 text-xs font-bold text-slate-700 dark:text-slate-300">
-                <span className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
-                  <Table size={15} />
-                  <span>Bản vẽ Bảng biến thiên tùy biến (Độ nét cao 300 DPI)</span>
-                </span>
-                <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                  Chép Word & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
-                </span>
-              </div>
-
               {/* VÙNG VẼ SVG BẢNG BIẾN THIÊN */}
               {(() => {
-                const fontMultiplier = fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35;
+                const numSize = Number(fontSizeMode);
+                const fontMultiplier = !isNaN(numSize) && numSize > 0
+                  ? (numSize / 12) * 1.35
+                  : (fontSizeMode === 'extra' ? 1.55 : fontSizeMode === 'standard' ? 1.1 : 1.35);
                 const numPts = points.length;
 
                 const svgW = tableWidthMode === 'wide' 

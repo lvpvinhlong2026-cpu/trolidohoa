@@ -45,7 +45,6 @@ import {
 } from './types/mathArtboard';
 import RibbonTabStrip from './components/WordRibbon/RibbonTabStrip';
 import RibbonCommandPanel from './components/WordRibbon/RibbonCommandPanel';
-import WordStatusBar from './components/StatusBar/WordStatusBar';
 import CommandPalette from './components/CommandPalette';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
@@ -514,18 +513,7 @@ export default function App() {
       </div>
 
       {/* =====================================================================
-          4. THANH TRẠNG THÁI DƯỚI CÙNG (WORD STATUS BAR - 24PX - THANH LỊCH)
-          ===================================================================== */}
-      <WordStatusBar
-        cursorX={cursorCoords.x}
-        cursorY={cursorCoords.y}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        statusText="Sẵn sàng (Offline • 300 DPI • Lề 24px)"
-      />
-
-      {/* =====================================================================
-          5. CÁC MODAL HỆ THỐNG
+          4. CÁC MODAL HỆ THỐNG
           ===================================================================== */}
       {/* Command Palette Ctrl + K */}
       <CommandPalette

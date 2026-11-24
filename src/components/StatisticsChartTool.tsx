@@ -44,6 +44,7 @@ export default function StatisticsChartTool() {
 
   const [chartType, setChartType] = useState<'both' | 'box' | 'hist'>('both');
   const [fontChoice, setFontChoice] = useState<MathFontChoice>('times');
+  const [fontScale, setFontScale] = useState<number>(1.0);
   const [strokeChoice, setStrokeChoice] = useState<MathStrokeChoice>('standard');
   const [isBold, setIsBold] = useState<boolean>(true);
   const [boxThemeColor, setBoxThemeColor] = useState<string>('#0d9488'); // teal-600
@@ -407,6 +408,11 @@ export default function StatisticsChartTool() {
         handleDownloadPng();
       } else if (type === 'set_font' && ce.detail.font) {
         setFontChoice(ce.detail.font);
+      } else if (type === 'set_font_size' && ce.detail.size) {
+        const sz = Number(ce.detail.size);
+        if (!isNaN(sz) && sz > 0) {
+          setFontScale(sz / 12);
+        }
       } else if (type === 'set_stroke' && ce.detail.stroke) {
         setStrokeChoice(ce.detail.stroke === 2.5 ? 'bold' : 'standard');
       } else if (type === 'toggle_bold') {

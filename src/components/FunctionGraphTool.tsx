@@ -584,8 +584,15 @@ export default function FunctionGraphTool({ onNavigateToBBT, subTab, onSubTabCha
         setGraphMode(inputMode);
       } else if (type === 'set_font' && ce.detail.font) {
         setGraphFont(ce.detail.font);
+      } else if (type === 'set_font_size' && ce.detail.size) {
+        const numSize = Number(ce.detail.size);
+        if (!isNaN(numSize) && numSize > 0) {
+          setFontScale(numSize / 12);
+        }
       } else if (type === 'set_bold') {
-        setGraphConfig(prev => ({ ...prev, isBoldLabels: ce.detail.bold }));
+        setGraphConfig(prev => ({ ...prev, isBoldLabels: ce.detail.bold !== undefined ? ce.detail.bold : !prev.isBoldLabels }));
+      } else if (type === 'set_italic') {
+        setGraphConfig(prev => ({ ...prev, isItalic: ce.detail.italic !== undefined ? ce.detail.italic : !(prev.isItalic ?? true) }));
       } else if (type === 'set_stroke' && ce.detail.stroke) {
         setGraphConfig(prev => ({ ...prev, curveWidth: ce.detail.stroke }));
       } else if (type === 'toggle_grid') {
@@ -1714,10 +1721,17 @@ export default function FunctionGraphTool({ onNavigateToBBT, subTab, onSubTabCha
                       <button
                         key={item.r}
                         type="button"
-                        onClick={() => setGraphConfig({ ...graphConfig, dotRadius: item.r })}
+                        onClick={() => setGraphConfig(prev => ({ 
+                          ...prev, 
+                          dotRadius: item.r,
+                          showExtrema: true,
+                          showIntersections: true,
+                          showExtremaDots: true,
+                          showIntersectionDots: true
+                        }))}
                         className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                          Math.abs((graphConfig.dotRadius ?? 2.4) - item.r) < 0.2
-                            ? 'bg-teal-600 text-white shadow-2xs'
+                          Math.abs((graphConfig.dotRadius ?? 2.4) - item.r) < 0.2 && graphConfig.showExtremaDots !== false
+                            ? 'bg-teal-600 text-white shadow-2xs font-bold'
                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                         }`}
                       >
@@ -1835,164 +1849,6 @@ export default function FunctionGraphTool({ onNavigateToBBT, subTab, onSubTabCha
         {/* CỘT PHẢI: KHUNG VẼ CANVAS TRỰC TIẾP (7 CỘT) */}
         {/* ========================================================= */}
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-teal-100 dark:border-slate-800 shadow-xs flex flex-col items-center justify-center min-h-[460px]">
-          <div className="w-full flex flex-col gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
-            {/* Thanh điều khiển hiển thị (Thu phóng, Bước chia & Cỡ chữ nhãn) */}
-            {activeSubTab === 'graph' && (
-              <div className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-                {/* Thu phóng phạm vi Oxy */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                    <Ruler size={13} className="text-teal-600" />
-                    Thu phóng: <span className="font-mono font-bold text-teal-700 dark:text-teal-300">±{Math.abs(graphConfig.xMax ?? 5.5)}</span>
-                  </span>
-                  <input
-                    type="range"
-                    min="3"
-                    max="10"
-                    step="0.5"
-                    value={Math.abs(graphConfig.xMax ?? 5.5)}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      setGraphConfig({
-                        ...graphConfig,
-                        xMin: -val,
-                        xMax: val,
-                        yMin: -val,
-                        yMax: val
-                      });
-                    }}
-                    className="w-20 sm:w-28 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
-                  />
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current = Math.abs(graphConfig.xMax ?? 5.5);
-                        const next = Math.min(10, Math.round((current + 0.5) * 10) / 10);
-                        setGraphConfig({ ...graphConfig, xMin: -next, xMax: next, yMin: -next, yMax: next });
-                      }}
-                      className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 cursor-pointer"
-                      title="Mở rộng trục Oxy (-)"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current = Math.abs(graphConfig.xMax ?? 5.5);
-                        const next = Math.max(3, Math.round((current - 0.5) * 10) / 10);
-                        setGraphConfig({ ...graphConfig, xMin: -next, xMax: next, yMin: -next, yMax: next });
-                      }}
-                      className="px-1.5 py-0.2 text-[10px] font-bold rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 cursor-pointer"
-                      title="Thu hẹp trục Oxy (+)"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cỡ chữ nhãn */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <span className="text-[11px] font-bold text-slate-500">
-                    Cỡ chữ: <span className="font-mono text-teal-700 dark:text-teal-300 font-bold">{Math.round(fontScale * 100)}%</span>
-                  </span>
-                  <input
-                    type="range"
-                    min="0.75"
-                    max="1.6"
-                    step="0.05"
-                    value={fontScale}
-                    onChange={e => setFontScale(parseFloat(e.target.value))}
-                    className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-teal-600"
-                  />
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.max(0.75, Math.round((prev - 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFontScale(prev => Math.min(1.6, Math.round((prev + 0.1) * 10) / 10))}
-                      className="px-1 py-0.2 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-teal-100 cursor-pointer"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bước chia & Lưới */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-slate-500">Bước:</span>
-                    <div className="flex bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[10px] font-bold">
-                      {[
-                        { step: 1, label: '1 (chuẩn)' },
-                        { step: 0.5, label: '0.5' },
-                        { step: 2, label: '2' },
-                      ].map(item => (
-                        <button
-                          key={item.step}
-                          type="button"
-                          onClick={() => setGraphConfig({
-                            ...graphConfig,
-                            tickStep: item.step,
-                            tickStepX: item.step,
-                            tickStepY: item.step,
-                            gridStep: item.step
-                          })}
-                          className={`px-1.5 py-0.5 rounded transition cursor-pointer ${
-                            (graphConfig.tickStep ?? 1) === item.step
-                              ? 'bg-teal-600 text-white shadow-2xs'
-                              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-1 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={graphConfig.showTicks ?? false}
-                      onChange={e => setGraphConfig({ ...graphConfig, showTicks: e.target.checked })}
-                      className="rounded text-teal-600"
-                    />
-                    <span>Vạch chia</span>
-                  </label>
-
-                  <label className="flex items-center gap-1 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={graphConfig.showTickLabels ?? false}
-                      onChange={e => setGraphConfig({ 
-                        ...graphConfig, 
-                        showTickLabels: e.target.checked,
-                        showTicks: e.target.checked ? true : graphConfig.showTicks 
-                      })}
-                      className="rounded text-teal-600"
-                    />
-                    <span>Đánh số</span>
-                  </label>
-
-                  <label className="flex items-center gap-1 cursor-pointer text-[11px] text-slate-600 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={graphConfig.showGrid ?? false}
-                      onChange={e => setGraphConfig({ ...graphConfig, showGrid: e.target.checked })}
-                      className="rounded text-teal-600"
-                    />
-                    <span>Lưới ô</span>
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="w-full flex items-center justify-center p-3 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 overflow-x-auto">
 
 
