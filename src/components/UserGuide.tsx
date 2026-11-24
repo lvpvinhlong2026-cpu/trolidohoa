@@ -53,23 +53,22 @@ export default function UserGuide() {
 
     {
       id: 'stat_chart_guide',
-      title: 'Biểu đồ Thống kê SGK (Mới)',
+      title: 'Biểu đồ Hộp & Thống kê THPT',
       icon: <PieChart size={18} />,
       content: (
         <div className="space-y-5">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">Vẽ Biểu Đồ Thống Kê SGK (THCS & THPT)</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 border-b pb-2">Biểu Đồ Hộp & Thống Kê Ghép Nhóm THPT (300 DPI)</h2>
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Công cụ vẽ nhanh 4 dạng biểu đồ phổ biến trong chương trình Toán 6, 7, 8 và THPT: <strong>Biểu đồ Cột đơn, Cột kép, Đoạn thẳng và Hình quạt tròn</strong>.
+            Công cụ vẽ biểu đồ hộp (Box plot) và phân tích mẫu số liệu ghép nhóm theo chương trình GDPT 2018 (Toán 10, 11 và 12): <strong>Biểu đồ Hộp, Biểu đồ tần số ghép nhóm (Histogram) và Tứ phân vị</strong>.
           </p>
 
           <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4 space-y-3">
             <h3 className="font-bold text-teal-800 dark:text-teal-300">Tính năng nổi bật:</h3>
             <ul className="list-disc pl-5 text-sm text-teal-700 dark:text-teal-200 space-y-1.5">
-              <li><strong>Kho mẫu có sẵn chuẩn SGK:</strong> Nạp ngay ví dụ SGK như doanh thu công viên nước Đầm Sen, so sánh điểm hai lớp, nhiệt độ các tháng, cơ cấu học lực...</li>
-              <li><strong>Nhập số liệu nhanh:</strong> Hỗ trợ phím Enter xuống dòng, dán trực tiếp từ bảng Excel hoặc Word (Ctrl + V).</li>
-              <li><strong>Đen trắng hoa văn (Hatch patterns):</strong> Chuyển nhanh sang chế độ in đen trắng với hoa văn sọc xiên, sọc ngược, chấm bi chuẩn SGK để in đề thi rõ nét.</li>
-              <li><strong>Chèn trực tiếp vào hình GSP:</strong> Có thể mở ngay trong GSP Sketchpad và bấm "Chèn vào hình" như một khung vẽ di chuyển, phóng to/thu nhỏ linh hoạt.</li>
-              <li><strong>Xuất ảnh 300 DPI & SVG:</strong> Bấm sao chép là có ảnh dán ngay vào Word.</li>
+              <li><strong>Biểu đồ hộp (Box Plot):</strong> Thể hiện rõ các giá trị Min, Q1, Q2 (Trung vị), Q3, Max và phát hiện điểm ngoại lệ (Outliers).</li>
+              <li><strong>Số liệu ghép nhóm:</strong> Tự động tính trung bình mẫu, khoảng biến thiên, khoảng tứ phân vị, phương sai và độ lệch chuẩn.</li>
+              <li><strong>Tùy chọn phông chữ Toán:</strong> Hỗ trợ LaTeX KaTeX hoặc Times New Roman chuẩn Bộ GD&ĐT.</li>
+              <li><strong>Xuất ảnh 300 DPI:</strong> Sao chép dán trực tiếp vào Microsoft Word bằng một cú nhấp.</li>
             </ul>
           </div>
         </div>

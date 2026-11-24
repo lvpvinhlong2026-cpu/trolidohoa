@@ -7,6 +7,8 @@
  * 4. Hàm phân thức bậc hai / bậc nhất: y = (ax^2 + bx + c) / (dx + e)
  */
 
+import type { MathStrokeChoice } from '../components/MathFontSelector';
+
 export interface BBTPoint {
   xLabel: string;
   yPrimeSymbol: string; // '0', '||', or ''
@@ -41,6 +43,7 @@ export function gcd(a: number, b: number): number {
  * Chuyển đổi một số thực thành phân số tối giản (num/den)
  * Hỗ trợ các phân số mẫu số lớn tới 2000 hoặc số thập phân như 0.48 -> 12/25
  */
+
 export function toFraction(
   val: number,
   maxDenominator = 2000,
@@ -174,6 +177,7 @@ export function formatNum(n: number): string {
 /**
  * Phân tích trực tiếp từ các hệ số a, b, c, d, e
  */
+
 export function analyzeFromCoeffs(
   type: 'cubic' | 'quartic' | 'rational_1_1' | 'rational_2_1',
   a: number,
@@ -229,6 +233,7 @@ export function formatPolyExpr(type: string, a: number, b: number, c: number, d:
 /**
  * 1. Hàm bậc 3: y = ax^3 + bx^2 + cx + d
  */
+
 export function analyzeCubicCoeffs(a: number, b: number, c: number, d: number): BBTData {
   if (a === 0) a = 1;
   const expr = formatPolyExpr('cubic', a, b, c, d);
@@ -290,6 +295,7 @@ export function analyzeCubicCoeffs(a: number, b: number, c: number, d: number): 
 /**
  * 2. Hàm bậc 4 trùng phương: y = ax^4 + bx^2 + c
  */
+
 export function analyzeQuarticCoeffs(a: number, b: number, c: number): BBTData {
   if (a === 0) a = 1;
   const expr = `${a === 1 ? '' : a === -1 ? '-' : a}x^4 ${b > 0 ? '+ ' + b : b < 0 ? '- ' + Math.abs(b) : ''}x^2 ${c > 0 ? '+ ' + c : c < 0 ? '- ' + Math.abs(c) : ''}`.trim();
@@ -351,6 +357,7 @@ export function analyzeQuarticCoeffs(a: number, b: number, c: number): BBTData {
 /**
  * 3. Hàm phân thức bậc nhất / bậc nhất: y = (ax + b) / (cx + d)
  */
+
 export function analyzeRational11Coeffs(a: number, b: number, c: number, d: number): BBTData {
   if (c === 0) c = 1;
   const xTC = -d / c;
@@ -382,6 +389,7 @@ export function analyzeRational11Coeffs(a: number, b: number, c: number, d: numb
 /**
  * 4. Hàm phân thức bậc hai / bậc nhất: y = (ax^2 + bx + c) / (dx + e)
  */
+
 export function analyzeRational21Coeffs(a: number, b: number, c: number, d: number, e: number): BBTData {
   if (d === 0) d = 1;
   if (a === 0) a = 1;
@@ -483,6 +491,7 @@ export function analyzeRational21Coeffs(a: number, b: number, c: number, d: numb
 /**
  * Phân tích hằng số tự do ở cuối biểu thức (hỗ trợ số nguyên, số thập phân 0.48 và phân số 12/25)
  */
+
 export function parseConstant(expr: string): number {
   if (!expr) return 0;
   const m = expr.match(/([+-]?(?:\d+\.?\d*|\d*\.?\d+)(?:\/\d+)?)$/);
@@ -513,6 +522,7 @@ export interface IntervalAnalysisResult {
 /**
  * Trích xuất hệ số hàm số từ chuỗi biểu thức f(x)
  */
+
 export function parseFunctionCoeffs(input: string): {
   type: 'cubic' | 'quartic' | 'rational_1_1' | 'rational_2_1';
   a: number;
@@ -605,6 +615,7 @@ export function parseFunctionCoeffs(input: string): {
 /**
  * Phân tích từ chuỗi biểu thức toán học trên toàn miền xác định
  */
+
 export function analyzeFunction(input: string): BBTData {
   const p = parseFunctionCoeffs(input);
   return analyzeFromCoeffs(p.type, p.a, p.b, p.c, p.d, p.e);
@@ -614,6 +625,7 @@ export function analyzeFunction(input: string): BBTData {
  * Phân tích và tạo Bảng biến thiên của hàm số trên một đoạn [a; b]
  * Hỗ trợ tự động tính cực trị trong đoạn và tìm GTLN (Max), GTNN (Min) chuẩn SGK
  */
+
 export function analyzeFromCoeffsOnInterval(
   type: 'cubic' | 'quartic' | 'rational_1_1' | 'rational_2_1',
   a: number,
@@ -846,6 +858,7 @@ export function analyzeFromCoeffsOnInterval(
 /**
  * Phân tích và tạo BBT từ chuỗi biểu thức trên đoạn [a; b]
  */
+
 export function analyzeFunctionOnInterval(input: string, intervalA: number, intervalB: number): IntervalAnalysisResult {
   const p = parseFunctionCoeffs(input);
   return analyzeFromCoeffsOnInterval(p.type, p.a, p.b, p.c, p.d, p.e, intervalA, intervalB);
@@ -871,6 +884,7 @@ export function parseCoeff(term: string, varPattern: string): number {
  * Hàm vẽ chữ hoặc phân số toán học (dạng tử trên mẫu dưới có gạch ngang) lên Canvas
  * Tối ưu hóa phông chữ toán học to rõ, in đậm chuẩn in ấn Word & SGK
  */
+
 export function drawMathText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -1086,6 +1100,7 @@ export function getTextHalfWidth(ctx: CanvasRenderingContext2D, val?: string, fo
  * Vẽ Bảng biến thiên lên HTML5 Canvas với độ nét cao (chuẩn SGK Việt Nam, tối ưu dán Word)
  * Kích thước vừa phải, phông chữ to rõ, không lãng phí diện tích
  */
+
 export function renderBBTToCanvas(
   data: BBTData,
   canvas: HTMLCanvasElement,
@@ -1457,6 +1472,7 @@ function createPhysChunk(dpi: number): Uint8Array {
  * Nhúng chunk pHYs vào file PNG để Microsoft Word nhận diện đúng DPI (mặc định 300 DPI)
  * Giúp ảnh tự động vừa vặn trang giấy Word và chữ to rõ nét, không bị phóng đại quá khổ
  */
+
 export function insertDpiIntoPng(pngBytes: Uint8Array, dpi = 300): Uint8Array {
   if (pngBytes.length < 33 || pngBytes[0] !== 0x89 || pngBytes[1] !== 0x50) {
     return pngBytes;
@@ -1491,6 +1507,7 @@ export function insertDpiIntoPng(pngBytes: Uint8Array, dpi = 300): Uint8Array {
 /**
  * Nhúng DPI vào Blob PNG để lưu file hoặc dán vào Word
  */
+
 export async function addDpiToBlob(blob: Blob, dpi = 300): Promise<Blob> {
   try {
     const buffer = await blob.arrayBuffer();
@@ -1506,6 +1523,7 @@ export async function addDpiToBlob(blob: Blob, dpi = 300): Promise<Blob> {
 /**
  * Nhúng DPI vào dataUrl PNG
  */
+
 export function addDpiToDataUrl(dataUrl: string, dpi = 300): string {
   try {
     const base64Index = dataUrl.indexOf(',');
@@ -1533,6 +1551,7 @@ export function addDpiToDataUrl(dataUrl: string, dpi = 300): string {
 /**
  * Sao chép ảnh từ Canvas vào Clipboard có nhúng DPI chuẩn Word (300 DPI)
  */
+
 export async function copyCanvasWithWordOptimization(
   canvas: HTMLCanvasElement,
   dpi = 300

@@ -25,7 +25,6 @@ import {
   Play,
   Pause,
   Grid,
-  Crop,
   Dot,
   CornerDownRight,
   Type,
@@ -33,6 +32,7 @@ import {
 } from 'lucide-react';
 import { TabId } from '../App';
 import { AccentColor, ACCENT_THEMES } from '../types/personalization';
+import { CustomDropdownSelect, SelectOption } from './CustomDropdown';
 
 export interface RibbonBarProps {
   activeTab: TabId;
@@ -66,6 +66,26 @@ const RIBBON_TABS: { id: TabId; label: string; icon: React.ComponentType<{ size?
   { id: 'guide', label: 'Hướng dẫn', icon: HelpCircle },
 ];
 
+const GRAPH_PRESET_OPTIONS: SelectOption[] = [
+  { value: 'rational_2_1_1', label: 'Bậc 2/1: (x²-x+1)/(x-1)' },
+  { value: 'rational_1_1', label: 'Hữu tỉ: (2x+1)/(x-1)' },
+  { value: 'cubic_2ext', label: 'Bậc 3: x³ - 3x + 1' },
+];
+
+const BBT_PRESET_OPTIONS: SelectOption[] = [
+  { value: 'cubic_image1', label: 'Bậc 3: 2 Cực trị (Hình 1)' },
+  { value: 'cubic_monotonic', label: 'Bậc 3: Đồng biến trên R (Hình 2)' },
+  { value: 'rational11_image3', label: 'Phân thức 1/1: Gián đoạn (Hình 3)' },
+  { value: 'rational21_image4', label: 'Phân thức 2/1: Tiệm cận xiên (Hình 4)' },
+  { value: 'quartic_image5', label: 'Trùng phương: 3 cực trị (Hình 5)' },
+];
+
+const FONT_SIZE_OPTIONS: SelectOption[] = [
+  { value: 'standard', label: 'Chuẩn' },
+  { value: 'large', label: 'To rõ SGK' },
+  { value: 'extra', label: 'Rất to' },
+];
+
 export default function RibbonBar({
   activeTab,
   onSelectTab,
@@ -89,51 +109,82 @@ export default function RibbonBar({
   const currentTab = (activeTab === 'gsp' || activeTab === 'quick3d') ? 'geometry' : activeTab;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs select-none">
+    <div className="bg-white dark:bg-slate-900 border-b border-[#E1DFDD] dark:border-slate-800 shadow-[0_2px_4px_rgba(0,0,0,0.06)] select-none">
       
-      {/* 1. DÒNG THẺ MENU (RIBBON TAB STRIP - Word Tabs: Home, Insert, Layout...) */}
-      <div className="flex items-center justify-between px-2 sm:px-3 pt-1 border-b border-slate-200/90 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-950/70">
+      {/* 1. DÒNG THẺ MENU (RIBBON TAB STRIP - Office 365 / Fluent Design Light Theme) */}
+      <div className="flex items-center justify-between px-2 sm:px-3 border-b border-[#E1DFDD] dark:border-slate-800 bg-[#F3F2F1] dark:bg-slate-950 h-[36px] min-h-[36px]">
         
         {/* Nhóm Tabs bên trái */}
-        <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-none">
+        <div role="tablist" aria-label="Ribbon Tabs" className="flex items-center gap-0.5 overflow-x-auto scrollbar-none h-full">
+          {/* NÚT TỆP (FILE TAB ĐẶC TRƯNG CỦA MICROSOFT WORD) */}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={false}
+            onClick={() => onRibbonAction({ type: 'open_file_menu' })}
+            className="h-[36px] px-3.5 bg-[#0F6CBD] hover:bg-[#115EA3] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer mr-1 shrink-0"
+            title="Tệp (Cài đặt, phím tắt, thông tin tài liệu)"
+          >
+            <span>Tệp</span>
+          </button>
+
           {RIBBON_TABS.map(tab => {
             const TabIcon = tab.icon;
             const isActive = currentTab === tab.id;
             return (
               <button
                 key={tab.id}
+                role="tab"
+                id={`ribbon-tab-${tab.id}`}
+                aria-selected={isActive}
+                aria-controls={`ribbon-panel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => {
                   onSelectTab(tab.id);
                   if (isRibbonCollapsed) {
                     onToggleRibbonCollapse();
                   }
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-all rounded-t-lg border-t-2 cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3.5 text-xs transition-all cursor-pointer whitespace-nowrap h-[36px] shrink-0 ${
                   isActive
-                    ? `bg-white dark:bg-slate-900 ${theme.primaryText} border-t-teal-600 dark:border-t-teal-400 border-x border-slate-200 dark:border-slate-800 -mb-px z-10 shadow-2xs`
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 border-t-transparent border-x border-x-transparent'
+                    ? 'font-bold text-[#242424] dark:text-white bg-white dark:bg-slate-900 border-b-[3px] border-[#0F6CBD] dark:border-sky-400 -mb-[1px]'
+                    : 'font-semibold text-[#424242] dark:text-slate-400 hover:bg-[#EDEBE9] dark:hover:bg-slate-800/60 hover:text-[#201F1E] dark:hover:text-slate-200 border-b-[3px] border-transparent'
                 }`}
               >
-                <TabIcon size={14} className={isActive ? theme.primaryText : 'text-slate-500'} />
+                <TabIcon size={14} className={isActive ? 'text-[#0F6CBD] dark:text-sky-400' : 'text-slate-500'} />
                 <span>{tab.label}</span>
               </button>
             );
           })}
+
+          {/* CONTEXTUAL TABS (THẺ NGỮ CẢNH ĐẶC BIỆT CHỮ XANH DƯƠNG THEO CHUẨN OFFICE 365) */}
+          {(currentTab === 'geometry' || currentTab === 'bbt' || currentTab === 'bbt_graph') && (
+            <div className="flex items-center ml-1.5 pl-2 border-l border-[#E1DFDD] dark:border-slate-800 shrink-0 h-full">
+              <div className="flex flex-col justify-center px-1">
+                <span className="text-[9px] font-bold text-[#0F6CBD] dark:text-sky-400 uppercase tracking-wider leading-none">
+                  {currentTab === 'geometry' ? 'CÔNG CỤ HÌNH HỌC (GSP)' : currentTab === 'bbt' ? 'CÔNG CỤ BẢNG BIẾN THIÊN' : 'CÔNG CỤ ĐỒ THỊ OXY'}
+                </span>
+                <span className="text-[11px] font-bold text-[#0F6CBD] dark:text-sky-300 leading-tight">
+                  Định dạng 300 DPI
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Nút thu gọn / bung rộng Ribbon (Ctrl + F1 hoặc Alt + B) */}
         <button
           onClick={onToggleRibbonCollapse}
-          className="p-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer shrink-0 ml-2"
+          className="w-[28px] h-[28px] flex items-center justify-center rounded-[4px] text-[#605E5C] hover:bg-[#EDEBE9] dark:hover:bg-slate-800 hover:text-[#201F1E] dark:hover:text-slate-200 transition cursor-pointer shrink-0 ml-2"
           title={isRibbonCollapsed ? "Mở rộng Dải công cụ Ribbon (Ctrl + F1)" : "Thu gọn Dải công cụ Ribbon (Ctrl + F1)"}
         >
-          {isRibbonCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          {isRibbonCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
         </button>
       </div>
 
-      {/* 2. DẢI CÔNG CỤ TOOLBAR (RIBBON BODY - CÁC NHÓM CÔNG CỤ PHONG CÁCH WORD) */}
+      {/* 2. DẢI CÔNG CỤ TOOLBAR (RIBBON COMMAND PANEL - BỐ CỤC CHUẨN OFFICE 365) */}
       {!isRibbonCollapsed && (
-        <div className="flex items-stretch overflow-x-auto py-1 px-2.5 sm:px-3 bg-white dark:bg-slate-900 min-h-[96px] max-h-[110px] scrollbar-thin">
+        <div className="flex items-stretch overflow-x-auto py-1 px-2 bg-white dark:bg-slate-900 min-h-[96px] max-h-[102px] scrollbar-thin">
           
           {/* =========================================================================
               PHÂN HỆ 1: ĐỒ THỊ & TRỤC SỐ
@@ -142,7 +193,7 @@ export default function RibbonBar({
             <div className="flex items-stretch gap-2 shrink-0">
               
               {/* Nhóm 1: CLIPBOARD / XUẤT ẢNH WORD */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -153,17 +204,6 @@ export default function RibbonBar({
                     <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction({ type: 'open_crop' })}
-                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
-                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
-                  >
-                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
@@ -185,13 +225,13 @@ export default function RibbonBar({
                     </button>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN WORD
                 </div>
               </div>
 
               {/* Nhóm 2: PHÂN HỆ CÔNG CỤ */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -235,13 +275,13 @@ export default function RibbonBar({
                     <span className="text-[9px] font-normal text-slate-400">Giao/Hợp/Hiệu</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   PHÂN HỆ TOÁN
                 </div>
               </div>
 
               {/* Nhóm 3: DẠNG HÀM OXY (Word Style Gallery Cards) */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
                     { id: 'rational_2_1', label: 'Bậc 2 / 1', formula: '(ax²+bx+c)/(dx+e)', desc: 'SGK Mới Toán 12' },
@@ -284,11 +324,12 @@ export default function RibbonBar({
                       </button>
                     </div>
 
-                    <select
-                      className="px-2 py-0.5 text-[10px] font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 cursor-pointer"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
+                    <CustomDropdownSelect
+                      value=""
+                      placeholder="-- Mẫu SGK --"
+                      ariaLabel="Chọn mẫu đồ thị SGK chuẩn ARIA"
+                      options={GRAPH_PRESET_OPTIONS}
+                      onChange={(val) => {
                         if (val === 'rational_2_1_1') {
                           onRibbonAction({
                             type: 'select_graph_preset',
@@ -309,16 +350,11 @@ export default function RibbonBar({
                           });
                         }
                       }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>-- Mẫu SGK --</option>
-                      <option value="rational_2_1_1">Bậc 2/1: (x²-x+1)/(x-1)</option>
-                      <option value="rational_1_1">Hữu tỉ: (2x+1)/(x-1)</option>
-                      <option value="cubic_2ext">Bậc 3: x³ - 3x + 1</option>
-                    </select>
+                      className="w-full"
+                    />
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CẤU HÌNH HÀM SỐ (DẠNG SGK)
                 </div>
               </div>
@@ -331,7 +367,7 @@ export default function RibbonBar({
                     <span className="text-[9px] text-slate-400">Chuẩn in SGK Word</span>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   ĐỊNH DẠNG
                 </div>
               </div>
@@ -346,7 +382,7 @@ export default function RibbonBar({
             <div className="flex items-stretch gap-2 shrink-0">
               
               {/* Nhóm 1: CLIPBOARD / XUẤT BẢN WORD */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -357,17 +393,6 @@ export default function RibbonBar({
                     <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction({ type: 'open_crop' })}
-                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
-                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
-                  >
-                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
@@ -389,13 +414,13 @@ export default function RibbonBar({
                     </button>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN WORD
                 </div>
               </div>
 
               {/* Nhóm 2: CHẾ ĐỘ BẢNG */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -439,13 +464,13 @@ export default function RibbonBar({
                     <span className="text-[9px] font-normal text-slate-400">Dấu f(x), f'(x)</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CHẾ ĐỘ BẢNG
                 </div>
               </div>
 
               {/* Nhóm 3: CẤU HÌNH HÀM SỐ (Dạng hàm SGK - Word Style Gallery Cards) */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
                     { id: 'rational_2_1', label: 'Bậc 2 / 1', formula: '(ax²+bx+c)/(dx+e)', desc: 'SGK Mới Toán 12' },
@@ -488,25 +513,19 @@ export default function RibbonBar({
                       </button>
                     </div>
 
-                    <select
-                      className="px-2 py-0.5 text-[10px] font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 cursor-pointer"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
+                    <CustomDropdownSelect
+                      value=""
+                      placeholder="-- Mẫu bài thi BBT --"
+                      ariaLabel="Chọn mẫu bài thi bảng biến thiên chuẩn ARIA"
+                      options={BBT_PRESET_OPTIONS}
+                      onChange={(val) => {
                         onRibbonAction({ type: 'select_bbt_preset', presetKey: val });
                       }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>-- Mẫu bài thi BBT --</option>
-                      <option value="cubic_image1">Bậc 3: 2 Cực trị (Hình 1)</option>
-                      <option value="cubic_monotonic">Bậc 3: Đồng biến trên R (Hình 2)</option>
-                      <option value="rational11_image3">Phân thức 1/1: Gián đoạn (Hình 3)</option>
-                      <option value="rational21_image4">Phân thức 2/1: Tiệm cận xiên (Hình 4)</option>
-                      <option value="quartic_image5">Trùng phương: 3 cực trị (Hình 5)</option>
-                    </select>
+                      className="w-full"
+                    />
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CẤU HÌNH HÀM SỐ (DẠNG SGK)
                 </div>
               </div>
@@ -572,18 +591,17 @@ export default function RibbonBar({
                       </button>
                     ))}
                     <span className="text-[10px] text-slate-400 font-bold ml-1">Cỡ:</span>
-                    <select
-                      value={bbtFontSize}
-                      onChange={(e) => onRibbonAction({ type: 'set_font_size', size: e.target.value })}
-                      className="px-1.5 py-0.5 text-[10px] font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                    >
-                      <option value="standard">Chuẩn</option>
-                      <option value="large">To rõ SGK</option>
-                      <option value="extra">Rất to</option>
-                    </select>
+                    <div className="w-24">
+                      <CustomDropdownSelect
+                        value={bbtFontSize}
+                        ariaLabel="Chọn cỡ chữ bảng biến thiên chuẩn ARIA"
+                        options={FONT_SIZE_OPTIONS}
+                        onChange={(val) => onRibbonAction({ type: 'set_font_size', size: val })}
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   ĐỊNH DẠNG CHỮ & NÉT
                 </div>
               </div>
@@ -597,7 +615,7 @@ export default function RibbonBar({
           {currentTab === 'geometry' && (
             <div className="flex items-stretch gap-2 shrink-0">
               {/* Nhóm 1: XUẤT BẢN WORD */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -608,17 +626,6 @@ export default function RibbonBar({
                     <Copy size={18} className="mb-0.5" />
                     <span className="text-[11px] leading-tight text-center">Chép Word</span>
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onRibbonAction({ type: 'open_crop' })}
-                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
-                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
-                  >
-                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
                   </button>
 
                   <div className="flex flex-col gap-1 justify-center">
@@ -642,13 +649,13 @@ export default function RibbonBar({
                     </button>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN WORD
                 </div>
               </div>
 
               {/* Nhóm 2: CÔNG CỤ DỰNG HÌNH GSP (TƯƠNG TÁC CHUỘT) */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
                     { id: 'select', label: 'Chọn & Dời', icon: MousePointer, tip: 'Chọn & di chuyển đỉnh, nhãn chữ' },
@@ -681,13 +688,13 @@ export default function RibbonBar({
                     );
                   })}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CÔNG CỤ DỰNG HÌNH GSP
                 </div>
               </div>
 
               {/* Nhóm 3: KHO MẪU HÌNH SGK (BẤM NẠP NGAY) */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
                     { id: 'pyramid_regular_quad', label: 'Chóp S.ABCD', desc: 'Chóp tứ giác đều (SO ⊥ đáy)' },
@@ -714,7 +721,7 @@ export default function RibbonBar({
                     </button>
                   ))}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   KHO MẪU HÌNH SGK (BẤM NẠP NGAY)
                 </div>
               </div>
@@ -776,7 +783,7 @@ export default function RibbonBar({
                     <span className="text-[10px] leading-tight">Lưới</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   ĐƯỜNG NÉT & CỠ ĐIỂM
                 </div>
               </div>
@@ -788,7 +795,7 @@ export default function RibbonBar({
               ========================================================================= */}
           {currentTab === 'statistics' && (
             <div className="flex items-stretch gap-2 shrink-0">
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -803,17 +810,6 @@ export default function RibbonBar({
 
                   <button
                     type="button"
-                    onClick={() => onRibbonAction({ type: 'open_crop' })}
-                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
-                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
-                  >
-                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => onRibbonAction({ type: 'download_png' })}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
                     title="Tải ảnh PNG"
@@ -822,19 +818,18 @@ export default function RibbonBar({
                     <span className="text-[11px]">PNG</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN WORD
                 </div>
               </div>
 
               {/* Cấp học & Dạng biểu đồ */}
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   {[
-                    { id: 'bar', label: 'Biểu đồ Cột', desc: 'Đơn / Kép (THCS)' },
-                    { id: 'pie', label: 'Quạt tròn', desc: 'Tỉ lệ phần trăm %' },
-                    { id: 'box', label: 'Biểu đồ Hộp', desc: 'Tứ phân vị Q1-Q3 (THPT)' },
-                    { id: 'line', label: 'Đoạn thẳng', desc: 'Biến thiên chuỗi' },
+                    { id: 'box', label: 'Biểu đồ Hộp', desc: 'Tứ phân vị Q1, Q2, Q3' },
+                    { id: 'hist', label: 'Ghép nhóm', desc: 'Tần số khoảng [a; b)' },
+                    { id: 'both', label: 'Cả hai dạng', desc: 'Hộp & Biểu đồ cột ghép' },
                   ].map(c => (
                     <button
                       key={c.id}
@@ -847,20 +842,20 @@ export default function RibbonBar({
                     </button>
                   ))}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
-                  DẠNG BIỂU ĐỒ THỐNG KÊ
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
+                  DẠNG BIỂU ĐỒ THỐNG KÊ THPT
                 </div>
               </div>
 
               <div className="flex flex-col justify-between px-2">
                 <div className="flex items-center gap-2 flex-1">
                   <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
-                    <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 block">THCS & THPT</span>
-                    <span className="text-[9px] text-slate-400">Số liệu ghép nhóm & Rời rạc</span>
+                    <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 block">Toán 10, 11, 12</span>
+                    <span className="text-[9px] text-slate-400">Số liệu ghép nhóm & Rời rạc 300 DPI</span>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
-                  SỐ LIỆU SGK
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
+                  CHUẨN GDPT 2018
                 </div>
               </div>
             </div>
@@ -871,7 +866,7 @@ export default function RibbonBar({
               ========================================================================= */}
           {currentTab === 'probability_tree' && (
             <div className="flex items-stretch gap-2 shrink-0">
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-1.5 flex-1">
                   <button
                     type="button"
@@ -886,17 +881,6 @@ export default function RibbonBar({
 
                   <button
                     type="button"
-                    onClick={() => onRibbonAction({ type: 'open_crop' })}
-                    className="flex flex-col items-center justify-center px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-bold transition shadow-2xs cursor-pointer border border-amber-300 dark:border-amber-700/60 h-[66px] min-w-[70px]"
-                    title="Cắt nhanh 1 chạm: Giữ chuột trái kéo khung cần cắt, thả chuột ra là tự động chép vào Word (Alt + C)"
-                  >
-                    <Crop size={18} className="mb-0.5 text-amber-600 dark:text-amber-400" />
-                    <span className="text-[11px] leading-tight text-center">Cắt nhanh</span>
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-normal">Kéo dán Word</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => onRibbonAction({ type: 'download_png' })}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer h-[66px]"
                     title="Tải ảnh PNG"
@@ -905,7 +889,7 @@ export default function RibbonBar({
                     <span className="text-[11px]">PNG</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN WORD
                 </div>
               </div>
@@ -924,7 +908,7 @@ export default function RibbonBar({
                     </button>
                   ))}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CẤU TRÚC CÂY XÁC SUẤT
                 </div>
               </div>
@@ -936,7 +920,7 @@ export default function RibbonBar({
               ========================================================================= */}
           {currentTab === 'geogebra' && (
             <div className="flex items-stretch gap-2 shrink-0">
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-2 flex-1">
                   <button
                     type="button"
@@ -948,7 +932,7 @@ export default function RibbonBar({
                     <span className="text-[9px] text-emerald-100 font-normal">300 DPI</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   XUẤT BẢN
                 </div>
               </div>
@@ -966,7 +950,7 @@ export default function RibbonBar({
                     </button>
                   ))}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   ĐỐI TƯỢNG OXYZ 3D
                 </div>
               </div>
@@ -978,7 +962,7 @@ export default function RibbonBar({
               ========================================================================= */}
           {currentTab === 'simulation' && (
             <div className="flex items-stretch gap-2 shrink-0">
-              <div className="flex flex-col justify-between px-2 border-r border-slate-200 dark:border-slate-800">
+              <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
                 <div className="flex items-center gap-2 flex-1">
                   <button
                     type="button"
@@ -997,7 +981,7 @@ export default function RibbonBar({
                     <span>Đặt lại</span>
                   </button>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   ĐIỀU KHIỂN
                 </div>
               </div>
@@ -1015,7 +999,7 @@ export default function RibbonBar({
                     </button>
                   ))}
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   CHỦ ĐỀ ĐỘNG MINH HỌA
                 </div>
               </div>
@@ -1034,7 +1018,7 @@ export default function RibbonBar({
                     <span className="text-[9px] text-slate-400">Tác giả: GV Lê Vĩnh Phúc (0944405124) - LVP EduEcosystem</span>
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center mt-0.5">
+                <div className="text-[11px] font-normal text-[#605E5C] dark:text-slate-400 text-center pb-0.5 mt-auto select-none">
                   HỆ SINH THÁI GIÁO DỤC SỐ LVP
                 </div>
               </div>

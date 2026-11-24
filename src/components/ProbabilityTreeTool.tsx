@@ -724,11 +724,11 @@ export default function ProbabilityTreeTool() {
       } else if (type === 'tree_select_type') {
         const structure = ce.detail.structure;
         if (structure === 'Định lý Bayes' || structure?.includes('Bayes')) {
-          handleApplyPreset(TREE_PRESETS[0]);
+          handleSelectPreset(TREE_PRESETS[0].id);
         } else if (structure === 'Xác suất toàn phần' || structure?.includes('toàn phần')) {
-          handleApplyPreset(TREE_PRESETS[1]);
+          handleSelectPreset(TREE_PRESETS[1].id);
         } else if (TREE_PRESETS.length > 2) {
-          handleApplyPreset(TREE_PRESETS[2]);
+          handleSelectPreset(TREE_PRESETS[2].id);
         }
       }
     };

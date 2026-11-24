@@ -28,6 +28,7 @@ import {
 } from '../types/personalization';
 import { SEARCHABLE_TOOLS } from './CommandPalette';
 import { TabId } from '../App';
+import { CustomDropdownSelect, SelectOption } from './CustomDropdown';
 
 interface PersonalizationModalProps {
   isOpen: boolean;
@@ -472,18 +473,20 @@ export default function PersonalizationModal({
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                     Công cụ tự động mở khi khởi động ứng dụng
                   </label>
-                  <select
+                  <CustomDropdownSelect
                     value={startupTab}
-                    onChange={e => onSelectStartupTab(e.target.value)}
-                    className={`w-full px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs ${theme.ring} focus:ring-2 outline-none`}
-                  >
-                    <option value="last_used">Ghi nhớ công cụ vừa làm việc trước đó (Mặc định)</option>
-                    {SEARCHABLE_TOOLS.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.category} → {t.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={onSelectStartupTab}
+                    options={[
+                      { value: 'last_used', label: 'Ghi nhớ công cụ vừa làm việc trước đó (Mặc định)' },
+                      ...SEARCHABLE_TOOLS.map(t => ({
+                        value: t.id,
+                        label: `${t.category} → ${t.label}`,
+                      })),
+                    ]}
+                    ariaLabel="Chọn công cụ tự động mở khi khởi động chuẩn ARIA"
+                    size="md"
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>

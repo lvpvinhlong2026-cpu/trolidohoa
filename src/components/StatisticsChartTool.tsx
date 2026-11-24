@@ -18,7 +18,6 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { addDpiToBlob, cropCanvasToContent } from '../utils/dpiUtils';
-import ThcsStatisticalChart from './ThcsStatisticalChart';
 import MathFontSelector, { MathFontChoice, MathStrokeChoice, MATH_FONT_FAMILIES } from './MathFontSelector';
 
 interface GroupedInterval {
@@ -29,7 +28,6 @@ interface GroupedInterval {
 }
 
 export default function StatisticsChartTool() {
-  const [activeMode, setActiveMode] = useState<'thcs' | 'thpt'>('thcs');
   const [dataType, setDataType] = useState<'raw' | 'grouped'>('raw');
   
   // Dữ liệu mẫu số liệu không ghép nhóm
@@ -410,17 +408,11 @@ export default function StatisticsChartTool() {
       } else if (type === 'select_stat_chart') {
         const c = ce.detail.chart;
         if (c === 'box') {
-          setActiveMode('thpt');
           setChartType('box');
-        } else if (c === 'bar') {
-          setActiveMode('thcs');
-          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'bar' } }));
-        } else if (c === 'pie') {
-          setActiveMode('thcs');
-          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'pie' } }));
-        } else if (c === 'line') {
-          setActiveMode('thcs');
-          window.dispatchEvent(new CustomEvent('lvp_stat_thcs_type', { detail: { type: 'line' } }));
+        } else if (c === 'hist') {
+          setChartType('hist');
+        } else if (c === 'both') {
+          setChartType('both');
         }
       }
     };
@@ -433,38 +425,8 @@ export default function StatisticsChartTool() {
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-3 sm:p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-      {/* THANH CHUYỂN ĐỔI CHẾ ĐỘ BIỂU ĐỒ THCS & THPT */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 flex-wrap">
-        <button
-          onClick={() => setActiveMode('thcs')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-            activeMode === 'thcs'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          <BarChart size={16} />
-          <span>Biểu đồ SGK THCS (Cột, Cột kép, Đoạn thẳng, Quạt tròn)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveMode('thpt')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
-            activeMode === 'thpt'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-          }`}
-        >
-          <BarChart2 size={16} />
-          <span>Biểu đồ Hộp & Thống kê Ghép nhóm THPT (GDPT 2018)</span>
-        </button>
-      </div>
-
-      {activeMode === 'thcs' ? (
-        <ThcsStatisticalChart />
-      ) : (
-        <div className="space-y-6">
-          {/* THANH CHUYỂN DỮ LIỆU */}
+      <div className="space-y-6">
+        {/* THANH CHUYỂN DỮ LIỆU */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-3">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1.5">
               <BarChart2 size={16} />
@@ -1166,7 +1128,6 @@ export default function StatisticsChartTool() {
         </div>
       </div>
     </div>
-  )}
     </div>
   );
 }

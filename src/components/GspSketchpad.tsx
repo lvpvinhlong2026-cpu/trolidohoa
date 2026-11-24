@@ -9,7 +9,6 @@ import {
 import { addDpiToBlob } from '../utils/bbtEngine';
 import { cropCanvasToContent } from '../utils/dpiUtils';
 import Gsp3DViewerModal from './Gsp3DViewerModal';
-import ThcsStatisticalChart, { StatisticalChartConfig } from './ThcsStatisticalChart';
 
 export interface GspChartItem {
   id: string;
@@ -18,7 +17,7 @@ export interface GspChartItem {
   width: number;
   height: number;
   svgString: string;
-  config: StatisticalChartConfig;
+  config?: any;
 }
 
 export interface GspPoint {
@@ -126,8 +125,6 @@ export default function GspSketchpad({
   const [charts, setCharts] = useState<GspChartItem[]>([]);
   const [selectedChartId, setSelectedChartId] = useState<string | null>(null);
   const [hoveredChartId, setHoveredChartId] = useState<string | null>(null);
-  const [showChartModal, setShowChartModal] = useState<boolean>(false);
-  const [editingChart, setEditingChart] = useState<GspChartItem | null>(null);
   const [chartRenderTrigger, setChartRenderTrigger] = useState<number>(0);
   const chartImagesRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const [chartDragState, setChartDragState] = useState<{
@@ -1304,14 +1301,6 @@ export default function GspSketchpad({
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasMouse(e);
 
-    // 0. Nhấp đúp vào Biểu đồ -> Mở trình chỉnh sửa biểu đồ
-    const clickedChart = [...charts].reverse().find(c => x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height);
-    if (clickedChart) {
-      setEditingChart(clickedChart);
-      setShowChartModal(true);
-      return;
-    }
-
     // 1. Nhấp đúp vào Text đã có -> Mở hộp thoại sửa text
     const nearbyTxt = findNearbyText(x, y);
     if (nearbyTxt) {
@@ -2149,7 +2138,7 @@ export default function GspSketchpad({
     window.dispatchEvent(new CustomEvent('lvp_gsp_tool_changed', { detail: { tool: activeTool } }));
   }, [activeTool]);
 
-  // Lắng nghe sự kiện từ Ribbon Bar (Chép Word, Tải PNG, Cắt nhanh, Chọn công cụ vẽ, Nạp mẫu SGK)
+  // Lắng nghe sự kiện từ Ribbon Bar (Chép Word, Tải PNG, Chọn công cụ vẽ, Nạp mẫu SGK)
   useEffect(() => {
     const handleRibbonAction = (e: Event) => {
       const ce = e as CustomEvent;
@@ -2159,12 +2148,6 @@ export default function GspSketchpad({
         handleCopyImage();
       } else if (type === 'download_png') {
         handleDownloadPng();
-      } else if (type === 'open_crop') {
-        const offscreen = renderToOffscreenCanvas(3);
-        const dataUrl = offscreen.toDataURL('image/png');
-        window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-          detail: { dataUrl, title: 'Hình học GSP' }
-        }));
       } else if (type === 'gsp_select_tool') {
         const tool = ce.detail.tool;
         if (tool === 'clear') {
@@ -3483,19 +3466,6 @@ export default function GspSketchpad({
 
             {/* NÚT XUẤT WORD, TẢI ẢNH 300 DPI VÀ MÔ HÌNH 3D XOAY 360 ĐỘ */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* NÚT VẼ BIỂU ĐỒ THỐNG KÊ (THCS & THPT) */}
-              <button
-                onClick={() => {
-                  setEditingChart(null);
-                  setShowChartModal(true);
-                }}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                title="Vẽ biểu đồ thống kê (Cột, Cột kép, Đoạn thẳng, Hình quạt tròn) và chèn vào hình vẽ"
-              >
-                <BarChart2 size={15} />
-                <span>Vẽ biểu đồ</span>
-              </button>
-
               {/* NÚT MÔ HÌNH 3D TƯƠNG TÁC XOAY 360 ĐỘ (CÓ PHÂN LOẠI NÉT THẤY/KHUẤT) */}
               <button
                 onClick={() => setShow3DViewerModal(true)}
@@ -4606,70 +4576,6 @@ export default function GspSketchpad({
         presetType={currentPresetType}
         onOpenFull3DTab={onOpen3D}
       />
-
-      {/* MODAL VẼ BIỂU ĐỒ THỐNG KÊ (THCS & THPT) */}
-      {showChartModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 animate-fade-in">
-          <div className="w-full max-w-5xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col">
-            <ThcsStatisticalChart
-              initialConfig={editingChart?.config}
-              isModal={true}
-              onCancel={() => {
-                setShowChartModal(false);
-                setEditingChart(null);
-              }}
-              onInsertToCanvas={(svgString, config) => {
-                saveSnapshot();
-                if (editingChart) {
-                  setCharts(prev => prev.map(c => c.id === editingChart.id ? {
-                    ...c,
-                    svgString,
-                    config
-                  } : c));
-                  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const img = new Image();
-                  img.onload = () => {
-                    chartImagesRef.current.set(editingChart.id, img);
-                    setChartRenderTrigger(prev => prev + 1);
-                  };
-                  img.src = url;
-                  showNotice('Đã cập nhật biểu đồ.');
-                } else {
-                  const newId = `chart_${Date.now()}`;
-                  const newW = 440;
-                  const newH = 280;
-                  const newX = Math.round((LOGICAL_WIDTH - newW) / 2);
-                  const newY = Math.round((LOGICAL_HEIGHT - newH) / 2);
-                  const newChart: GspChartItem = {
-                    id: newId,
-                    x: newX,
-                    y: newY,
-                    width: newW,
-                    height: newH,
-                    svgString,
-                    config
-                  };
-                  setCharts(prev => [...prev, newChart]);
-                  setSelectedChartId(newId);
-                  
-                  const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                  const url = URL.createObjectURL(blob);
-                  const img = new Image();
-                  img.onload = () => {
-                    chartImagesRef.current.set(newId, img);
-                    setChartRenderTrigger(prev => prev + 1);
-                  };
-                  img.src = url;
-                  showNotice('Đã chèn biểu đồ vào hình vẽ.');
-                }
-                setShowChartModal(false);
-                setEditingChart(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

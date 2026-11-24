@@ -578,20 +578,6 @@ export default function FunctionGraphTool({ apiKey, model, onNavigateToBBT }: Pr
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleCopyImage(graphDataUrl, 'Đồ thị Oxy');
         }
-      } else if (type === 'open_crop') {
-        let urlToUse = graphDataUrl;
-        if (graphCanvasRef.current) {
-          const cropped = cropCanvasToContent(graphCanvasRef.current, 6);
-          urlToUse = cropped.toDataURL('image/png');
-        }
-        if (urlToUse) {
-          window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-            detail: {
-              dataUrl: urlToUse,
-              title: activeSubTab === 'graph' ? 'Đồ thị Oxy' : activeSubTab === 'inequality' ? 'Miền nghiệm BPT' : 'Trục số thực R'
-            }
-          }));
-        }
       } else if (type === 'download_png') {
         if (activeSubTab === 'graph' && graphDataUrl) {
           handleDownloadImage(graphDataUrl, 'do_thi_oxy.png');

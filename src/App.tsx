@@ -27,8 +27,7 @@ import {
   Grid,
   GitFork,
   LayoutGrid,
-  Check,
-  Crop
+  Check
 } from 'lucide-react';
 
 import { 
@@ -40,7 +39,7 @@ import CommandPalette from './components/CommandPalette';
 import PersonalizationModal from './components/PersonalizationModal';
 import TabLoadingSkeleton from './components/TabLoadingSkeleton';
 import RibbonBar from './components/RibbonBar';
-import FastSnipOverlay from './components/FastSnipOverlay';
+import { CustomDropdownMenu, DropdownMenuItem } from './components/CustomDropdown';
 
 // =====================================================================
 // CHỈ GIỮ LẠI CÁC PHÂN HỆ CỐT LÕI ĐỒ HỌA TOÁN HỌC (300 DPI)
@@ -102,8 +101,8 @@ export const NAV_CATEGORIES: NavCategory[] = [
       },
       {
         id: 'statistics',
-        label: 'Biểu đồ Thống kê',
-        sub: 'Biểu đồ cột, quạt tròn, đoạn thẳng & biểu đồ hộp',
+        label: 'Biểu đồ Hộp & Thống kê THPT',
+        sub: 'Biểu đồ hộp (Box plot) & Thống kê số liệu ghép nhóm GDPT 2018',
         icon: BarChart2,
       },
       {
@@ -269,11 +268,6 @@ export default function App() {
   // 9. Modals State
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
-  const [cropModalState, setCropModalState] = useState<{
-    isOpen: boolean;
-    initialImageUrl?: string;
-    title?: string;
-  }>({ isOpen: false });
 
   const theme = ACCENT_THEMES[accentColor] || ACCENT_THEMES.teal;
 
@@ -336,21 +330,7 @@ export default function App() {
     };
   }, []);
 
-  // Lắng nghe sự kiện mở công cụ cắt ảnh khung chữ nhật
-  useEffect(() => {
-    const handleOpenCropModal = (e: Event) => {
-      const ce = e as CustomEvent;
-      setCropModalState({
-        isOpen: true,
-        initialImageUrl: ce.detail?.dataUrl,
-        title: ce.detail?.title || 'Hình vẽ Toán học',
-      });
-    };
-    window.addEventListener('lvp_open_crop_modal', handleOpenCropModal);
-    return () => window.removeEventListener('lvp_open_crop_modal', handleOpenCropModal);
-  }, []);
-
-  // Lắng nghe phím tắt toàn cục (Ctrl + F1 hoặc Alt + B thu gọn Ribbon kiểu MS Word, Alt + C cắt ảnh)
+  // Lắng nghe phím tắt toàn cục (Ctrl + F1 hoặc Alt + B thu gọn Ribbon kiểu MS Word, Ctrl + K tìm kiếm)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (((e.ctrlKey || e.metaKey) && e.key === 'F1') || (e.altKey && e.key.toLowerCase() === 'b')) {
@@ -362,9 +342,6 @@ export default function App() {
       } else if (e.altKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         setIsCompactMode(prev => !prev);
-      } else if (e.altKey && e.key.toLowerCase() === 'c') {
-        e.preventDefault();
-        handleRibbonAction({ type: 'open_crop' });
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -377,19 +354,6 @@ export default function App() {
     if (action.type === 'copy_word') {
       setToastMessage('Đã sao chép ảnh 300 DPI! Thầy/Cô mở Word và nhấn phím Ctrl + V để dán ngay.');
       setTimeout(() => setToastMessage(null), 4500);
-    } else if (action.type === 'open_crop') {
-      // Cho các component con cơ hội phản hồi và gửi dataUrl chi tiết
-      setTimeout(() => {
-        setCropModalState(prev => {
-          if (prev.isOpen) return prev;
-          const activeCanvas = document.querySelector('main canvas') as HTMLCanvasElement | null;
-          return {
-            isOpen: true,
-            initialImageUrl: activeCanvas ? activeCanvas.toDataURL('image/png') : undefined,
-            title: 'Hình vẽ Toán học',
-          };
-        });
-      }, 50);
     } else if (action.type === 'switch_subtab') {
       setGraphSubTab(action.subtab);
     } else if (action.type === 'switch_bbt_mode') {
@@ -453,33 +417,47 @@ export default function App() {
     setActiveTab(tabId);
   };
 
+  // Danh sách các mục trong Menu sổ dọc tùy biến (Custom Dropdown) chuẩn ARIA
+  const toolMenuItems: DropdownMenuItem[] = ALL_TOOLS.map((tool, idx) => ({
+    id: tool.id,
+    label: tool.label,
+    subLabel: tool.sub,
+    icon: tool.icon,
+    selected: activeTab === tool.id,
+    divider: idx === 7,
+    onClick: () => handleSelectTab(tool.id),
+  }));
+
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#E8E8E8] text-[#242424]'}`}>
       
       {/* =====================================================================
-          1. TOPBAR CHUẨN ĐỒ HỌA & SỐ HÓA LVP
+          1. TOPBAR CHUẨN OFFICE 365 / FLUENT DESIGN LIGHT THEME
           ===================================================================== */}
-      <header className={`sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-2xs transition-all ${
-        isCompactMode ? 'py-1 px-3 sm:px-4' : 'py-2 px-3 sm:px-5'
+      <header className={`sticky top-0 z-30 bg-[#F3F2F1] dark:bg-slate-900 border-b border-[#E1DFDD] dark:border-slate-800 shadow-xs transition-all ${
+        isCompactMode ? 'py-1 px-3 sm:px-4' : 'py-1.5 px-3 sm:px-5'
       }`}>
         <div className="flex items-center justify-between gap-3">
           
           {/* Left: Brand Logo + Title + Author info */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl ${theme.primaryBg} text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0`}>
+            <div className="w-8 h-8 rounded-[4px] bg-[#0F6CBD] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
               <Palette size={18} />
             </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xs sm:text-sm md:text-base font-black tracking-tight text-slate-900 dark:text-white uppercase truncate">
+                <h1 className="text-xs sm:text-sm font-bold tracking-tight text-[#242424] dark:text-white uppercase truncate">
                   TRỢ LÝ ĐỒ HỌA TOÁN HỌC
                 </h1>
+                <span className="text-[10px] bg-[#EFF6FC] text-[#0F6CBD] dark:bg-sky-950 dark:text-sky-300 font-bold px-1.5 py-0.2 rounded border border-[#0F6CBD]/30">
+                  Office 365 Fluent UI
+                </span>
               </div>
               {!isCompactMode && profile.showGreeting && profile.name && (
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  <span className="text-slate-500 dark:text-slate-400 truncate">
-                    <strong className="text-slate-700 dark:text-slate-200">{profile.name}</strong> ({profile.school})
+                <div className="flex items-center gap-2 text-[11px] text-[#605E5C] dark:text-slate-400 truncate mt-0.5">
+                  <span className="truncate">
+                    <strong className="text-[#242424] dark:text-slate-200">{profile.name}</strong> ({profile.school})
                   </span>
                 </div>
               )}
@@ -487,16 +465,27 @@ export default function App() {
           </div>
 
           {/* Right Action Buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Menu sổ dọc tùy biến (Custom Dropdown) chuẩn ARIA */}
+            <CustomDropdownMenu
+              ariaLabel="Menu chuyển đổi nhanh phân hệ đồ họa Toán học chuẩn ARIA"
+              label="Phân hệ"
+              icon={Menu}
+              items={toolMenuItems}
+              placement="bottom-right"
+              menuWidth="w-72 sm:w-80"
+              buttonClassName="bg-white hover:bg-[#EDEBE9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#242424] dark:text-slate-200 border border-[#E1DFDD] dark:border-slate-700 rounded-[4px]"
+            />
+
             {/* Quick Command Palette Search (Ctrl + K) */}
             <button
               onClick={() => setShowCommandPalette(true)}
-              className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
+              className="flex items-center gap-2 px-3 py-1 rounded-[4px] text-xs font-normal bg-white hover:bg-[#EDEBE9] dark:bg-slate-800 dark:hover:bg-slate-700 text-[#605E5C] dark:text-slate-300 transition cursor-pointer border border-[#E1DFDD] dark:border-slate-700"
               title="Tìm nhanh công cụ đồ họa Toán học (Ctrl + K)"
             >
-              <Search size={14} className={theme.primaryText} />
+              <Search size={14} className="text-[#0F6CBD]" />
               <span className="hidden md:inline">Tìm kiếm</span>
-              <kbd className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400">
+              <kbd className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#F3F2F1] dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-700 text-[#605E5C]">
                 Ctrl K
               </kbd>
             </button>
@@ -504,37 +493,37 @@ export default function App() {
             {/* Nút Cấu hình AI & Cá nhân hóa */}
             <button
               onClick={() => setShowSettingsModal(true)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1 rounded-[4px] text-xs font-semibold flex items-center gap-1.5 transition border cursor-pointer ${
                 !apiKey.trim()
-                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900'
-                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                  ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900'
+                  : 'bg-white text-[#242424] border-[#E1DFDD] hover:bg-[#EDEBE9] dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
               }`}
               title="Mở Cài đặt & Cá nhân hóa"
             >
-              <Settings size={14} className={!apiKey.trim() ? 'text-rose-500' : theme.primaryText} />
+              <Settings size={14} className={!apiKey.trim() ? 'text-rose-500' : 'text-[#0F6CBD]'} />
               <span className="hidden sm:inline">{apiKey.trim() ? 'Cài đặt' : 'Nhập API Key'}</span>
             </button>
 
             {/* Nút Bật/Tắt Chế độ Tinh gọn (Zen Mode) */}
             <button
               onClick={() => setIsCompactMode(prev => !prev)}
-              className={`p-1.5 rounded-xl border transition cursor-pointer ${
+              className={`p-1.5 rounded-[4px] border transition cursor-pointer ${
                 isCompactMode
-                  ? `${theme.softBg} ${theme.primaryText} ${theme.softBorder}`
-                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD]'
+                  : 'border-[#E1DFDD] dark:border-slate-700 hover:bg-[#EDEBE9] dark:hover:bg-slate-800 text-[#605E5C] dark:text-slate-300 bg-white dark:bg-slate-800'
               }`}
               title={isCompactMode ? "Tắt chế độ tinh gọn (Alt + Z)" : "Bật chế độ tinh gọn toàn màn hình (Alt + Z)"}
             >
-              {isCompactMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isCompactMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
 
             {/* Nút Chuyển chế độ Sáng / Tối */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+              className="p-1.5 rounded-[4px] border border-[#E1DFDD] dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-[#EDEBE9] dark:hover:bg-slate-700 text-[#605E5C] dark:text-slate-300 transition cursor-pointer"
               title="Chuyển chế độ Sáng / Tối"
             >
-              {isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+              {isDarkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
             </button>
           </div>
         </div>
@@ -564,74 +553,75 @@ export default function App() {
       />
 
       {/* =====================================================================
-          3. KHÔNG GIAN LÀM VIỆC: WORKSPACE TOÀN MÀN HÌNH 100%
+          3. VÙNG LÀM VIỆC CHÍNH (DOCUMENT WORKSPACE - NỀN XÁM NHẠT #E8E8E8 + TRANG GIẤY TRẮNG ĐỔ BÓNG A4)
           ===================================================================== */}
-      <div className="flex flex-1 overflow-hidden w-full">
-        {/* WORKSPACE AREA (Mở rộng toàn bộ 100% màn hình, không bị Sidebar chiếm chỗ) */}
+      <div className="flex flex-1 overflow-hidden w-full bg-[#E8E8E8] dark:bg-slate-950">
         <main className={`flex-1 w-full overflow-y-auto ${isCompactMode ? 'p-2 sm:p-3' : 'p-3 sm:p-5'}`}>
-          <Suspense fallback={<TabLoadingSkeleton title="Đang nạp phân hệ công cụ..." accentColor={accentColor} />}>
-            
-            {/* NHÓM 1: ĐỒ HỌA TOÁN HỌC */}
-            {/* 1.1 ĐỒ THỊ OXY, MIỀN NGHIỆM BPT & TRỤC SỐ */}
-            {visitedTabs.has('bbt_graph') && (
-              <div className={activeTab === 'bbt_graph' ? 'block animate-fade-in' : 'hidden'}>
-                <FunctionGraphTool 
-                  apiKey={apiKey} 
-                  model={preferredModel} 
-                  onNavigateToBBT={() => handleSelectTab('bbt')}
-                />
-              </div>
-            )}
+          <div className="max-w-[1550px] mx-auto bg-white dark:bg-slate-900 border border-[#E1DFDD] dark:border-slate-800 rounded-[4px] shadow-[0_4px_16px_rgba(0,0,0,0.10),0_1px_3px_rgba(0,0,0,0.06)] p-3 sm:p-5 min-h-[calc(100vh-165px)]">
+            <Suspense fallback={<TabLoadingSkeleton title="Đang nạp phân hệ công cụ..." accentColor={accentColor} />}>
+              
+              {/* NHÓM 1: ĐỒ HỌA TOÁN HỌC */}
+              {/* 1.1 ĐỒ THỊ OXY, MIỀN NGHIỆM BPT & TRỤC SỐ */}
+              {visitedTabs.has('bbt_graph') && (
+                <div className={activeTab === 'bbt_graph' ? 'block animate-fade-in' : 'hidden'}>
+                  <FunctionGraphTool 
+                    apiKey={apiKey} 
+                    model={preferredModel} 
+                    onNavigateToBBT={() => handleSelectTab('bbt')}
+                  />
+                </div>
+              )}
 
-            {/* 1.2 BẢNG BIẾN THIÊN & XÉT DẤU TOÁN HỌC */}
-            {visitedTabs.has('bbt') && (
-              <div className={activeTab === 'bbt' ? 'block animate-fade-in' : 'hidden'}>
-                <TableVariationTool />
-              </div>
-            )}
+              {/* 1.2 BẢNG BIẾN THIÊN & XÉT DẤU TOÁN HỌC */}
+              {visitedTabs.has('bbt') && (
+                <div className={activeTab === 'bbt' ? 'block animate-fade-in' : 'hidden'}>
+                  <TableVariationTool />
+                </div>
+              )}
 
-            {/* 1.3 BIỂU ĐỒ HỘP & THỐNG KÊ (SGK MỚI) */}
-            {visitedTabs.has('statistics') && (
-              <div className={activeTab === 'statistics' ? 'block animate-fade-in' : 'hidden'}>
-                <StatisticsChartTool />
-              </div>
-            )}
+              {/* 1.3 BIỂU ĐỒ HỘP & THỐNG KÊ (SGK MỚI) */}
+              {visitedTabs.has('statistics') && (
+                <div className={activeTab === 'statistics' ? 'block animate-fade-in' : 'hidden'}>
+                  <StatisticsChartTool />
+                </div>
+              )}
 
-            {/* 1.4 HÌNH HỌC 2D & 3D (GSP 5 + KHO MẪU HÌNH HỌC) */}
-            {(visitedTabs.has('geometry') || visitedTabs.has('gsp') || visitedTabs.has('quick3d')) && (
-              <div className={(activeTab === 'geometry' || activeTab === 'gsp' || activeTab === 'quick3d') ? 'block animate-fade-in' : 'hidden'}>
-                <CombinedGeometryTab />
-              </div>
-            )}
+              {/* 1.4 HÌNH HỌC 2D & 3D (GSP 5 + KHO MẪU HÌNH HỌC) */}
+              {(visitedTabs.has('geometry') || visitedTabs.has('gsp') || visitedTabs.has('quick3d')) && (
+                <div className={(activeTab === 'geometry' || activeTab === 'gsp' || activeTab === 'quick3d') ? 'block animate-fade-in' : 'hidden'}>
+                  <CombinedGeometryTab />
+                </div>
+              )}
 
-            {/* 1.5 GEOGEBRA 3D AI */}
-            {visitedTabs.has('geogebra') && (
-              <div className={activeTab === 'geogebra' ? 'block animate-fade-in' : 'hidden'}>
-                <Geogebra3DTool apiKey={apiKey} model={preferredModel} />
-              </div>
-            )}
+              {/* 1.5 GEOGEBRA 3D AI */}
+              {visitedTabs.has('geogebra') && (
+                <div className={activeTab === 'geogebra' ? 'block animate-fade-in' : 'hidden'}>
+                  <Geogebra3DTool apiKey={apiKey} model={preferredModel} />
+                </div>
+              )}
 
-            {/* 1.6 MÔ PHỎNG KHÁI NIỆM TƯƠNG TÁC */}
-            {visitedTabs.has('simulation') && (
-              <div className={activeTab === 'simulation' ? 'block animate-fade-in' : 'hidden'}>
-                <SimulationGenerator apiKey={apiKey} model={preferredModel} />
-              </div>
-            )}
+              {/* 1.6 MÔ PHỎNG KHÁI NIỆM TƯƠNG TÁC */}
+              {visitedTabs.has('simulation') && (
+                <div className={activeTab === 'simulation' ? 'block animate-fade-in' : 'hidden'}>
+                  <SimulationGenerator apiKey={apiKey} model={preferredModel} />
+                </div>
+              )}
 
-            {/* 1.7 SƠ ĐỒ CÂY XÁC SUẤT & ĐỊNH LÝ BAYES (TOÁN 12 SGK MỚI) */}
-            {visitedTabs.has('probability_tree') && (
-              <div className={activeTab === 'probability_tree' ? 'block animate-fade-in' : 'hidden'}>
-                <ProbabilityTreeTool />
-              </div>
-            )}
+              {/* 1.7 SƠ ĐỒ CÂY XÁC SUẤT & ĐỊNH LÝ BAYES (TOÁN 12 SGK MỚI) */}
+              {visitedTabs.has('probability_tree') && (
+                <div className={activeTab === 'probability_tree' ? 'block animate-fade-in' : 'hidden'}>
+                  <ProbabilityTreeTool />
+                </div>
+              )}
 
-            {/* 2. HƯỚNG DẪN SỬ DỤNG HỆ THỐNG */}
-            {visitedTabs.has('guide') && (
-              <div className={activeTab === 'guide' ? 'block animate-fade-in' : 'hidden'}>
-                <UserGuide />
-              </div>
-            )}
-          </Suspense>
+              {/* 2. HƯỚNG DẪN SỬ DỤNG HỆ THỐNG */}
+              {visitedTabs.has('guide') && (
+                <div className={activeTab === 'guide' ? 'block animate-fade-in' : 'hidden'}>
+                  <UserGuide />
+                </div>
+              )}
+            </Suspense>
+          </div>
         </main>
       </div>
 
@@ -665,18 +655,6 @@ export default function App() {
         onTogglePin={handleTogglePin}
         startupTab={startupTabSetting}
         onSelectStartupTab={handleSelectStartupTab}
-      />
-
-      {/* Lớp phủ Cắt Nhanh Khung Chữ Nhật ➔ Tự Động Lưu Vào Word (300 DPI) */}
-      <FastSnipOverlay
-        isOpen={cropModalState.isOpen}
-        onClose={() => setCropModalState(prev => ({ ...prev, isOpen: false }))}
-        imageUrl={cropModalState.initialImageUrl}
-        title={cropModalState.title}
-        onNotify={msg => {
-          setToastMessage(msg);
-          setTimeout(() => setToastMessage(null), 5000);
-        }}
       />
 
       {/* Floating Toast Thông báo Sao chép Word 300 DPI */}

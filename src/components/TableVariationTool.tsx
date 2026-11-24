@@ -745,27 +745,6 @@ export default function TableVariationTool() {
         } else {
           handleCopyImage();
         }
-      } else if (type === 'open_crop') {
-        let dataUrl: string | null = null;
-        if (masterMode === 'auto') {
-          if (autoCanvasRef.current) {
-            const cropped = cropCanvasToContent(autoCanvasRef.current, 4);
-            dataUrl = cropped.toDataURL('image/png');
-          }
-        } else {
-          const canvas = document.createElement('canvas');
-          drawBBTToCanvas(canvas, points, bbtMode, fontChoice, colorStyle, 3.0, fontSizeMode, tableWidthMode, strokeChoice, isBoldLabels);
-          const cropped = cropCanvasToContent(canvas, 4);
-          dataUrl = cropped.toDataURL('image/png');
-        }
-        if (dataUrl) {
-          window.dispatchEvent(new CustomEvent('lvp_open_crop_modal', {
-            detail: {
-              dataUrl,
-              title: masterMode === 'auto' ? 'Bảng biến thiên tự động' : 'Bảng biến thiên tùy biến',
-            }
-          }));
-        }
       } else if (type === 'download_png') {
         if (masterMode === 'auto') {
           handleDownloadAutoPng();
@@ -1129,7 +1108,7 @@ export default function TableVariationTool() {
                 <span>Bản vẽ Bảng biến thiên tự động (Độ nét cao 300 DPI)</span>
               </span>
               <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                Chép Word, Cắt nhanh & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
+                Chép Word & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
               </span>
             </div>
 
@@ -1381,7 +1360,7 @@ export default function TableVariationTool() {
                   <span>Bản vẽ Bảng biến thiên tùy biến (Độ nét cao 300 DPI)</span>
                 </span>
                 <span className="text-[11px] text-slate-400 font-normal hidden sm:inline">
-                  Chép Word, Cắt nhanh & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
+                  Chép Word & Đổi phông trực tiếp trên thanh Ribbon Word ở trên
                 </span>
               </div>
 

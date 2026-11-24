@@ -48,11 +48,11 @@ export const SEARCHABLE_TOOLS: SearchToolItem[] = [
   },
   {
     id: 'statistics',
-    label: 'Biểu đồ Thống kê SGK (Cột, Quạt, Hộp)',
+    label: 'Biểu đồ Hộp & Thống kê THPT',
     category: 'Đồ Họa Toán Học (300 DPI)',
-    sub: 'Biểu đồ cột, cột kép, đoạn thẳng, hình quạt tròn THCS & biểu đồ hộp THPT 300 DPI',
-    badge: 'Mới',
-    keywords: ['thống kê', 'biểu đồ cột', 'cột kép', 'đoạn thẳng', 'hình quạt tròn', 'quạt tròn', 'biểu đồ hộp', 'box plot', 'tứ phân vị', 'trung vị', 'ghép nhóm'],
+    sub: 'Biểu đồ hộp (Box plot) & Thống kê ghép nhóm Toán 10, 11, 12 GDPT 2018',
+    badge: 'Toán THPT',
+    keywords: ['thống kê', 'biểu đồ hộp', 'box plot', 'tứ phân vị', 'trung vị', 'ghép nhóm', 'khoảng biến thiên', 'ngoại lệ', 'phương sai', 'độ lệch chuẩn'],
     icon: BarChart2,
   },
   {
