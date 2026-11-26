@@ -54,7 +54,8 @@ import {
   Type,
   Eraser,
   MonitorPlay,
-  Table as TableIcon
+  Table as TableIcon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { 
   RibbonTabId, 
@@ -774,8 +775,32 @@ export default function RibbonCommandPanel({
                   { id: 'pyr_sa', label: 'Chóp S.ABCD (SA ⊥ đáy)', subLabel: 'Cạnh bên vuông góc', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'chop_sa_vuong_day' }) },
                   { id: 'box', label: 'Hình hộp chữ nhật ABCD.A\'B\'C\'D\'', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'box_abcd' }) },
                   { id: 'sphere', label: 'Mặt cầu (bán kính R & elip)', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'hinh_cau' }) },
+                  { id: 'div_oxyz', label: '', divider: true, onClick: () => {} },
+                  { id: 'oxyz_balloons', label: '🎈 Oxyz: 2 Khinh khí cầu (A, B, E, F)', subLabel: 'Bài toán thực tế Toán 12', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'oxyz_balloons' }) },
+                  { id: 'oxyz_radar', label: '✈️ Oxyz: Trạm Radar & Máy bay', subLabel: 'Bài toán thực tế Toán 12', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'oxyz_radar' }) },
+                  { id: 'oxyz_std', label: '🧭 Hệ trục tọa độ Oxyz chuẩn SGK', subLabel: 'Chiếu vuông góc lên (Oxy)', onClick: () => onRibbonAction?.({ type: 'gsp_load_sample', sample: 'oxyz_standard' }) },
                 ]}
               />
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'gsp_open_oxyz_modal', tab: 'oxyz' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-[#EFF6FC] hover:border-[#0F6CBD]/30 transition cursor-pointer text-center"
+                title="Mở trình dựng Hệ trục tọa độ Oxyz & Bài toán thực tế"
+              >
+                <Box size={20} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[10px] leading-tight font-semibold text-[#0F6CBD]">Dựng Oxyz</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onRibbonAction?.({ type: 'gsp_open_oxyz_modal', tab: 'stickers' })}
+                className="h-[64px] px-2.5 flex flex-col items-center justify-center rounded-[4px] border border-transparent hover:bg-pink-50 hover:border-pink-200 transition cursor-pointer text-center"
+                title="Kho Sticker thực tế (Khinh khí cầu, Máy bay, Radar...) / Tải ảnh / AI SVG"
+              >
+                <ImageIcon size={20} className="mb-1 text-pink-600" />
+                <span className="text-[10px] leading-tight font-semibold text-pink-700">Sticker/Ảnh</span>
+              </button>
 
               <div className="flex flex-col gap-1 justify-center">
                 <div className="flex items-center gap-1">

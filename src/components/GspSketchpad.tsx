@@ -4,11 +4,18 @@ import {
   Trash2, Undo2, Redo2, Copy, Download, RefreshCw, 
   Layers, CheckCircle2, AlertCircle, Sparkles, Grid, Eye, EyeOff,
   FileDown, FileUp, Edit3, X, Check, Type, ArrowRight, ArrowLeftRight,
-  Box, FolderKanban, BarChart2, Crop, Sliders, Equal, RotateCw
+  Box, FolderKanban, BarChart2, Crop, Sliders, Equal, RotateCw, Image as ImageIcon
 } from 'lucide-react';
 import { addDpiToBlob } from '../utils/bbtEngine';
 import { cropCanvasToContent } from '../utils/dpiUtils';
 import Gsp3DViewerModal from './Gsp3DViewerModal';
+import OxyzBuilderModal from './OxyzBuilderModal';
+import {
+  buildOxyzScene,
+  OXYZ_PRESET_BALLOONS,
+  OXYZ_PRESET_STANDARD,
+  OXYZ_PRESET_RADAR_PLANE
+} from '../utils/oxyzEngine';
 
 export interface GspChartItem {
   id: string;
@@ -167,8 +174,10 @@ export default function GspSketchpad({
   const [redoStack, setRedoStack] = useState<GspState[]>([]);
   const dragStartSnapshotRef = useRef<GspState | null>(null);
 
-  // Mô hình 3D tương tác xoay 360 độ
+  // Mô hình 3D tương tác xoay 360 độ & Trình dựng Oxyz / Sticker
   const [show3DViewerModal, setShow3DViewerModal] = useState<boolean>(false);
+  const [showOxyzModal, setShowOxyzModal] = useState<boolean>(false);
+  const [oxyzModalTab, setOxyzModalTab] = useState<'oxyz' | 'stickers'>('oxyz');
   const [currentPresetType, setCurrentPresetType] = useState<string>('pyramid_regular_quad');
 
   // Công cụ đang chọn
@@ -1479,6 +1488,13 @@ export default function GspSketchpad({
       }
     } else if (activeTool === 'eraser') {
       saveSnapshot();
+      const clickedSticker = [...charts].reverse().find(c => x >= c.x && x <= c.x + c.width && y >= c.y && y <= c.y + c.height);
+      if (clickedSticker) {
+        setCharts(prev => prev.filter(c => c.id !== clickedSticker.id));
+        if (selectedChartId === clickedSticker.id) setSelectedChartId(null);
+        showNotice('Đã xóa hình minh họa / sticker');
+        return;
+      }
       const nearbyTa = findNearbyTrigAngle(x, y);
       if (nearbyTa) {
         setTrigAngles(tas => tas.filter(t => t.id !== nearbyTa.id));
@@ -1521,7 +1537,7 @@ export default function GspSketchpad({
     const { x, y } = getCanvasMouse(e);
     setDrawingCurrentMouse({ x, y });
 
-    // Kéo thả hoặc co giãn biểu đồ
+      // Kéo thả hoặc co giãn biểu đồ / sticker
     if (chartDragState) {
       const dx = x - chartDragState.startX;
       const dy = y - chartDragState.startY;
@@ -1529,14 +1545,27 @@ export default function GspSketchpad({
         setCharts(prev => prev.map(c => c.id === chartDragState.chartId ? {
           ...c,
           x: Math.round(chartDragState.origX + dx),
-          y: Math.round(chartDragState.origY + dy)
+          y: Math.round(chartDragState.origY + dy),
+          config: c.config ? { ...c.config, anchorPointId: undefined } : undefined
         } : c));
       } else if (chartDragState.mode === 'resize') {
-        setCharts(prev => prev.map(c => c.id === chartDragState.chartId ? {
-          ...c,
-          width: Math.max(140, Math.round(chartDragState.origW + dx)),
-          height: Math.max(90, Math.round(chartDragState.origH + dy))
-        } : c));
+        setCharts(prev => prev.map(c => {
+          if (c.id !== chartDragState.chartId) return c;
+          const isSticker = Boolean(c.config?.isSticker);
+          const minW = isSticker ? 24 : 140;
+          const minH = isSticker ? 24 : 90;
+          let newW = Math.max(minW, Math.round(chartDragState.origW + dx));
+          let newH = Math.max(minH, Math.round(chartDragState.origH + dy));
+          if (c.config?.keepAspect && chartDragState.origW > 0 && chartDragState.origH > 0) {
+            const aspect = chartDragState.origH / chartDragState.origW;
+            newH = Math.max(minH, Math.round(newW * aspect));
+          }
+          return {
+            ...c,
+            width: newW,
+            height: newH
+          };
+        }));
       }
       return;
     }
@@ -1662,6 +1691,20 @@ export default function GspSketchpad({
         }
 
         return nextPoints;
+      });
+      // Di chuyển sticker đang neo vào điểm được kéo thả
+      setCharts(prev => {
+        if (!prev.some(c => c.config?.anchorPointId === draggedPointId)) return prev;
+        return prev.map(c => {
+          if (c.config?.anchorPointId !== draggedPointId) return c;
+          const ax = c.config?.anchorX ?? 0.5;
+          const ay = c.config?.anchorY ?? 1.0;
+          return {
+            ...c,
+            x: Math.round(x - c.width * ax),
+            y: Math.round(y - c.height * ay)
+          };
+        });
       });
     } else if (draggedTextId) {
       // Kéo thả di chuyển text chú thích
@@ -1805,9 +1848,80 @@ export default function GspSketchpad({
   // ==========================================
   // THƯ VIỆN MẪU HÌNH DỰNG SẴN 1-CLICK (PRESETS)
   // ==========================================
+  const handleApplyOxyzScene = (scene: {
+    points: GspPoint[];
+    segments: GspSegment[];
+    texts: GspText[];
+    charts: GspChartItem[];
+    presetName?: string;
+  }) => {
+    saveSnapshot();
+    setPoints(scene.points);
+    setSegments(scene.segments);
+    setCircles([]);
+    setEllipses([]);
+    setRightAngles([]);
+    setTrigAngles([]);
+    setTexts(scene.texts || []);
+    setCharts(scene.charts || []);
+    setShowGrid(false);
+    setActiveTool('select');
+    showNotice(`✅ Đã dựng: ${scene.presetName || 'Hệ trục tọa độ Oxyz'}`);
+  };
+
+  const handleInsertSticker = (item: GspChartItem, label: string) => {
+    saveSnapshot();
+    setCharts(prev => [...prev, item]);
+    setSelectedChartId(item.id);
+    setActiveTool('select');
+    showNotice(`✅ Đã chèn hình minh họa "${label}". Kéo để dời, kéo góc để phóng to/thu nhỏ.`);
+  };
+
   const loadPreset = (presetType: string) => {
     saveSnapshot();
     setCurrentPresetType(presetType);
+    setCharts([]);
+
+    if (presetType === 'oxyz_balloons') {
+      const scene = buildOxyzScene(OXYZ_PRESET_BALLOONS);
+      setPoints(scene.points);
+      setSegments(scene.segments);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTrigAngles([]);
+      setTexts(scene.texts);
+      setCharts(scene.charts);
+      setShowGrid(false);
+      showNotice('Đã nạp mẫu: Bài toán thực tế Oxyz – 2 Khinh khí cầu (chuẩn SGK Toán 12)');
+      return;
+    } else if (presetType === 'oxyz_standard') {
+      const scene = buildOxyzScene(OXYZ_PRESET_STANDARD);
+      setPoints(scene.points);
+      setSegments(scene.segments);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTrigAngles([]);
+      setTexts(scene.texts);
+      setCharts(scene.charts);
+      setShowGrid(false);
+      showNotice('Đã nạp mẫu: Hệ trục tọa độ Oxyz chuẩn SGK');
+      return;
+    } else if (presetType === 'oxyz_radar') {
+      const scene = buildOxyzScene(OXYZ_PRESET_RADAR_PLANE);
+      setPoints(scene.points);
+      setSegments(scene.segments);
+      setCircles([]);
+      setEllipses([]);
+      setRightAngles([]);
+      setTrigAngles([]);
+      setTexts(scene.texts);
+      setCharts(scene.charts);
+      setShowGrid(false);
+      showNotice('Đã nạp mẫu: Trạm Radar & Máy bay trong không gian Oxyz');
+      return;
+    }
 
     if (presetType === 'cone' || presetType === 'hinh_non') {
       const pO = createPoint(375, 380, 'O');
@@ -2600,8 +2714,162 @@ export default function GspSketchpad({
     showNotice('Đang tải ảnh PNG 300 DPI...');
   };
 
+  const handleDownloadSvg = () => {
+    const ptMap = new Map<string, GspPoint>(points.map(p => [p.id, p]));
+    let minX = LOGICAL_WIDTH;
+    let minY = LOGICAL_HEIGHT;
+    let maxX = 0;
+    let maxY = 0;
+    let hasContent = false;
+
+    for (const p of points) {
+      if (p.hidden) continue;
+      hasContent = true;
+      const lx = p.x + (p.labelOffsetX ?? 9);
+      const ly = p.y + (p.labelOffsetY ?? -8);
+      minX = Math.min(minX, p.x - 12, lx - 6);
+      maxX = Math.max(maxX, p.x + 12, lx + Math.max(20, (p.label?.length || 1) * 16));
+      minY = Math.min(minY, p.y - 12, ly - 24);
+      maxY = Math.max(maxY, p.y + 12, ly + 8);
+    }
+    for (const c of charts) {
+      hasContent = true;
+      minX = Math.min(minX, c.x);
+      maxX = Math.max(maxX, c.x + c.width);
+      minY = Math.min(minY, c.y);
+      maxY = Math.max(maxY, c.y + c.height);
+    }
+    for (const el of ellipses) {
+      if (el.hidden) continue;
+      const center = ptMap.get(el.centerId);
+      if (center) {
+        hasContent = true;
+        minX = Math.min(minX, center.x - el.rx - 4);
+        maxX = Math.max(maxX, center.x + el.rx + 4);
+        minY = Math.min(minY, center.y - el.ry - 4);
+        maxY = Math.max(maxY, center.y + el.ry + 4);
+      }
+    }
+    for (const c of circles) {
+      if (c.hidden) continue;
+      const center = ptMap.get(c.centerId);
+      if (center) {
+        hasContent = true;
+        const r = c.radius || 50;
+        minX = Math.min(minX, center.x - r - 4);
+        maxX = Math.max(maxX, center.x + r + 4);
+        minY = Math.min(minY, center.y - r - 4);
+        maxY = Math.max(maxY, center.y + r + 4);
+      }
+    }
+
+    const vx = hasContent ? Math.max(0, Math.floor(minX - 12)) : 0;
+    const vy = hasContent ? Math.max(0, Math.floor(minY - 12)) : 0;
+    const vw = hasContent ? Math.min(LOGICAL_WIDTH - vx, Math.ceil(maxX - vx + 16)) : LOGICAL_WIDTH;
+    const vh = hasContent ? Math.min(LOGICAL_HEIGHT - vy, Math.ceil(maxY - vy + 16)) : LOGICAL_HEIGHT;
+
+    const escapeXml = (str: string) =>
+      str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const usedColors = Array.from(new Set<string>(segments.filter(s => !s.hidden && s.isVector).map(s => s.color || '#000000')));
+    const markersXml = usedColors.map(col => {
+      const id = `arrow-${col.replace('#', '')}`;
+      return `<marker id="${id}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="${col}" /></marker>`;
+    }).join('');
+
+    const segmentsXml = segments.filter(s => !s.hidden).map(s => {
+      const p1 = ptMap.get(s.p1Id);
+      const p2 = ptMap.get(s.p2Id);
+      if (!p1 || !p2) return '';
+      const col = s.color || '#000000';
+      const dash = s.style === 'dashed' ? ' stroke-dasharray="6,5"' : '';
+      const markerAttr = s.isVector ? ` marker-end="url(#arrow-${col.replace('#', '')})"` : '';
+      return `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${col}" stroke-width="${s.width || 1.6}"${dash}${markerAttr} />`;
+    }).join('');
+
+    const circlesXml = circles.filter(c => !c.hidden).map(c => {
+      const center = ptMap.get(c.centerId);
+      if (!center) return '';
+      let r = c.radius || 50;
+      if (c.radiusPointId) {
+        const rp = ptMap.get(c.radiusPointId);
+        if (rp) r = Math.hypot(rp.x - center.x, rp.y - center.y);
+      }
+      const dash = c.style === 'dashed' ? ' stroke-dasharray="5,4"' : '';
+      return `<circle cx="${center.x}" cy="${center.y}" r="${r.toFixed(1)}" fill="none" stroke="${c.color || '#000000'}" stroke-width="2"${dash} />`;
+    }).join('');
+
+    const ellipsesXml = ellipses.filter(el => !el.hidden).map(el => {
+      const center = ptMap.get(el.centerId);
+      if (!center) return '';
+      let rx = el.rx;
+      let ry = el.ry;
+      if (el.rxPointId) {
+        const rp = ptMap.get(el.rxPointId);
+        if (rp) {
+          rx = Math.hypot(rp.x - center.x, rp.y - center.y) || el.rx;
+          ry = Math.round(rx * ((el.ry && el.rx) ? el.ry / el.rx : 0.32));
+        }
+      }
+      const col = el.color || '#000000';
+      const w = el.width || 2;
+      if (el.style === 'half_dashed') {
+        const x1 = center.x - rx;
+        const x2 = center.x + rx;
+        return `<path d="M ${x1} ${center.y} A ${rx} ${ry} 0 0 1 ${x2} ${center.y}" fill="none" stroke="${col}" stroke-width="${w}" stroke-dasharray="5,4" /><path d="M ${x1} ${center.y} A ${rx} ${ry} 0 0 0 ${x2} ${center.y}" fill="none" stroke="${col}" stroke-width="${w}" />`;
+      }
+      const dash = el.style === 'dashed' ? ' stroke-dasharray="5,4"' : '';
+      return `<ellipse cx="${center.x}" cy="${center.y}" rx="${rx}" ry="${ry}" fill="none" stroke="${col}" stroke-width="${w}"${dash} />`;
+    }).join('');
+
+    const chartsBehindXml = charts.filter(c => c.config?.layer === 'behind_labels').map(c =>
+      `<image x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" href="data:image/svg+xml;utf8,${encodeURIComponent(c.svgString)}" />`
+    ).join('');
+
+    const chartsFrontXml = charts.filter(c => c.config?.layer !== 'behind_labels').map(c =>
+      `<image x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" href="data:image/svg+xml;utf8,${encodeURIComponent(c.svgString)}" />`
+    ).join('');
+
+    const pointsXml = points.filter(p => !p.hidden).map(p => {
+      const dotR = pointSize === 'tiny' ? 1.4 : pointSize === 'medium' ? 2.8 : 2.0;
+      const dot = (pointDisplayMode === 'all' && !p.hideDot)
+        ? `<circle cx="${p.x}" cy="${p.y}" r="${dotR}" fill="${p.color || '#000000'}" />`
+        : '';
+      const label = (pointDisplayMode !== 'hidden' && !p.hideLabel && p.label)
+        ? `<text x="${p.x + (p.labelOffsetX ?? 9)}" y="${p.y + (p.labelOffsetY ?? -8)}" font-family="&quot;Times New Roman&quot;, serif" font-size="21" font-weight="bold" font-style="italic" stroke="#FFFFFF" stroke-width="4" paint-order="stroke" fill="${p.color || '#000000'}">${escapeXml(p.label)}</text>`
+        : '';
+      return dot + label;
+    }).join('');
+
+    const textsXml = texts.filter(t => !t.hidden).map(t => {
+      const sz = t.fontSize || 16;
+      const fs = t.isItalic !== false ? 'italic' : 'normal';
+      const fw = t.isBold ? 'bold' : 'normal';
+      return `<text x="${t.x}" y="${t.y}" font-family="&quot;Times New Roman&quot;, serif" font-size="${sz}" font-style="${fs}" font-weight="${fw}" fill="${t.color || '#000000'}">${escapeXml(t.content)}</text>`;
+    }).join('');
+
+    const svgDoc = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}">
+  <defs>${markersXml}</defs>
+  <rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#FFFFFF" />
+  ${segmentsXml}
+  ${circlesXml}
+  ${ellipsesXml}
+  ${chartsBehindXml}
+  ${pointsXml}
+  ${textsXml}
+  ${chartsFrontXml}
+</svg>`;
+
+    const blob = new Blob([svgDoc], { type: 'image/svg+xml;charset=utf-8' });
+    const link = document.createElement('a');
+    link.download = `GSP_Hinh_Hoc_${Date.now()}.svg`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    showNotice('✅ Đã tải file vector SVG sắc nét!');
+  };
+
   const handleSaveJson = () => {
-    const data: GspState = { points, segments, circles, ellipses, rightAngles, texts };
+    const data: GspState = { points, segments, circles, ellipses, rightAngles, texts, charts, trigAngles };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.download = `Ban_ve_GSP_${Date.now()}.gsp.json`;
@@ -2625,6 +2893,8 @@ export default function GspSketchpad({
           setEllipses(parsed.ellipses || []);
           setRightAngles(parsed.rightAngles || []);
           setTexts(parsed.texts || []);
+          setCharts(parsed.charts || []);
+          setTrigAngles(parsed.trigAngles || []);
           showNotice('Đã nạp bản vẽ thành công.');
         }
       } catch (err) {
@@ -2650,6 +2920,11 @@ export default function GspSketchpad({
         handleCopyImage();
       } else if (type === 'download_png') {
         handleDownloadPng();
+      } else if (type === 'download_svg') {
+        handleDownloadSvg();
+      } else if (type === 'gsp_open_oxyz_modal') {
+        setOxyzModalTab(ce.detail.tab === 'stickers' ? 'stickers' : 'oxyz');
+        setShowOxyzModal(true);
       } else if (type === 'gsp_select_tool') {
         const tool = ce.detail.tool;
         if (tool === 'clear') {
@@ -2705,6 +2980,9 @@ export default function GspSketchpad({
           'goc_luong_giac_duong': 'goc_luong_giac_duong',
           'goc_luong_giac_am': 'goc_luong_giac_am',
           'goc_luong_giac_xoan_oc': 'goc_luong_giac_xoan_oc',
+          'oxyz_balloons': 'oxyz_balloons',
+          'oxyz_standard': 'oxyz_standard',
+          'oxyz_radar': 'oxyz_radar',
         };
         const presetKey = sampleMap[sample] || sample;
         loadPreset(presetKey);
@@ -3369,6 +3647,45 @@ export default function GspSketchpad({
       ctx.restore();
     }
 
+    // Helper vẽ biểu đồ / sticker SVG
+    const drawChartItems = (items: GspChartItem[]) => {
+      for (const c of items) {
+        const img = chartImagesRef.current.get(c.id);
+        if (img && img.complete) {
+          ctx.drawImage(img, c.x, c.y, c.width, c.height);
+        } else {
+          ctx.save();
+          ctx.strokeStyle = '#94a3b8';
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(c.x, c.y, c.width, c.height);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '11px sans-serif';
+          ctx.fillText('Đang nạp hình...', c.x + 6, c.y + 18);
+          ctx.restore();
+        }
+
+        if (isInteractive && (selectedChartId === c.id || hoveredChartId === c.id)) {
+          ctx.save();
+          ctx.strokeStyle = '#0284c7';
+          ctx.lineWidth = 1.6;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(c.x, c.y, c.width, c.height);
+
+          const hs = 8;
+          ctx.fillStyle = '#0284c7';
+          ctx.setLineDash([]);
+          ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs);
+          ctx.fillRect(c.x + c.width - hs / 2, c.y - hs / 2, hs, hs);
+          ctx.fillRect(c.x - hs / 2, c.y + c.height - hs / 2, hs, hs);
+          ctx.fillRect(c.x + c.width - hs / 2, c.y + c.height - hs / 2, hs, hs);
+          ctx.restore();
+        }
+      }
+    };
+
+    // 6.8. Vẽ các sticker minh họa lớp nền (trước nhãn chữ A, B để chữ luôn nổi rõ)
+    drawChartItems(charts.filter(c => c.config?.layer === 'behind_labels'));
+
     // 7. Ghi nhãn chữ tên đỉnh (Times New Roman in nghiêng, viền Halo trắng chống đè nét)
     if (pointDisplayMode !== 'hidden') {
       ctx.font = 'italic bold 21px "Times New Roman", serif';
@@ -3450,40 +3767,8 @@ export default function GspSketchpad({
       ctx.restore();
     }
 
-    // 9. Vẽ các biểu đồ thống kê đã chèn (kéo để dời, kéo góc để phóng to/thu nhỏ)
-    for (const c of charts) {
-      const img = chartImagesRef.current.get(c.id);
-      if (img && img.complete) {
-        ctx.drawImage(img, c.x, c.y, c.width, c.height);
-      } else {
-        ctx.save();
-        ctx.strokeStyle = '#94a3b8';
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(c.x, c.y, c.width, c.height);
-        ctx.fillStyle = '#64748b';
-        ctx.font = '12px sans-serif';
-        ctx.fillText('Đang nạp biểu đồ...', c.x + 10, c.y + 20);
-        ctx.restore();
-      }
-
-      if (isInteractive && (selectedChartId === c.id || hoveredChartId === c.id)) {
-        ctx.save();
-        ctx.strokeStyle = '#0284c7';
-        ctx.lineWidth = 1.6;
-        ctx.setLineDash([4, 3]);
-        ctx.strokeRect(c.x, c.y, c.width, c.height);
-
-        // Vẽ 4 góc điều chỉnh kích thước
-        const hs = 8;
-        ctx.fillStyle = '#0284c7';
-        ctx.setLineDash([]);
-        ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs);
-        ctx.fillRect(c.x + c.width - hs / 2, c.y - hs / 2, hs, hs);
-        ctx.fillRect(c.x - hs / 2, c.y + c.height - hs / 2, hs, hs);
-        ctx.fillRect(c.x + c.width - hs / 2, c.y + c.height - hs / 2, hs, hs);
-        ctx.restore();
-      }
-    }
+    // 9. Vẽ các biểu đồ thống kê / hình nổi đã chèn (kéo để dời, kéo góc để phóng to/thu nhỏ)
+    drawChartItems(charts.filter(c => c.config?.layer !== 'behind_labels'));
   };
 
   // Nạp hình ảnh biểu đồ vào cache Ref
@@ -4089,6 +4374,20 @@ export default function GspSketchpad({
             </span>
             <div className="grid grid-cols-1 gap-1 text-xs">
               <button
+                onClick={() => loadPreset('oxyz_balloons')}
+                className="p-1.5 rounded-lg text-left bg-pink-50 dark:bg-pink-950/40 hover:bg-pink-100 text-pink-800 dark:text-pink-200 font-bold transition cursor-pointer text-[11px] flex items-center justify-between"
+              >
+                <span>🎈 Oxyz: 2 Khinh khí cầu (A, B, E, F)</span>
+                <span className="text-[9px] bg-pink-200 dark:bg-pink-900 px-1 rounded">Thực tế</span>
+              </button>
+              <button
+                onClick={() => loadPreset('oxyz_standard')}
+                className="p-1.5 rounded-lg text-left bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 text-sky-800 dark:text-sky-200 font-bold transition cursor-pointer text-[11px] flex items-center justify-between"
+              >
+                <span>🧭 Hệ trục tọa độ Oxyz chuẩn</span>
+                <span className="text-[9px] bg-sky-200 dark:bg-sky-900 px-1 rounded">SGK 12</span>
+              </button>
+              <button
                 onClick={() => loadPreset('cone')}
                 className="p-1.5 rounded-lg text-left bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 text-teal-800 dark:text-teal-200 font-bold transition cursor-pointer text-[11px] flex items-center justify-between"
               >
@@ -4320,8 +4619,34 @@ export default function GspSketchpad({
               </button>
             </div>
 
-            {/* NÚT TÍNH NĂNG ĐẶC BIỆT (MÔ HÌNH 3D XOAY 360 ĐỘ) - CÁC NÚT XUẤT ẢNH WORD ĐÃ CHUYỂN LÊN RIBBON */}
+            {/* NÚT TÍNH NĂNG ĐẶC BIỆT (OXYZ, STICKER THỰC TẾ, MÔ HÌNH 3D XOAY 360 ĐỘ) */}
             <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setOxyzModalTab('oxyz');
+                  setShowOxyzModal(true);
+                }}
+                className="px-3 py-1.5 bg-[#0F6CBD] hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                title="Dựng nhanh Hệ trục tọa độ Oxyz, hình chiếu vuông góc và gắn hình minh họa thực tế"
+              >
+                <Compass size={14} />
+                <span>Hệ trục Oxyz</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOxyzModalTab('stickers');
+                  setShowOxyzModal(true);
+                }}
+                className="px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                title="Chèn hình minh họa thực tế (Khinh khí cầu, Máy bay, Radar, Tàu...) hoặc tạo SVG bằng AI"
+              >
+                <ImageIcon size={14} />
+                <span>Sticker / Ảnh</span>
+              </button>
+
               {/* NÚT MÔ HÌNH 3D TƯƠNG TÁC XOAY 360 ĐỘ (CÓ PHÂN LOẠI NÉT THẤY/KHUẤT) */}
               <button
                 onClick={() => setShow3DViewerModal(true)}
@@ -5640,6 +5965,15 @@ export default function GspSketchpad({
         ellipses={ellipses}
         presetType={currentPresetType}
         onOpenFull3DTab={onOpen3D}
+      />
+
+      {/* MODAL DỰNG HỆ TRỤC OXYZ & CHÈN STICKER THỰC TẾ */}
+      <OxyzBuilderModal
+        isOpen={showOxyzModal}
+        initialTab={oxyzModalTab}
+        onClose={() => setShowOxyzModal(false)}
+        onApplyOxyzScene={handleApplyOxyzScene}
+        onInsertSticker={handleInsertSticker}
       />
     </div>
   );
