@@ -146,10 +146,9 @@ async function startServer() {
 
   // Lazy initialization of Gemini client to prevent crashes if key is omitted on startup
   let aiClients: Record<string, GoogleGenAI> = {};
-  function getGeminiClient(clientKey?: string, modelName: string = 'gemini-3-flash-preview'): GoogleGenAI {
-    const safeModelName = typeof modelName === 'string' && modelName ? modelName : 'gemini-3-flash-preview';
-    const isV1Alpha = safeModelName.includes('3.0') || safeModelName.includes('3.5') || safeModelName.includes('3-');
-    const apiVersion = isV1Alpha ? 'v1alpha' : 'v1beta';
+  function getGeminiClient(clientKey?: string, modelName: string = 'gemini-3.8-flash'): GoogleGenAI {
+    const safeModelName = typeof modelName === 'string' && modelName ? modelName : 'gemini-3.8-flash';
+    const apiVersion = 'v1beta';
     const key = clientKey || process.env.GEMINI_API_KEY;
     if (!key) {
       throw new Error("GEMINI_API_KEY environment variable is required but missing on the server.");
@@ -164,10 +163,57 @@ async function startServer() {
   // Global cache để ghi nhớ model nào đang hoạt động tốt cho từng API Key (tránh việc loop lại các model đã lỗi gây tốn Quota 15 RPM)
   const workingModelCache: Record<string, string> = {};
 
-  // API endpoint proxy to call Gemini
+  const DEFAULT_SERVER_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash"
+  ];
+
+  function parseServerApiKeys(raw?: string): string[] {
+    const keys: string[] = [];
+    if (raw && typeof raw === "string") {
+      for (const part of raw.split(/[\r\n,;]+/)) {
+        const trimmed = part.trim();
+        if (trimmed.length >= 10) keys.push(trimmed);
+      }
+    }
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length >= 10) {
+      keys.push(process.env.GEMINI_API_KEY.trim());
+    }
+    return Array.from(new Set(keys));
+  }
+
+  async function discoverLiveGeminiModels(effectiveKey: string): Promise<string[]> {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(effectiveKey)}`);
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      const models: string[] = (data.models || [])
+        .filter((m: any) =>
+          Array.isArray(m.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes("generateContent") &&
+          typeof m.name === "string" &&
+          m.name.includes("gemini") &&
+          !/embedding|imagen|veo|tts|aqa|robotics|computer-use|audio|live/i.test(m.name)
+        )
+        .map((m: any) => m.name.replace(/^models\//, ""));
+      models.sort((a, b) => {
+        const aFlash = /flash/i.test(a) ? 0 : 1;
+        const bFlash = /flash/i.test(b) ? 0 : 1;
+        if (aFlash !== bFlash) return aFlash - bFlash;
+        return b.localeCompare(a, undefined, { numeric: true });
+      });
+      return models;
+    } catch {
+      return [];
+    }
+  }
+
+  // API endpoint proxy to call Gemini (hỗ trợ nhiều API Key xoay vòng & tự dò model)
   app.post("/api/gemini", async (req, res) => {
     try {
-      const { prompt, model = "gemini-3-flash-preview", apiKey, imageBase64, temperature, topP } = req.body;
+      const { prompt, model = "gemini-3.8-flash", apiKey, imageBase64, temperature, topP } = req.body;
       if (!prompt && !imageBase64) {
         return res.status(400).json({ error: "Vui lòng truyền dữ liệu đầu vào." });
       }
@@ -183,76 +229,72 @@ async function startServer() {
         ];
       }
 
-      const clientKeyToUse = apiKey || "default";
-      const cachedModel = workingModelCache[clientKeyToUse];
+      const keysToTry = parseServerApiKeys(apiKey);
+      if (keysToTry.length === 0) {
+        return res.status(400).json({ error: "Thiếu Google Gemini API Key. Vui lòng nhập ít nhất 1 Key." });
+      }
 
-      // Đưa model đã hoạt động thành công lên đầu danh sách để ưu tiên
-      const basePool = [
-        model, 
-        "gemini-2.5-flash", 
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-3-flash-preview",
-        "gemini-3.5-flash",
-        "gemini-3-pro-preview",
-        "gemini-1.5-pro"
-      ];
-      
-      const MODELS_POOL = Array.from(new Set(cachedModel ? [cachedModel, ...basePool] : basePool));
-      let allErrors: string[] = [];
+      const allErrors: string[] = [];
 
-      for (const modelName of MODELS_POOL) {
-        try {
-          const client = getGeminiClient(apiKey, modelName);
-          const response = await client.models.generateContent({
-            model: modelName,
-            contents: contents,
-            config: {
-              temperature: typeof temperature === 'number' ? temperature : 0.7,
-              topP: typeof topP === 'number' ? topP : undefined,
-              maxOutputTokens: 8192,
+      for (const currentKey of keysToTry) {
+        const cachedModel = workingModelCache[currentKey];
+        const basePool = [cachedModel, model, ...DEFAULT_SERVER_MODELS].filter(Boolean) as string[];
+        const MODELS_POOL = Array.from(new Set(basePool));
+
+        const tryPool = async (pool: string[]) => {
+          for (const modelName of pool) {
+            try {
+              const client = getGeminiClient(currentKey, modelName);
+              const response = await client.models.generateContent({
+                model: modelName,
+                contents: contents,
+                config: {
+                  temperature: typeof temperature === 'number' ? temperature : 0.7,
+                  topP: typeof topP === 'number' ? topP : undefined,
+                  maxOutputTokens: 8192,
+                }
+              });
+
+              if (response && response.text) {
+                let textValue = typeof (response as any).text === 'function' ? await (response as any).text() : response.text;
+                if (typeof prompt === 'string' && (prompt.includes('Markmap') || prompt.includes('Sơ đồ tư duy'))) {
+                  textValue = sanitizeMindmapCode(textValue);
+                }
+                workingModelCache[currentKey] = modelName;
+                const finishReason = response.candidates?.[0]?.finishReason || 'UNKNOWN';
+                const isFinished = finishReason !== 'MAX_TOKENS';
+                return { text: textValue, finishReason, isFinished };
+              } else {
+                allErrors.push(`[...${currentKey.slice(-4)}/${modelName}]: No response.text returned`);
+              }
+            } catch (err: any) {
+              const msg = err?.message || String(err);
+              console.warn(`Lỗi khi gọi model ${modelName} (key ...${currentKey.slice(-4)}):`, msg);
+              if (cachedModel === modelName && /404|not found|no longer available/i.test(msg)) {
+                delete workingModelCache[currentKey];
+              }
+              allErrors.push(`[...${currentKey.slice(-4)}/${modelName}]: ${msg}`);
+              if (/API_KEY_INVALID|key not valid/i.test(msg)) {
+                return null;
+              }
+              await new Promise(r => setTimeout(r, 400));
             }
-          });
-
-          if (response && response.text) {
-            // @google/genai v2.x returns .text as a string. If it's a function (old SDK), call it.
-            let textValue = typeof (response as any).text === 'function' ? await (response as any).text() : response.text;
-            if (typeof prompt === 'string' && (prompt.includes('Markmap') || prompt.includes('Sơ đồ tư duy'))) {
-              textValue = sanitizeMindmapCode(textValue);
-            }
-            
-            // Lưu lại model này vì nó đã chạy thành công
-            workingModelCache[clientKeyToUse] = modelName;
-
-            const finishReason = response.candidates?.[0]?.finishReason || 'UNKNOWN';
-            const isFinished = finishReason !== 'MAX_TOKENS';
-            return res.json({ text: textValue, finishReason, isFinished });
-          } else {
-             allErrors.push(`[${modelName}]: No response.text returned`);
           }
-        } catch (err: any) {
-          console.warn(`Lỗi khi gọi model ${modelName}:`, err.message || err);
-          allErrors.push(`[${modelName}]: ${err.message || err}`);
-          
-          // Nghỉ 1 giây trước khi thử model tiếp theo để lách luật chống Spam (Burst limit)
-          await new Promise(r => setTimeout(r, 1000));
+          return null;
+        };
+
+        const firstRes = await tryPool(MODELS_POOL);
+        if (firstRes) return res.json(firstRes);
+
+        const liveModels = await discoverLiveGeminiModels(currentKey);
+        const fallbackPool = liveModels.filter(m => !MODELS_POOL.includes(m)).slice(0, 5);
+        if (fallbackPool.length > 0) {
+          const discoveredRes = await tryPool(fallbackPool);
+          if (discoveredRes) return res.json(discoveredRes);
         }
       }
 
-      // NẾU TẤT CẢ MODEL ĐỀU THẤT BẠI: Gọi API listModels để xem API Key này có model nào
-      let debugAvailableModels = "";
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        if (response.ok) {
-          const data = await response.json();
-          const modelNames = data.models?.map((m: any) => m.name.replace('models/', '')).join(', ') || 'Không có model nào';
-          debugAvailableModels = ` (Các model khả dụng cho API Key của bạn: ${modelNames})`;
-        } else {
-          debugAvailableModels = ` (Không thể lấy danh sách model, HTTP ${response.status})`;
-        }
-      } catch (e) {}
-
-      throw new Error(`Tất cả các model đều lỗi. Chi tiết: ${allErrors.join(' | ')}${debugAvailableModels}`);
+      throw new Error(`Tất cả ${keysToTry.length} API Key & model đều lỗi. Chi tiết: ${allErrors.join(' | ')}`);
     } catch (error: any) {
       console.error("API Gemini Proxy Exception:", error);
       res.status(500).json({
