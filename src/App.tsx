@@ -59,6 +59,8 @@ const CombinedGeometryTab = lazy(() => import('./components/CombinedGeometryTab'
 const TrigAngleTool = lazy(() => import('./components/TrigAngleTool'));
 const StatisticsChartTool = lazy(() => import('./components/StatisticsChartTool'));
 const ProbabilityTreeTool = lazy(() => import('./components/ProbabilityTreeTool'));
+const Geogebra3DTool = lazy(() => import('./components/Geogebra3DTool'));
+const SimulationGenerator = lazy(() => import('./components/SimulationGenerator'));
 const UserGuide = lazy(() => import('./components/UserGuide'));
 
 export type TabId = 'home' | 'bbt_graph' | 'bbt' | 'geometry' | 'trig_angle' | 'statistics' | 'probability_tree' | 'geogebra' | 'simulation' | 'guide' | 'gsp' | 'quick3d';
@@ -72,6 +74,7 @@ export default function App() {
 
   // 2. Trạng thái các tab con bên trong các phân hệ chuyên sâu
   const [statsSubTool, setStatsSubTool] = useState<'statistics' | 'tree'>('statistics');
+  const [space3dSubTool, setSpace3dSubTool] = useState<'geogebra' | 'simulation'>('geogebra');
 
   // 3. Trạng thái tài liệu Artboard Document
   const [doc, setDoc] = useState<ArtboardDocument>(() => {
@@ -436,6 +439,8 @@ export default function App() {
             gspActiveTool={gspActiveTool}
             statsTool={statsSubTool}
             onSetStatsTool={setStatsSubTool}
+            space3dTool={space3dSubTool}
+            onSetSpace3dTool={setSpace3dSubTool}
           />
         )}
       </div>
@@ -488,6 +493,23 @@ export default function App() {
                     <StatisticsChartTool />
                   ) : (
                     <ProbabilityTreeTool />
+                  )}
+                </div>
+              )}
+
+              {/* 3.6 TAB KHÔNG GIAN 3D & OXYZ */}
+              {visitedTabs.has('space_3d') && (
+                <div className={activeTab === 'space_3d' ? 'block animate-fade-in' : 'hidden'}>
+                  {space3dSubTool === 'geogebra' ? (
+                    <Geogebra3DTool
+                      apiKey={localStorage.getItem('gemini_api_key') || ''}
+                      model={localStorage.getItem('gemini_model') || 'gemini-2.5-flash'}
+                    />
+                  ) : (
+                    <SimulationGenerator
+                      apiKey={localStorage.getItem('gemini_api_key') || ''}
+                      model={localStorage.getItem('gemini_model') || 'gemini-2.5-flash'}
+                    />
                   )}
                 </div>
               )}

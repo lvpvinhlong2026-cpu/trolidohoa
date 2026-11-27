@@ -83,6 +83,8 @@ export interface RibbonCommandPanelProps {
   gspActiveTool?: string;
   statsTool?: 'statistics' | 'tree';
   onSetStatsTool?: (tool: 'statistics' | 'tree') => void;
+  space3dTool?: 'geogebra' | 'simulation';
+  onSetSpace3dTool?: (tool: 'geogebra' | 'simulation') => void;
 }
 
 // Nhóm xuất Word chung tiện dụng cho mọi tab
@@ -281,6 +283,8 @@ export default function RibbonCommandPanel({
   gspActiveTool = 'select',
   statsTool = 'statistics',
   onSetStatsTool,
+  space3dTool = 'geogebra',
+  onSetSpace3dTool,
 }: RibbonCommandPanelProps) {
 
   // Update Typography
@@ -1158,6 +1162,56 @@ export default function RibbonCommandPanel({
           />
 
           {/* Nhóm 4 – Xuất sang Word */}
+          <ExportGroup
+            onCopyWord={onCopyWord}
+            onDownloadPng={onDownloadPng}
+            onDownloadSvg={onDownloadSvg}
+          />
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 6: KHÔNG GIAN 3D & OXYZ (GEOGEBRA 3D AI & MÔ PHỎNG TƯƠNG TÁC)
+          ========================================================================= */}
+      {activeTab === 'space_3d' && (
+        <div className="flex items-stretch gap-2 shrink-0 h-[84px] w-full">
+          <div className="flex flex-col justify-between px-2 border-r border-[#E1DFDD] dark:border-slate-800">
+            <div className="flex items-center gap-1.5 flex-1">
+              <button
+                type="button"
+                onClick={() => onSetSpace3dTool?.('geogebra')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  space3dTool === 'geogebra'
+                    ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold'
+                    : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+                title="GeoGebra 3D AI & Khối tròn xoay"
+              >
+                <Box size={20} className="mb-1 text-teal-600" />
+                <span className="text-[11px] leading-tight">GeoGebra 3D AI</span>
+                <span className="text-[9px] text-[#605E5C]">Dựng hình Oxyz</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSetSpace3dTool?.('simulation')}
+                className={`h-[64px] px-3 flex flex-col items-center justify-center rounded-[4px] border transition cursor-pointer text-center ${
+                  space3dTool === 'simulation'
+                    ? 'bg-[#EFF6FC] text-[#0F6CBD] border-[#0F6CBD] font-bold'
+                    : 'border-transparent hover:bg-[#EDEBE9] text-[#242424]'
+                }`}
+                title="Mô phỏng tương tác HTML5 Canvas & p5.js"
+              >
+                <MonitorPlay size={20} className="mb-1 text-[#0F6CBD]" />
+                <span className="text-[11px] leading-tight">Mô phỏng Tương tác</span>
+                <span className="text-[9px] text-[#605E5C]">HTML5 / p5.js</span>
+              </button>
+            </div>
+            <div className="text-[11px] font-normal text-[#605E5C] text-center pb-0.5 mt-auto select-none">
+              Công cụ 3D & Mô phỏng
+            </div>
+          </div>
+
           <ExportGroup
             onCopyWord={onCopyWord}
             onDownloadPng={onDownloadPng}

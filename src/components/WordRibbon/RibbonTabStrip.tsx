@@ -33,6 +33,7 @@ const TABS: { id: RibbonTabId; label: string }[] = [
   { id: 'plane_trig', label: 'Hình học phẳng' },
   { id: 'trig_angle', label: 'Góc lượng giác' },
   { id: 'stats_prob', label: 'Thống kê & Xác suất' },
+  { id: 'space_3d', label: 'Không Gian 3D & Oxyz' },
 ];
 
 export default function RibbonTabStrip({

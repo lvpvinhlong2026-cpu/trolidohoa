@@ -11,6 +11,7 @@ export type RibbonTabId =
   | 'plane_trig'
   | 'trig_angle'
   | 'stats_prob'
+  | 'space_3d'
   | 'format'; // Contextual Tab
 
 export type GraphicCategory =
